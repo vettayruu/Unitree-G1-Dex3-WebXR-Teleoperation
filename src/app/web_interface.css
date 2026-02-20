@@ -1,0 +1,114 @@
+.right-arm{
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 250px;
+    background-color:rgba(192,192,192,0.2);
+    padding: 10px;
+    display: grid;
+    button {
+        margin: 5px;
+    }
+}
+
+.left-arm{
+    position: fixed;
+    top: 450px;
+    right: 10px;
+    width: 250px;
+    background-color:rgba(192,192,192,0.2);
+    padding: 10px;
+    display: grid;
+    button {
+        margin: 5px;
+    }
+}
+
+.cam-arm{
+    position: fixed;
+    top: 10px;
+    right: 270px;
+    width: 250px;
+    background-color:rgba(192,192,192,0.2);
+    padding: 10px;
+    display: grid;
+    button {
+        margin: 5px;
+    }
+}
+
+.view-cam{
+    position: fixed;
+    top: 175px;
+    left: 10px;
+    width: 240px;
+    background-color:rgba(192,192,192,0.2);
+    padding: 10px;
+    display: grid;
+    button {
+        margin: 5px;
+    }
+}
+
+.view-cam > span,
+.right-arm > span,
+.left-arm > span,
+.cam-arm > span {
+  display: block;
+  margin-bottom: 10px; 
+  font-weight: bold;
+  font-size: 1.1em;
+  text-align: center;
+}
+
+.user-uuid {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 5px;
+  font-family: monospace;
+  font-size: 12px;
+  z-index: 10000;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.user-uuid:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.user-uuid span {
+  font-weight: bold;
+  color: #00ff00;
+  user-select: all;
+}
+
+.webrtc-channel {
+  position: fixed;
+  top: 45px; 
+  left: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 5px;
+  font-family: monospace;
+  font-size: 12px;
+  z-index: 10000;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.webrtc-channel:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.webrtc-channel span {
+  font-weight: bold;
+  color: #00ffff;
+  user-select: all;
+}
