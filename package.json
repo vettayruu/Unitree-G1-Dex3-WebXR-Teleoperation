@@ -1,0 +1,28 @@
+{
+  "name": "Unitree-G1-control-LIU",
+  "version": "0.1.1",
+  "private": true,
+  "customInfo": {
+    "robotid": "Unitree-G1-control-LIU",
+    "developer": "uclab-liust",
+    "description": "Web-based VR Teleoperation System for Unitree G1 Robot"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "dev-https": "next dev --experimental-https",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "aframe": "^1.7.1",
+    "bootstrap": "^5.3.3",
+    "mqtt": "^5.15.0",
+    "next": "^16.1.6",
+    "numeric": "^1.2.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "sora-js-sdk": "^2025.1.0",
+    "three": "^0.183.1"
+  }
+}
