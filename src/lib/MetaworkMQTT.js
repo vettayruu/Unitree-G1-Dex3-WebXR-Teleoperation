@@ -1,19 +1,21 @@
 "use client";
 import mqtt from 'mqtt'
 import package_info from '../../package.json' // load version
-
-console.log("Package_Info",package_info.name, package_info.version);
-export const codeType = package_info.name; // software name
-const version = package_info.version; // version number
-
-// const MQTT_BROKER_URL = "wss://sora2.uclab.jp/mqws"; // For Nagoya-U UCLab Development
-const MQTT_BROKER_URL = "wss://192.168.197.49:8333"; // For Local Development, change to your broker address
-
 import {userUUID} from './cookie_id';
+
+export const codeType = package_info.name; // software name
+export const version = package_info.version; // version number
+export const robotid = package_info.customInfo.robotid; // request robot id, currently same as codeType, but can be different in the future
+console.log("Code Type:", codeType);
+console.log("Version:", version);
+console.log("Request Robot ID:", robotid);
 
 // global private variable
 export var mqttclient = null;
 export var idtopic = userUUID;
+
+// const MQTT_BROKER_URL = "wss://sora2.uclab.jp/mqws"; // For Nagoya-U UCLab Development
+const MQTT_BROKER_URL = "wss://192.168.197.36:8333"; // For Local Development, change to your broker address
 
 export const connectMQTT = (callback) => {
     if (mqttclient == null) {
