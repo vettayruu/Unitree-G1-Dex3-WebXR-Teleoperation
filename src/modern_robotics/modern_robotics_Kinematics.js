@@ -210,15 +210,16 @@ RobotKinematics.register_robot("unitree_g1_arm_right_body", function build_unitr
     const jointLimits = [
     { min: deg2rad(-120), max: deg2rad(120) },   // theta_0, wrist
     { min: deg2rad(-150), max: deg2rad(60) },   // theta_1
-    { min: deg2rad(-93), max: deg2rad(3) },   // theta_2
+    { min: deg2rad(-100), max: deg2rad(5) },   // theta_2
     { min: deg2rad(-90), max: deg2rad(90) },   // theta_3 defalt: { min: deg2rad(-150), max: deg2rad(150) }
-    { min: deg2rad(-60), max: deg2rad(85) },   // theta_4
+    { min: deg2rad(-60), max: deg2rad(90) },   // theta_4
     { min: deg2rad(-113), max: deg2rad(113) },   // theta_5
     { min: deg2rad(-92.5), max: deg2rad(92.5) },   // theta_6
     { min: deg2rad(-92.5), max: deg2rad(92.5) },   // theta_7
     ];
 
-    const jointInitial = deg2rad([0, 0, 0, 0, 0, 0, 0, 0]);
+    // const jointInitial = deg2rad([0, 0, 0, 0, 0, 0, 0, 0]);
+    const jointInitial = [0, -0.025, -0.25, 0.23, 0.022, 0.25, -0.055, -0.225];
 
     // const M = [
     //     [1, 0, 0, 0.19978+0.12],
@@ -266,15 +267,18 @@ RobotKinematics.register_robot("unitree_g1_arm_left_body", function build_unitre
     const jointLimits = [
     { min: deg2rad(-120), max: deg2rad(120) },   // theta_0, wrist
     { min: deg2rad(-150), max: deg2rad(60) },   // theta_1
-    { min: deg2rad(-3), max: deg2rad(93) },   // theta_2
+    { min: deg2rad(-5), max: deg2rad(100) },   // theta_2
     { min: deg2rad(-90), max: deg2rad(90) },   // theta_3
-    { min: deg2rad(-60), max: deg2rad(85) },   // theta_4
+    { min: deg2rad(-60), max: deg2rad(90) },   // theta_4
     { min: deg2rad(-113), max: deg2rad(113) },   // theta_5
     { min: deg2rad(-92.5), max: deg2rad(92.5) },   // theta_6
     { min: deg2rad(-92.5), max: deg2rad(92.5) },   // theta_7
     ];
 
-    const jointInitial = deg2rad([0, 0, 0, 0, 0, 0, 0, 0]);
+    // const jointInitial = deg2rad([0, 0, 0, 0, 0, 0, 0, 0]);
+
+    const jointInitial = [0, -0.025, 0.25, -0.23, 0.022, -0.25, -0.055, 0.225];
+    // [0, -0.024563147987939713, 0.25127309482299626, -0.23209768998129876, 0.02179546260306924, -0.2503966555932314, -0.05533942513782316, 0.22617949527328127]
 
     // const M = [
     //     [1, 0, 0, 0.19978+0.12],
@@ -308,6 +312,7 @@ RobotKinematics.register_robot("unitree_g1_arm_left_body", function build_unitre
     return { M, Slist: SlistT, jointLimits, jointInitial };
 });
 
+
 RobotKinematics.register_robot("unitree_g1_waist", function build_unitree_g1_waist() {
     const P0 = [0, 0, 0]
     const P1 = [-0.00396, 0.0, 0.044]
@@ -323,8 +328,8 @@ RobotKinematics.register_robot("unitree_g1_waist", function build_unitree_g1_wai
 
     const M = [
         [1, 0, 0, -0.00396],
-        [0, 0, 1, 0],
-        [0, -1, 0, 0.044],
+        [0, 1, 0, 0],
+        [0, 0, 1, 0.044],
         [0, 0, 0, 1]
     ];
 
@@ -340,6 +345,7 @@ RobotKinematics.register_robot("unitree_g1_waist", function build_unitree_g1_wai
 
     return { M, Slist: SlistT, jointLimits, jointInitial };
 });
+
 
 RobotKinematics.register_robot("unitree_g1_hand_index_middle", function build_unitree_g1_hand_index_middle() {
     const P0 = [0, 0, 0]

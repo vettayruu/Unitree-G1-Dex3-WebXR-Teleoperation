@@ -71,7 +71,7 @@ class HandKinematics {
 }
 
 HandKinematics.register_hand("right", () => {
-    const M_thumb = [[0, 0, 1, 0.033], [0, 1, 0, -0.0025], [-1, 0, 0, 0.0193], [0, 0, 0, 1]];
+    const M_middle = [[0, 0, 1, 0.033], [0, 1, 0, -0.0025], [-1, 0, 0, 0.0193], [0, 0, 0, 1]];
     const Slist_thumb = [[0, 0, 1, 0], [0, 1, 0, -0.0255], [-1, 0, 0, -0.0193]];
     const Limit_thumb = [[-30 * Math.PI / 180, 30 * Math.PI / 180], [-17 * Math.PI / 180, 17 * Math.PI / 180], [-42 * Math.PI / 180, 42 * Math.PI / 180]];
     const Initial_thumb = [0, 0, 0];

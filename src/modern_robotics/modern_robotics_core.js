@@ -1,6 +1,5 @@
 const numeric = require('numeric'); 
-const ml = require('ml-matrix');
-// import { Matrix, SVD } from 'ml-matrix';
+// const ml = require('ml-matrix'); 
 
 // *** BASIC HELPER FUNCTIONS ***
 
@@ -31,191 +30,16 @@ function NearZero(z) {
     Output:
         [0, 0, 0]
  */
-function Normalize(V) {
-    const norm = Math.sqrt(V.reduce((sum, v) => sum + v * v, 0));
-    if (NearZero(norm)) return V.map(() => 0); 
-    return V.map(v => v / norm);
-}
-
-
-/**
- * Computes the Euclidean norm of a vector
- * @param {Array<number>} v A vector
- * @returns {number} The Euclidean norm of v
- * Example Input:
- *   v = [1, 2, 3]
- * Output:
- *   3.7416573867739413
- */
-// function Norm(v) {
-//     // Computes the Euclidean norm of a vector
-//     return Math.sqrt(v.reduce((sum, val) => sum + val * val, 0));
+// function Normalize(V) {
+//     const norm = Math.sqrt(V.reduce((sum, v) => sum + v * v, 0));
+//     if (NearZero(norm)) return V.map(() => 0); 
+//     return V.map(v => v / norm);
 // }
 
-function Norm(v) {
-    const n = v.length;
-    
-    // 针对 3 维向量的特殊优化（最常见场景：旋转向量、位置向量）
-    if (n === 3) {
-        return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-    }
-    
-    // 针对 6 维向量（常用场景：空间速度 Vs）
-    if (n === 6) {
-        return Math.sqrt(
-            v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + 
-            v[3] * v[3] + v[4] * v[4] + v[5] * v[5]
-        );
-    }
-
-    // 通用情况使用原生 for 循环，性能优于 reduce
-    let sum = 0;
-    for (let i = 0; i < n; i++) {
-        sum += v[i] * v[i];
-    }
-    return Math.sqrt(sum);
-}
-
-/**
- * Creates an n x n identity matrix
- * @param {number} n The size of the identity matrix
- * @returns {Array<Array<number>>} An n x n identity matrix
- * Example Input:
- *   n = 3
- * Output:
- *   [
- *     [1, 0, 0],
- *     [0, 1, 0],
- *     [0, 0, 1]
- *   ]
- */
-function Eye(n) {
-    // Returns an n x n identity matrix
-    return Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));
-}
-
-/**
- * Computes the dot product of two matrices A and B
- * @description Computes the matrix product of A and B, where A is m x n and B is n x p
- * @param {Array<Array<number>>} A
- * @param {Array<Array<number>>} B
- * @returns {Array<Array<number>>}
- * @example
- *   A = [
- *     [1, 2],
- *     [3, 4]
- *   ];
- *   B = [
- *     [5, 6],
- *     [7, 8]
- *   ];
- *   Dot(A, B) => [
- *     [19, 22],
- *     [43, 50]
- *   ];
- */
-function matDot(A, B) {
-    if (Array.isArray(B[0]) === false) {
-        B = B.map(x => [x]);
-        const matRes = matDot(A, B);
-        return matRes.map(row => row[0]);
-    }
-    const m = A.length;
-    const n = A[0].length;
-    const p = B[0].length;
-    let result = Array.from({ length: m }, () => Array(p).fill(0));
-    for (let i = 0; i < m; i++) {
-        for (let j = 0; j < p; j++) {
-            for (let k = 0; k < n; k++) {
-                result[i][j] += A[i][k] * B[k][j];
-            }
-        }
-    }
-    return result;
-}
-
-function vecMatDot(vec, mat) {
-  const result = [];
-  for (let j = 0; j < mat[0].length; ++j) {
-    let sum = 0;
-    for (let i = 0; i < vec.length; ++i) {
-      sum += vec[i] * mat[i][j];
-    }
-    result.push(sum);
-  }
-  return result;
-}
-
-/**
- * @description Adds two matrices A and B element-wise
- * @param {Array<Array<number>>} A
- * @param {Array<Array<number>>} B
- * @returns {Array<Array<number>>} A+B
- * @example
- *   A = [
- *     [1, 2],
- *     [3, 4]
- *   ];
- *   B = [
- *     [5, 6],
- *     [7, 8]
- *   ];
- *   matAdd(A, B) => [
- *     [6, 8],
- *     [10, 12]
- *   ];
- */
-function matAdd(A, B) {
-    const m = A.length;
-    const n = A[0].length;
-    let result = [];
-    for (let i = 0; i < m; i++) {
-        result[i] = [];
-        for (let j = 0; j < n; j++) {
-            result[i][j] = A[i][j] + B[i][j];
-        }
-    }
-    return result;
-}
-
-/**
- * @description Adds multiple matrices element-wise
- * @param  {...Array<Array<number>>} matrices 
- * @returns {Array<Array<number>>} 
- * @example
- *   matAddN(
- *     [
- *       [1, 2],
- *       [3, 4]
- *     ],
- *     [
- *       [5, 6],
- *       [7, 8]
- *     ],
- *     [
- *       [9, 10],
- *       [11, 12]
- *     ]
- *   ) => [
- *     [15, 18],
- *     [21, 24]
- *   ];
- */
-function matAddN(...matrices) {
-    if (matrices.length === 0) return [];
-    const m = matrices[0].length;
-    const n = matrices[0][0].length;
-    let result = Array.from({ length: m }, (_, i) =>
-        Array.from({ length: n }, (_, j) => 0)
-    );
-    for (const mat of matrices) {
-        for (let i = 0; i < m; i++) {
-            for (let j = 0; j < n; j++) {
-                result[i][j] += mat[i][j];
-            }
-        }
-    }
-    return result;
+function Normalize(V) {
+    const norm = numeric.norm2(V); // ✅ 使用 numeric 内置的 L2 范数
+    if (NearZero(norm)) return numeric.rep([V.length], 0); // ✅ 返回零向量
+    return numeric.div(V, norm); // ✅ 向量除以标量
 }
 
 /* This was the original version that computed the pseudo-inverse incorrectly. It can not sovle the 6x7 matrix case correctly */
@@ -240,46 +64,46 @@ function matAddN(...matrices) {
 // }
 
 /* Fixed version: it can solve the 6x7 matrix case correctly */
-// function matPinv(A) {
-//     // A: 6×7
-//     const AT = numeric.transpose(A); // 7×6
-//     const svd = numeric.svd(AT);    // SVD on 7×6
-//     // const svd = new ml.SVD(AT); // Using ml-matrix for better stability
-//     const U = svd.U;
-//     const S = svd.S;
-//     const V = svd.V;
-//     const tol = 1e-3;
-//     // S+ 
-//     const S_inv = S.map(s => (Math.abs(s) > tol ? 1 / s : 0));
-//     let Splus = numeric.rep([V[0].length, U[0].length], 0);
-//     for (let i = 0; i < S_inv.length; i++) {
-//         Splus[i][i] = S_inv[i];
-//     }
-//     // Pseudo-inverse: V * S+ * U^T, then transpose back
-//     const pinvT = numeric.dot(numeric.dot(V, Splus), numeric.transpose(U));
-//     return numeric.transpose(pinvT); // Return 7×6 → 6×7
-// }
-
 function matPinv(A) {
-  // A: 2D array
-  const mat = new ml.Matrix(A);
-  const svd = new ml.SVD(mat);
-
-  const U = svd.leftSingularVectors;
-  const S = svd.diagonal;
-  const V = svd.rightSingularVectors;
-
-  const tol = 1e-2;
-  // S+ (伪逆对角阵)
-  const S_inv = S.map(s => (Math.abs(s) > tol ? 1 / s : 0));
-  const Splus = ml.Matrix.zeros(V.columns, U.columns);
-  for (let i = 0; i < S_inv.length; i++) {
-    Splus.set(i, i, S_inv[i]);
-  }
-  // V * S+ * U^T
-  const pinv = V.mmul(Splus).mmul(U.transpose());
-  return pinv.to2DArray();
+    // A: 6×7
+    const AT = numeric.transpose(A); // 7×6
+    const svd = numeric.svd(AT);    // SVD on 7×6
+    // const svd = new ml.SVD(AT); // Using ml-matrix for better stability
+    const U = svd.U;
+    const S = svd.S;
+    const V = svd.V;
+    const tol = 1e-3;
+    // S+ 
+    const S_inv = S.map(s => (Math.abs(s) > tol ? 1 / s : 0));
+    let Splus = numeric.rep([V[0].length, U[0].length], 0);
+    for (let i = 0; i < S_inv.length; i++) {
+        Splus[i][i] = S_inv[i];
+    }
+    // Pseudo-inverse: V * S+ * U^T, then transpose back
+    const pinvT = numeric.dot(numeric.dot(V, Splus), numeric.transpose(U));
+    return numeric.transpose(pinvT); // Return 7×6 → 6×7
 }
+
+// function matPinv(A) {
+//   // A: 2D array
+//   const mat = new ml.Matrix(A);
+//   const svd = new ml.SVD(mat);
+
+//   const U = svd.leftSingularVectors;
+//   const S = svd.diagonal;
+//   const V = svd.rightSingularVectors;
+
+//   const tol = 1e-2;
+//   // S+ (伪逆对角阵)
+//   const S_inv = S.map(s => (Math.abs(s) > tol ? 1 / s : 0));
+//   const Splus = ml.Matrix.zeros(V.columns, U.columns);
+//   for (let i = 0; i < S_inv.length; i++) {
+//     Splus.set(i, i, S_inv[i]);
+//   }
+//   // V * S+ * U^T
+//   const pinv = V.mmul(Splus).mmul(U.transpose());
+//   return pinv.to2DArray();
+// }
 
 function deg2rad(deg) {
     if (Array.isArray(deg)) {
@@ -293,42 +117,6 @@ function rad2deg(rad) {
         return rad.map(r => rad2deg(r));
     }
     return rad * (180 / Math.PI);
-}
-
-function worlr2three(v) {
-    const R_three = [
-        [0, -1, 0],
-        [0,  0, 1],
-        [-1, 0, 0]
-    ]
-    return matDot(R_three, v);
-}
-
-function three2world(v) {
-    const R_three_inv = [
-        [0, 0, -1],
-        [-1, 0, 0],
-        [0, 1, 0]
-    ];
-    return matDot(R_three_inv, v);
-}
-
-function worlr2threeT(T) {
-    const T_three = [[0, -1, 0, 0],
-                     [0,  0, 1, 0],
-                     [-1, 0, 0, 0],
-                     [0,  0, 0, 1]];
-    return matDot(T_three, T);
-}
-
-function three2worldT(T) {  
-    const T_three_inv = [
-        [0, 0, -1, 0],
-        [-1, 0, 0, 0],
-        [0, 1, 0, 0],
-        [0, 0, 0, 1]
-    ];
-    return matDot(T_three_inv, T);
 }
 
 /**
@@ -489,13 +277,13 @@ function EulerToRotMat(euler, order = "ZYX") {
 
     if (order === "ZYX") {
         // [yaw(Z), pitch(Y), roll(X)]
-        return matDot(matDot(Rz(alpha), Ry(beta)), Rx(gamma));
+        return numeric.dot(numeric.dot(Rz(alpha), Ry(beta)), Rx(gamma));
     } else if (order === "XYZ") {
         // [roll(X), pitch(Y), yaw(Z)]
-        return matDot(matDot(Rx(alpha), Ry(beta)), Rz(gamma));
+        return numeric.dot(numeric.dot(Rx(alpha), Ry(beta)), Rz(gamma));
     } else if (order === "ZYZ") {
         // [roll(X), pitch(Y), yaw(Z)]
-        return matDot(matDot(Rz(alpha), Ry(beta)), Rz(gamma));
+        return numeric.dot(numeric.dot(Rz(alpha), Ry(beta)), Rz(gamma));
     } 
     else {
         throw new Error("Unsupported Euler order: " + order);
@@ -591,7 +379,7 @@ function so3ToVec(so3mat) {
  *   ([0.26726124, 0.53452248, 0.80178373], 3.7416573867739413)
  */
 function AxisAng3(expc3) {
-    const norm = Norm(expc3);
+    const norm = numeric.norm2(expc3);
     if (NearZero(norm)) {
         // If norm is near zero, return zero vector and zero angle
         return [Normalize(expc3), 0];
@@ -622,22 +410,22 @@ function AxisAng3(expc3) {
  */
 function MatrixExp3(so3mat) {
     const omgtheta = so3ToVec(so3mat);
-    const norm = Norm(omgtheta)
+    const norm = numeric.norm2(omgtheta)
     if (NearZero(norm)) {
         // return the identity matrix if the norm is near zero
-        return Eye(3);
+        return numeric.identity(3);
     } else {
         const theta = norm;
         const omgmat = so3mat.map(row => row.map(val => val / theta));
         // compute omgmat^2
-        const omgmat2 = matDot(omgmat, omgmat);
+        const omgmat2 = numeric.dot(omgmat, omgmat);
         // compute R = I + sin(theta)*omgmat + (1-cos(theta))*omgmat^2
-        const I = Eye(3);
+        const I = numeric.identity(3);
         const sinTerm = omgmat.map(row => row.map(val => Math.sin(theta) * val));
         const cosTerm = omgmat2.map(row => row.map(val => (1 - Math.cos(theta)) * val));
         // R = I + sinTerm + cosTerm
         let R = [];
-        R = matAddN(I, sinTerm, cosTerm);
+        R = numeric.add(numeric.add(I, sinTerm), cosTerm);
         // return the resulting rotation matrix
         return R;
     }
@@ -846,24 +634,6 @@ function TransToRp(T) {
  *     [0,  0, 0,  1]
  *   ]
  */
-// function TransInv(T) {
-//     const [R, p] = TransToRp(T);
-//     // RotInv returns the inverse of a rotation matrix, which is its transpose
-//     const Rt = RotInv(R);
-//     // -Rt * p
-//     const minus_Rt_p = [
-//         -(Rt[0][0] * p[0] + Rt[0][1] * p[1] + Rt[0][2] * p[2]),
-//         -(Rt[1][0] * p[0] + Rt[1][1] * p[1] + Rt[1][2] * p[2]),
-//         -(Rt[2][0] * p[0] + Rt[2][1] * p[1] + Rt[2][2] * p[2])
-//     ];
-//     return [
-//         [Rt[0][0], Rt[0][1], Rt[0][2], minus_Rt_p[0]],
-//         [Rt[1][0], Rt[1][1], Rt[1][2], minus_Rt_p[1]],
-//         [Rt[2][0], Rt[2][1], Rt[2][2], minus_Rt_p[2]],
-//         [0, 0, 0, 1]
-//     ];
-// }
-
 function TransInv(T) {
     const r11 = T[0][0], r12 = T[0][1], r13 = T[0][2], px = T[0][3];
     const r21 = T[1][0], r22 = T[1][1], r23 = T[1][2], py = T[1][3];
@@ -954,34 +724,6 @@ function se3ToVec(se3mat) {
  *     [0, 0,  0, 0, 1,  0]
  *   ]
  */
-// function Adjoint(T) {
-//     const [R, p] = TransToRp(T);
-//     const zero3 = [
-//         [0, 0, 0],
-//         [0, 0, 0],
-//         [0, 0, 0]
-//     ];
-//     const p_hat = VecToso3(p);
-//     const p_hat_R = matDot(p_hat, R);
-
-//     // 构造6x6矩阵
-//     let AdT = Array.from({ length: 6 }, () => Array(6).fill(0));
-//     // 左上R
-//     for (let i = 0; i < 3; i++)
-//         for (let j = 0; j < 3; j++)
-//             AdT[i][j] = R[i][j];
-//     // 右上0
-//     // 左下p_hat*R
-//     for (let i = 0; i < 3; i++)
-//         for (let j = 0; j < 3; j++)
-//             AdT[i + 3][j] = p_hat_R[i][j];
-//     // 右下R
-//     for (let i = 0; i < 3; i++)
-//         for (let j = 0; j < 3; j++)
-//             AdT[i + 3][j + 3] = R[i][j];
-//     return AdT;
-// }
-
 function Adjoint(T) {
     // 假设 T 是 4x4 嵌套数组或平铺数组
     // 直接提取 R 和 p，减少函数调用开销
@@ -1041,15 +783,15 @@ function ScrewToAxis(q, s, h) {
  */
 function AxisAng6(expc6) {
     // Normalize the first three elements to get the screw axis
-    const norm = Norm(expc6.slice(0, 3));
+    const norm = numeric.norm2(expc6.slice(0, 3));
     if (NearZero(norm)) {
         // If the first three elements are near zero, normalize the last three
-        return [Norm(expc6.slice(3, 6)), 0];
+        return [numeric.norm2(expc6.slice(3, 6)), 0];
     }
     // Normalize the first three elements to get the screw axis
-    const S = Norm(expc6.slice(0, 3));
+    const S = numeric.norm2(expc6.slice(0, 3));
     // Compute the theta value as the norm of the first three elements
-    const theta = Norm(expc6.slice(3, 6));
+    const theta = numeric.norm2(expc6.slice(3, 6));
     // Scale the second half of the vector by theta
     const scaledExpc6 = expc6.map((val, i) => (i < 3 ? val / norm : val / theta));
     // Return the normalized screw axis and the theta value
@@ -1222,14 +964,13 @@ function MatrixExp6(se3mat) {
 //     } else {
 //         const theta = Math.acos((R[0][0] + R[1][1] + R[2][2] - 1) / 2.0);
 //         // G_inv = I - 0.5*omgmat + (1/theta - 0.5/Math.tan(theta/2)) * omgmat^2 / theta
-//         const I = Eye(3);
-//         const omgmat2 = matDot(omgmat, omgmat);
+//         const I = numeric.identity(3);
+//         const omgmat2 = numeric.dot(omgmat, omgmat);
 //         const tanHalfTheta = Math.tan(theta / 2.0);
 //         const coeff = (1.0 / theta - 1.0 / (2 * tanHalfTheta)) / theta;
 //         // G_inv = I - 0.5*omgmat + coeff*omgmat2
-//         const G_inv = matAddN(
-//             I,
-//             omgmat.map(row => row.map(val => -0.5 * val)),
+//         const G_inv = numeric.add(
+//             numeric.add(I, omgmat.map(row => row.map(val => -0.5 * val))),
 //             omgmat2.map(row => row.map(val => coeff * val))
 //         );
 //         // G_inv * p
@@ -1299,6 +1040,7 @@ function MatrixLog6(T) {
     ];
 }
 
+
 /**
  * Returns a projection of mat into SO(3)
  * @param {Array<Array<number>>} mat A matrix near SO(3) to project to SO(3)
@@ -1325,7 +1067,7 @@ function ProjectToSO3(mat) {
     let U = svd.U;
     let V = svd.V;
     // R = U * V^T
-    let R = matDot(U, numeric.transpose(V));
+    let R = numeric.dot(U, numeric.transpose(V));
     const detR = R[0][0]*(R[1][1]*R[2][2]-R[1][2]*R[2][1])
                - R[0][1]*(R[1][0]*R[2][2]-R[1][2]*R[2][0])
                + R[0][2]*(R[1][0]*R[2][1]-R[1][1]*R[2][0]);
@@ -1334,7 +1076,7 @@ function ProjectToSO3(mat) {
         for (let i = 0; i < 3; i++) {
             U[i][2] *= -1;
         }
-        R = matDot(U, numeric.transpose(V));
+        R = numeric.dot(U, numeric.transpose(V));
     }
     return R;
 }
@@ -1392,14 +1134,14 @@ function DistanceToSO3(mat) {
         mat[0][1] * (mat[1][0] * mat[2][2] - mat[1][2] * mat[2][0]) +
         mat[0][2] * (mat[1][0] * mat[2][1] - mat[1][1] * mat[2][0]);
     if (det <= 0) {
-        return 1e9;
+        return 1e6;
     }
     // mat^T * mat
     const matT = mat[0].map((_, col) => mat.map(row => row[col]));
-    const prod = matDot(matT, mat);
+    const prod = numeric.dot(matT, mat);
     // prod - I
-    const I = Eye(3);
-    const diff = matAdd(prod, I.map(row => row.map(val => -val)));
+    const I = numeric.identity(3);
+    const diff = numeric.add(prod, I.map(row => row.map(val => -val)));
     // Frobenius norm
     const norm = Math.sqrt(diff.flat().reduce((sum, val) => sum + val * val, 0));
     return norm;
@@ -1442,7 +1184,7 @@ function DistanceToSE3(mat) {
     }
     // matR^T * matR
     const matRT = matR[0].map((_, col) => matR.map(row => row[col]));
-    const prod = matDot(matRT, matR);
+    const prod = numeric.dot(matRT, matR);
     // Construct new 4x4 matrix
     let newMat = [
         [prod[0][0], prod[0][1], prod[0][2], 0],
@@ -1451,8 +1193,8 @@ function DistanceToSE3(mat) {
         [mat[3][0],  mat[3][1],  mat[3][2],  mat[3][3]]
     ];
     // mat - I
-    const I = Eye(4);
-    const diff = newMat.map((row, i) => row.map((val, j) => val - I[i][j]));
+    const I = numeric.identity(4);
+    const diff = numeric.sub(newMat, I);
     // Frobenius norm
     const norm = Math.sqrt(diff.flat().reduce((sum, val) => sum + val * val, 0));
     return norm;
@@ -1517,7 +1259,7 @@ function RotMatToAxisAngle(R) {
 }
 
 function SlistToBlist(M, Slist) {
-    const Blist = matDot(Adjoint(TransInv(M)), Slist);
+    const Blist = numeric.dot(Adjoint(TransInv(M)), Slist);
     return Blist;
 }
 
@@ -1546,7 +1288,7 @@ function SlistToBlist(M, Slist) {
  */
 function GetTwistFromTransform(T_sb, T_sc) {
     // T_SE = T_sc @ TransInv(T_sb)
-    const T_SE = matDot(T_sc, TransInv(T_sb));
+    const T_SE = numeric.dot(T_sc, TransInv(T_sb));
 
     // Step 1: Get se(3) matrix (对数映射)
     const se3mat = MatrixLog6(T_SE);
@@ -1559,13 +1301,13 @@ function GetTwistFromTransform(T_sb, T_sc) {
     const v_theta = twist_theta.slice(3, 6);
 
     // Check if w_theta is all zeros
-    const w_theta_norm = Norm(w_theta);
+    const w_theta_norm = numeric.norm2(w_theta);
     let omega_hat, theta, v;
     
     if (w_theta_norm < 1e-6) {
         console.warn("Pure translation detected, setting omega_hat to zero.");
         omega_hat = [0.0, 0.0, 0.0];
-        theta = Norm(v_theta);
+        theta = numeric.norm2(v_theta);
         if (theta < 1e-6) {
             v = [0.0, 0.0, 0.0];  // No movement
         } else {
@@ -1622,59 +1364,16 @@ function GetTwistFromTransform(T_sb, T_sc) {
  *     [0, 0,  0,          1]
  *   ]
  */
-// function FKinBody(M, Blist, thetalist) {
-//     let T = M.map(row => row.slice()); // Deep copy
-//     for (let i = 0; i < thetalist.length; i++) {
-//         // Extract the i-th column of Blist
-//         const Bi = Blist.map(row => row[i]);
-//         // Bi * thetalist[i]
-//         const expc6 = Bi.map(val => val * thetalist[i]);
-//         // MatrixExp6(VecTose3(expc6))
-//         const exp6 = MatrixExp6(VecTose3(expc6));
-//         T = matDot(T, exp6);
-//     }
-//     return T;
-// }
-
-/**
- * 优化后的 FKinBody
- * 核心改进：消除 map/slice，使用直接索引访问，减少内存抖动
- */
 function FKinBody(M, Blist, thetalist) {
-    // 1. 避免使用 M.map(row => row.slice())。
-    // 如果 M 是固定的，建议预先定义好结果矩阵的结构
-    let T = [
-        [M[0][0], M[0][1], M[0][2], M[0][3]],
-        [M[1][0], M[1][1], M[1][2], M[1][3]],
-        [M[2][0], M[2][1], M[2][2], M[2][3]],
-        [M[3][0], M[3][1], M[3][2], M[3][3]]
-    ];
-
-    const n = thetalist.length;
-    // 临时向量，复用内存以减少 GC
-    const expc6 = new Float64Array(6);
-
-    for (let i = 0; i < n; i++) {
-        const theta = thetalist[i];
-        
-        // 2. 只有当关节角度不为 0 时才进行矩阵乘法（跳过零空间优化）
-        if (Math.abs(theta) < 1e-6) continue;
-
-        // 3. 直接从 Blist 提取列并计算 (Bi * theta)
-        // 避免使用 Blist.map(row => row[i])
-        expc6[0] = Blist[0][i] * theta;
-        expc6[1] = Blist[1][i] * theta;
-        expc6[2] = Blist[2][i] * theta;
-        expc6[3] = Blist[3][i] * theta;
-        expc6[4] = Blist[4][i] * theta;
-        expc6[5] = Blist[5][i] * theta;
-
-        // 4. 计算指数矩阵
-        // 建议：VecTose3 也可以改写为不返回新数组，而是修改传入的数组
+    let T = M.map(row => row.slice()); // Deep copy
+    for (let i = 0; i < thetalist.length; i++) {
+        // Extract the i-th column of Blist
+        const Bi = Blist.map(row => row[i]);
+        // Bi * thetalist[i]
+        const expc6 = Bi.map(val => val * thetalist[i]);
+        // MatrixExp6(VecTose3(expc6))
         const exp6 = MatrixExp6(VecTose3(expc6));
-
-        // 5. 使用快速矩阵乘法 (只处理 4x4)
-        T = multiply4x4(T, exp6);
+        T = numeric.dot(T, exp6);
     }
     return T;
 }
@@ -1745,28 +1444,12 @@ function FKinSpace(M, Slist, thetalist) {
                 [0, 0, 0, 0]
             ]);
             
-            // 手动展开 4x4 矩阵乘法: T = T * exp6
-            T = multiply4x4(T, exp6);
+            T = numeric.dot(T, exp6);
         }
     }
 
     // 最后再乘以初始位姿 M: T_final = T * M
-    return multiply4x4(T, M);
-}
-
-/**
- * 高性能 4x4 矩阵乘法助手
- */
-function multiply4x4(A, B) {
-    let C = [new Float64Array(4), new Float64Array(4), new Float64Array(4), new Float64Array(4)];
-    for (let i = 0; i < 4; i++) {
-        const ai0 = A[i][0], ai1 = A[i][1], ai2 = A[i][2], ai3 = A[i][3];
-        C[i][0] = ai0 * B[0][0] + ai1 * B[1][0] + ai2 * B[2][0] + ai3 * B[3][0];
-        C[i][1] = ai0 * B[0][1] + ai1 * B[1][1] + ai2 * B[2][1] + ai3 * B[3][1];
-        C[i][2] = ai0 * B[0][2] + ai1 * B[1][2] + ai2 * B[2][2] + ai3 * B[3][2];
-        C[i][3] = ai0 * B[0][3] + ai1 * B[1][3] + ai2 * B[2][3] + ai3 * B[3][3];
-    }
-    return C;
+    return numeric.dot(T, M);
 }
 
 
@@ -1813,7 +1496,7 @@ function JacobianBody(Blist, thetalist) {
         const Bi1 = Blist.map(row => row[i+1]);
         const expc6 = Bi1.map(val => -thetalist[i+1] * val);
         const exp6 = MatrixExp6(VecTose3(expc6));
-        T = matDot(T, exp6);
+        T = numeric.dot(T, exp6);
         // Adjoint(T) * Blist[:,i]
         const Bi = Blist.map(row => row[i]);
         const adjT = Adjoint(T);
@@ -1858,39 +1541,6 @@ function JacobianBody(Blist, thetalist) {
  *     [0.2, 2.96026613,  3.23573065,  2.22512443]
  *   ]
  */
-// function JacobianSpace(Slist, thetalist) {
-//     const n = thetalist.length;
-//     let Js = Slist.map(row => row.slice());
-//     let T = [
-//         [1,0,0,0],
-//         [0,1,0,0],
-//         [0,0,1,0],
-//         [0,0,0,1]
-//     ];
-//     for (let i = 1; i < n; i++) {
-//         // Slist[:,i-1] * thetalist[i-1]
-//         const Si_1 = Slist.map(row => row[i-1]);
-//         const expc6 = Si_1.map(val => val * thetalist[i-1]);
-//         const exp6 = MatrixExp6(VecTose3(expc6));
-//         T = numeric.dot(T, exp6);
-//         // Adjoint(T) * Slist[:,i]
-//         const Si = Slist.map(row => row[i]);
-//         const adjT = Adjoint(T);
-//         const Js_col = [];
-//         for (let r = 0; r < 6; r++) {
-//             let sum = 0;
-//             for (let c = 0; c < 6; c++) {
-//                 sum += adjT[r][c] * Si[c];
-//             }
-//             Js_col.push(sum);
-//         }
-//         for (let r = 0; r < 6; r++) {
-//             Js[r][i] = Js_col[r];
-//         }
-//     }
-//     return Js;
-// }
-
 function JacobianSpace(Slist, thetalist) {
     const n = thetalist.length;
     let Js = Array.from({ length: 6 }, () => new Float64Array(n));
@@ -1980,8 +1630,8 @@ function IKinBody(Blist, M, T, thetalist0, eomg, ev) {
     let i = 0;
     const maxiterations = 30;
     let Tsb = FKinBody(M, Blist, thetalist);
-    let Vb = se3ToVec(MatrixLog6(matDot(TransInv(Tsb), T)));
-    let err = (Norm(Vb.slice(0, 3)) > eomg) || (Norm(Vb.slice(3, 6)) > ev);
+    let Vb = se3ToVec(MatrixLog6(numeric.dot(TransInv(Tsb), T)));
+    let err = (numeric.norm2(Vb.slice(0, 3)) > eomg) || (numeric.norm2(Vb.slice(3, 6)) > ev);
     while (err && i < maxiterations) {
         const Jb = JacobianBody(Blist, thetalist);
         // Moore-Penrose pseudoinverse of Jb
@@ -1991,8 +1641,8 @@ function IKinBody(Blist, M, T, thetalist0, eomg, ev) {
             theta + Jb_pinv[idx].reduce((sum, val, j) => sum + val * Vb[j], 0)
         );
         Tsb = FKinBody(M, Blist, thetalist);
-        Vb = se3ToVec(MatrixLog6(matDot(TransInv(Tsb), T)));
-        err = (Norm(Vb.slice(0, 3)) > eomg) || (Norm(Vb.slice(3, 6)) > ev);
+        Vb = se3ToVec(MatrixLog6(numeric.dot(TransInv(Tsb), T)));
+        err = (numeric.norm2(Vb.slice(0, 3)) > eomg) || (numeric.norm2(Vb.slice(3, 6)) > ev);
         i += 1;
     }
     return [thetalist, !err];
@@ -2016,7 +1666,7 @@ function IKinBodyNull(Blist, M, T, thetalist0, qmin, qmax, eomg, ev) {
     
     // 阻尼系数（Damped Least Squares）
     let lambda = 1e-3; 
-    const v_max = 0.35; // 最大步长限幅
+    const v_max = 0.25; // 最大步长限幅
     const n = thetalist.length;
     const IdentityN = numeric.identity(n);
 
@@ -2078,7 +1728,7 @@ function IKinBodyNull(Blist, M, T, thetalist0, qmin, qmax, eomg, ev) {
         for (let j = 0; j < n; j++) thetalist[j] += step[j];
 
         // 10. 迭代优化
-        lambda *= 0.6; 
+        lambda *= 0.68; 
         i++;
     }
 
@@ -2124,8 +1774,8 @@ function IKinSpace(Slist, M, T, thetalist0, eomg, ev) {
     let i = 0;
     const maxiterations = 30;
     let Tsb = FKinSpace(M, Slist, thetalist);
-    let Vs = matDot(Adjoint(Tsb), se3ToVec(MatrixLog6(matDot(TransInv(Tsb), T))));
-    let err = (Norm(Vs.slice(0, 3)) > eomg) || (Norm(Vs.slice(3, 6)) > ev);
+    let Vs = numeric.dot(Adjoint(Tsb), se3ToVec(MatrixLog6(numeric.dot(TransInv(Tsb), T))));
+    let err = (numeric.norm2(Vs.slice(0, 3)) > eomg) || (numeric.norm2(Vs.slice(3, 6)) > ev);
     while (err && i < maxiterations) {
         const Js = JacobianSpace(Slist, thetalist);
         const Js_pinv = matPinv(Js); 
@@ -2133,8 +1783,8 @@ function IKinSpace(Slist, M, T, thetalist0, eomg, ev) {
             theta + Js_pinv[idx].reduce((sum, val, j) => sum + val * Vs[j], 0)
         );
         Tsb = FKinSpace(M, Slist, thetalist);
-        Vs = matDot(Adjoint(Tsb), se3ToVec(MatrixLog6(matDot(TransInv(Tsb), T))));
-        err = (Norm(Vs.slice(0, 3)) > eomg) || (Norm(Vs.slice(3, 6)) > ev);
+        Vs = numeric.dot(Adjoint(Tsb), se3ToVec(MatrixLog6(numeric.dot(TransInv(Tsb), T))));
+        err = (numeric.norm2(Vs.slice(0, 3)) > eomg) || (numeric.norm2(Vs.slice(3, 6)) > ev);
         i += 1;
     }
     return [thetalist, !err];
@@ -2201,81 +1851,140 @@ function IKinSpace(Slist, M, T, thetalist0, eomg, ev) {
 //     return [thetalist, !err];
 // }
 
-function IKinSpaceNull(Slist, M, T, thetalist0, qmin, qmax, eomg, ev) {
-    let thetalist = thetalist0.slice();
-    let i = 0;
-    const maxiterations = 50;
-    
-    // 初始阻尼系数（DLS核心）
-    let lambda = 1e-3; 
-    const v_max = 0.35; 
-    const n = thetalist.length;
-    const IdentityN = numeric.identity(n);
-
-    while (i < maxiterations) {
-        // 1. 计算当前位姿与误差 (Space Frame)
-        const Tsb = FKinSpace(M, Slist, thetalist);
-        const Vs = numeric.dot(Adjoint(Tsb), 
-            se3ToVec(MatrixLog6(numeric.dot(TransInv(Tsb), T)))
-        );
-
-        // 2. 检查误差 (避免 slice 以提升速度)
-        const err_omg = Math.sqrt(Vs[0]*Vs[0] + Vs[1]*Vs[1] + Vs[2]*Vs[2]);
-        const err_v = Math.sqrt(Vs[3]*Vs[3] + Vs[4]*Vs[4] + Vs[5]*Vs[5]);
+    function IKinSpaceNull(Slist, M, T, thetalist0, qmin, qmax, eomg, ev) {
+        let thetalist = thetalist0.slice();
+        let i = 0;
+        const maxiterations = 50;
         
-        if (err_omg < eomg && err_v < ev) return [thetalist, true];
+        // 初始阻尼系数（DLS核心）
+        let lambda = 1e-3; 
+        const v_max = 0.35; 
+        const n = thetalist.length;
+        const IdentityN = numeric.identity(n);
 
-        // 3. 计算雅可比
-        const Js = JacobianSpace(Slist, thetalist);
-        const JsT = numeric.transpose(Js);
-        
-        // 4. Damped Least Squares (DLS) 主任务求解
-        // 公式: (J^T * J + lambda * I) * dtheta = J^T * Vs
-        const JTJ = numeric.dot(JsT, Js);
-        const A = numeric.add(JTJ, numeric.mul(lambda, IdentityN));
-        const b = numeric.dot(JsT, Vs);
-        
-        // dtheta_task 是主任务解
-        const dtheta_task = numeric.solve(A, b);
+        while (i < maxiterations) {
+            // 1. 计算当前位姿与误差 (Space Frame)
+            const Tsb = FKinSpace(M, Slist, thetalist);
+            const Vs = numeric.dot(Adjoint(Tsb), 
+                se3ToVec(MatrixLog6(numeric.dot(TransInv(Tsb), T)))
+            );
 
-        // 5. 零空间投影优化 (避开限位)
-        // 重点：不需要计算 N = I - J_pinv * J，这太慢了。
-        // 直接利用 N * grad = grad - J_pinv * (J * grad)
-        // 在 DLS 下，J_pinv 近似为 A^-1 * J^T
-        
-        const qmid = thetalist.map((_, idx) => (qmax[idx] + qmin[idx]) / 2);
-        const grad = thetalist.map((t, idx) => -1.0 * (t - qmid[idx])); 
+            // 2. 检查误差 (避免 slice 以提升速度)
+            const err_omg = Math.sqrt(Vs[0]*Vs[0] + Vs[1]*Vs[1] + Vs[2]*Vs[2]);
+            const err_v = Math.sqrt(Vs[3]*Vs[3] + Vs[4]*Vs[4] + Vs[5]*Vs[5]);
+            
+            if (err_omg < eomg && err_v < ev) return [thetalist, true];
 
-        // 零空间投影计算：dtheta_null = grad - A^-1 * J^T * (J * grad)
-        const J_grad = numeric.dot(Js, grad);
-        const JT_J_grad = numeric.dot(JsT, J_grad);
-        const J_pinv_J_grad = numeric.solve(A, JT_J_grad);
-        const dtheta_null = numeric.sub(grad, J_pinv_J_grad);
+            // 3. 计算雅可比
+            const Js = JacobianSpace(Slist, thetalist);
+            const JsT = numeric.transpose(Js);
+            
+            // 4. Damped Least Squares (DLS) 主任务求解
+            // 公式: (J^T * J + lambda * I) * dtheta = J^T * Vs
+            const JTJ = numeric.dot(JsT, Js);
+            const A = numeric.add(JTJ, numeric.mul(lambda, IdentityN));
+            const b = numeric.dot(JsT, Vs);
+            
+            // dtheta_task 是主任务解
+            const dtheta_task = numeric.solve(A, b);
 
-        // 6. 合成更新并进行步长限幅
-        let step = dtheta_task.map((v, idx) => v + 0.1 * dtheta_null[idx]);
-        
-        let max_s = 0;
-        for (let j = 0; j < n; j++) {
-            const abs_s = Math.abs(step[j]);
-            if (abs_s > max_s) max_s = abs_s;
+            // 5. 零空间投影优化 (避开限位)
+            // 重点：不需要计算 N = I - J_pinv * J，这太慢了。
+            // 直接利用 N * grad = grad - J_pinv * (J * grad)
+            // 在 DLS 下，J_pinv 近似为 A^-1 * J^T
+            
+            const qmid = thetalist.map((_, idx) => (qmax[idx] + qmin[idx]) / 2);
+            const grad = thetalist.map((t, idx) => -1.0 * (t - qmid[idx])); 
+
+            // 零空间投影计算：dtheta_null = grad - A^-1 * J^T * (J * grad)
+            const J_grad = numeric.dot(Js, grad);
+            const JT_J_grad = numeric.dot(JsT, J_grad);
+            const J_pinv_J_grad = numeric.solve(A, JT_J_grad);
+            const dtheta_null = numeric.sub(grad, J_pinv_J_grad);
+
+            // 6. 合成更新并进行步长限幅
+            let step = dtheta_task.map((v, idx) => v + 0.1 * dtheta_null[idx]);
+            
+            let max_s = 0;
+            for (let j = 0; j < n; j++) {
+                const abs_s = Math.abs(step[j]);
+                if (abs_s > max_s) max_s = abs_s;
+            }
+
+            if (max_s > v_max) {
+                const scale = v_max / max_s;
+                for (let j = 0; j < n; j++) step[j] *= scale;
+            }
+
+            // 7. 更新关节角
+            for (let j = 0; j < n; j++) thetalist[j] += step[j];
+
+            // 8. 动态调整阻尼 (Levenberg-Marquardt 简化逻辑)
+            // 随迭代减小 lambda，让后期收敛变快
+            lambda *= 0.6; 
+            i++;
         }
-
-        if (max_s > v_max) {
-            const scale = v_max / max_s;
-            for (let j = 0; j < n; j++) step[j] *= scale;
-        }
-
-        // 7. 更新关节角
-        for (let j = 0; j < n; j++) thetalist[j] += step[j];
-
-        // 8. 动态调整阻尼 (Levenberg-Marquardt 简化逻辑)
-        // 随迭代减小 lambda，让后期收敛变快
-        lambda *= 0.6; 
-        i++;
+        return [thetalist, false];
     }
-    return [thetalist, false];
-}
+
+    function IKRetarget(Slist, M, T, thetalist0, eomg, ev) {
+        let thetalist = thetalist0.slice();
+        const n = thetalist.length;
+        const IdentityN = numeric.identity(n);
+        
+        // --- Retarget 关键参数 ---
+        // 如果是腰部，通常优先保证旋转 (前3项)，减弱位置要求 (后3项)
+        const taskWeight = [1.0, 1.0, 1.0, 0.01, 0.01, 0.01]; 
+        let lambda = 0.01; // 较大的初始阻尼能让缺少自由度的系统更稳定
+        
+        for (let i = 0; i < 30; i++) {
+            console.log(`Iteration ${i}: thetalist =`, thetalist);
+            const Tsb = FKinSpace(M, Slist, thetalist);
+            console.log("Current Tsb:", Tsb);
+            console.log("Target T:", T);
+            
+            // 计算 Vs 误差
+            const Vs = se3ToVec(MatrixLog6(numeric.dot(TransInv(Tsb), T)));
+            console.log("Vs (before weighting):", numeric.dot(TransInv(Tsb), T));
+            
+            // 应用权重：Vs_w = W * Vs
+            const Vs_w = Vs.map((v, idx) => v * taskWeight[idx]);
+
+            // 检查加权后的误差是否达标
+            const err_omg = Math.sqrt(Vs_w[0]*Vs_w[0] + Vs_w[1]*Vs_w[1] + Vs_w[2]*Vs_w[2]);
+            const err_v = Math.sqrt(Vs_w[3]*Vs_w[3] + Vs_w[4]*Vs_w[4] + Vs_w[5]*Vs_w[5]);
+
+            if (err_omg < eomg && err_v < ev) return [thetalist, true];
+            
+            const Js = JacobianSpace(Slist, thetalist);
+            
+            // --- 加权雅可比求逆 ---
+            // Js_w = W * Js
+            const Js_w = Js.map((row, rIdx) => row.map(val => val * taskWeight[rIdx]));
+            const Js_wT = numeric.transpose(Js_w);
+
+            // DLS 求解: (Jw^T * Jw + lambda * I) * dtheta = Jw^T * Vs_w
+            const A = numeric.add(numeric.dot(Js_wT, Js_w), numeric.mul(lambda, IdentityN));
+            const b = numeric.dot(Js_wT, Vs_w);
+            
+            const dtheta = numeric.solve(A, b);
+            for (let j = 0; j < n; j++) {
+                thetalist[j] += dtheta[j];
+            }
+            // 更新关节角
+            // for (let j = 0; j < n; j++) {
+            //     thetalist[j] += dtheta[j];
+            //     // 强制限制在物理限位内
+            //     if (thetalist[j] < qmin[j]) thetalist[j] = qmin[j];
+            //     if (thetalist[j] > qmax[j]) thetalist[j] = qmax[j];
+            // }
+            
+            // 随迭代略微调整阻尼
+            lambda *= 0.8;
+        }
+        console.log("IKresult", thetalist);
+        return [thetalist, false];
+    }
 
 
 /*** CHAPTER 8: DYNAMICS OF OPEN CHAINS ***/ 
@@ -2414,7 +2123,7 @@ function ad(V) {
 function InverseDynamics(thetalist, dthetalist, ddthetalist, g, Ftip, Mlist, Glist, Slist) {
     console.log("Starting Inverse Dynamics Computation...");
     const n = thetalist.length;
-    let Mi = Eye(4);
+    let Mi = numeric.identity(4);
     let Ai = Array.from({ length: 6 }, () => Array(n).fill(0));
     let AdTi = Array(n + 1).fill(null);
     let Vi = Array.from({ length: 6 }, () => Array(n + 1).fill(0));
@@ -2431,7 +2140,7 @@ function InverseDynamics(thetalist, dthetalist, ddthetalist, g, Ftip, Mlist, Gli
 
     // 前向递推
     for (let i = 0; i < n; i++) {
-        Mi = matDot(Mi, Mlist[i]);
+        Mi = numeric.dot(Mi, Mlist[i]);
         // Ai[:, i] = Adjoint(TransInv(Mi)) * Slist[:, i]
         const Scol = Slist.map(row => row[i]);
         const AdTinvMi = Adjoint(TransInv(Mi));
@@ -2444,7 +2153,7 @@ function InverseDynamics(thetalist, dthetalist, ddthetalist, g, Ftip, Mlist, Gli
         // AdTi[i] = Adjoint(MatrixExp6(VecTose3(Ai[:,i]*-thetalist[i])) * TransInv(Mlist[i]))
         const Ai_theta = Ai.map(row => row[i] * -thetalist[i]);
         const exp6 = MatrixExp6(VecTose3(Ai_theta));
-        const AdT = Adjoint(matDot(exp6, TransInv(Mlist[i])));
+        const AdT = Adjoint(numeric.dot(exp6, TransInv(Mlist[i])));
         AdTi[i] = AdT;
         // Vi[:, i+1] = AdTi[i] * Vi[:,i] + Ai[:,i] * dthetalist[i]
         for (let r = 0; r < 6; r++) {
@@ -2838,7 +2547,7 @@ function ScrewTrajectory(Xstart, Xend, Tf, N, method) {
     let traj = [];
     // Compute constants once
     const Xstart_inv = TransInv(Xstart);
-    const Xrel = matDot(Xstart_inv, Xend);
+    const Xrel = numeric.dot(Xstart_inv, Xend);
     const logXrel = MatrixLog6(Xrel);
     for (let i = 0; i < N; i++) {
         let s;
@@ -2850,7 +2559,7 @@ function ScrewTrajectory(Xstart, Xend, Tf, N, method) {
         // MatrixExp6(logXrel * s)
         const exp6 = MatrixExp6(logXrel.map(row => row.map(val => val * s)));
         // Xstart * exp6
-        traj.push(matDot(Xstart, exp6));
+        traj.push(numeric.dot(Xstart, exp6));
     }
     return traj;
 }
@@ -2912,7 +2621,7 @@ function CartesianTrajectory(Xstart, Xend, Tf, N, method) {
     const [Rend, pend] = TransToRp(Xend);
     // Rotation interpolation constants
     const RstartT = RotInv(Rstart);
-    const Rrel = matDot(RstartT, Rend);
+    const Rrel = numeric.dot(RstartT, Rend);
     const logRrel = MatrixLog3(Rrel);
     for (let i = 0; i < N; i++) {
         let s;
@@ -2923,7 +2632,7 @@ function CartesianTrajectory(Xstart, Xend, Tf, N, method) {
         }
         // Rotation interpolation: Rstart * exp(logRrel * s)
         const exp3 = MatrixExp3(logRrel.map(row => row.map(val => val * s)));
-        const R = matDot(Rstart, exp3);
+        const R = numeric.dot(Rstart, exp3);
         // Translation interpolation: s*pend + (1-s)*pstart
         const p = [];
         for (let j = 0; j < pstart.length; j++) {
@@ -3003,20 +2712,9 @@ function simulate_PIDcontrol(q0, dq0, q_ref, dq_ref, dt, steps, Mlist, Glist, Sl
 module.exports = {
     /* Basic Functions */
     NearZero,
-    Norm,
-    Eye,
-    matDot,
-    vecMatDot,
-    matAdd,
-    matAddN,
     matPinv,
     deg2rad,
     rad2deg,
-
-    worlr2three,
-    three2world,
-    worlr2threeT,
-    three2worldT,
 
     RotMatToQuaternion,
     QuaternionToRotMat,
@@ -3063,6 +2761,7 @@ module.exports = {
     IKinBodyNull,
     IKinSpace,
     IKinSpaceNull,
+    IKRetarget,
 
     // Chapter 8: Dynamics of Open Chains
     ad,

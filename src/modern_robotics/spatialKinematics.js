@@ -241,19 +241,21 @@ function updateRobotIK(controller, isTriggerOn ) {
  */
 function IK_joint_velocity_limit(T_sd, M, Slist, Blist, jointLimits, theta_body, VR_Control_Mode, dt) {
   let thetalist_sol, ik_success;
-  const max_joint_vel = 50.0; // rad/s
+  const max_joint_vel = 30; // rad/s
   let error_code = STATE_CODES.NORMAL;
   const qmin = jointLimits.map(j => j.min);
   const qmax = jointLimits.map(j => j.max);
 
   // 1. 选择 IK 模式 (直接传入预设的 qmin, qmax 避免 map)
-  if (VR_Control_Mode === 'inBody') {
-    [thetalist_sol, ik_success] = mr.IKinBodyNull(Blist, M, T_sd, theta_body, qmin, qmax, 1e-4, 1e-4);
-    // [thetalist_sol, ik_success] = mr.IKinBody(Blist, M, T_sd, theta_body, 1e-4, 1e-4);
-  } else {
-    // 空间模式使用我们优化过的 NullSpace 版本
-    [thetalist_sol, ik_success] = mr.IKinSpaceNull(Slist, M, T_sd, theta_body, qmin, qmax, 1e-3, 1e-3);
-  }
+  // if (VR_Control_Mode === 'inBody') {
+  //   [thetalist_sol, ik_success] = mr.IKinBodyNull(Blist, M, T_sd, theta_body, qmin, qmax, 1e-4, 1e-4);
+  //   // [thetalist_sol, ik_success] = mr.IKinBody(Blist, M, T_sd, theta_body, 1e-4, 1e-4);
+  // } else {
+  //   // 空间模式使用我们优化过的 NullSpace 版本
+  //   [thetalist_sol, ik_success] = mr.IKinSpaceNull(Slist, M, T_sd, theta_body, qmin, qmax, 1e-6, 1e-6);
+  // }
+
+  [thetalist_sol, ik_success] = mr.IKinSpaceNull(Slist, M, T_sd, theta_body, qmin, qmax, 1e-4, 1e-4);
 
   if (!ik_success) {
     console.warn("IK failed");
@@ -285,7 +287,7 @@ function IK_joint_velocity_limit(T_sd, M, Slist, Blist, jointLimits, theta_body,
     console.warn("Velocity Limit Reached");
   } else if (isAtLimit) {
     // 如果触碰限位，给予一个缓冲衰减，而不是生硬停下
-    scale = 0.5; 
+    scale = 0.2; 
     error_code = STATE_CODES.JOINT_LIMIT;
   }
 
@@ -350,7 +352,7 @@ function IK_joint_velocity(T_sd, M, Slist, Blist, jointLimits, theta_body, VR_Co
   let scale = 1.0;
   if (isAtLimit) {
     error_code = STATE_CODES.JOINT_LIMIT;
-    scale = 0.318; 
+    scale = 0.5; 
     console.warn("Joint Limit Reached");
   }
 
@@ -403,7 +405,7 @@ function IK_finger(T_sd, M, Slist, theta_body, hand) {
   let scale = 1.0;
   if (isAtLimit) {
     error_code = STATE_CODES.JOINT_LIMIT;
-    scale = 0.318; 
+    scale = 0.1; 
     console.warn("Joint Limit Reached");
   }
 
@@ -416,6 +418,24 @@ function IK_finger(T_sd, M, Slist, theta_body, hand) {
   return { new_theta_body: Array.from(new_theta_body), error_code };
 }
 
+
+function Retarget(T_sd, M, Slist, theta_body) {
+  let thetalist_sol, ik_success;
+  let error_code = STATE_CODES.NORMAL;
+
+  [thetalist_sol, ik_success] = mr.IKinSpace(Slist, M, T_sd, theta_body, 100, 1e-2);
+
+  if (!ik_success) {
+    console.warn("IK failed");
+    return { new_theta_body: theta_body, error_code: STATE_CODES.IK_FAILED };
+  }
+
+  // 4. 计算最终姿态 (单次循环完成)
+  const new_theta_body = new Float64Array(n);
+
+  return { new_theta_body: Array.from(new_theta_body), error_code };
+}
+
 module.exports = {
     calculateRelativeRotationMatrix,
     relativeRMatrixtoScrewAxis,
@@ -424,5 +444,6 @@ module.exports = {
     IK_joint_velocity_limit,
     IK_joint_velocity,
     IK_finger,
+    Retarget,
     updateRobotIK
 };
