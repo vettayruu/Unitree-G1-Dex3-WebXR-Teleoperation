@@ -189,7 +189,7 @@ class MQTT_Client():
 
     def publish_robot_state(self):
         try:
-            robot_state_msg = {
+            robot_msg = {
                 "header": {
                     "timestamp": int(time.time()*1000),
                     "devId": ROBOT_UUID
@@ -207,7 +207,7 @@ class MQTT_Client():
             # 建议使用 qos=0 提高实时性，因为反馈状态是流式的，丢一帧没关系
             self.client.publish(
                 f"{MQTT_ROBOT_STATE_TOPIC}/{ROBOT_UUID}",
-                json.dumps(robot_state_msg),
+                json.dumps(robot_msg),
                 qos=0
             )
         except KeyError as e:
