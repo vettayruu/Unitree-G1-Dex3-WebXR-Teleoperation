@@ -5,7 +5,7 @@ import WebInterface from './web_interface.js';
 
 export default function RobotScene(props) {
   const {
-    robot_list, 
+    robot_assets, 
     robotProps, 
     
     // VR
@@ -29,8 +29,8 @@ export default function RobotScene(props) {
 
     // Cam Arm
     state_codes_cam,
-    // position_ee_cam,
-    // euler_ee_cam,
+    position_ee_cam,
+    euler_ee_cam,
 
     // Others
     // modelOpacity, 
@@ -56,12 +56,12 @@ export default function RobotScene(props) {
 
   const stateCodeColor = getStateCodeColor(state_codes);
   const stateCodeColorLeft = getStateCodeColor(state_codes_left);
-  // const stateCodeColorCam = getStateCodeColor(state_codes_cam);
+  const stateCodeColorCam = getStateCodeColor(state_codes_cam);
 
   const rad2deg = rad => rad * 180 / Math.PI;
   const euler_ee_deg = euler_ee.map(rad2deg);
   const euler_ee_deg_left = euler_ee_left.map(rad2deg);
-  // const euler_ee_deg_cam = euler_ee_cam.map(rad2deg);
+  const euler_ee_deg_cam = euler_ee_cam.map(rad2deg);
 
   const botton_width = "0.45";
   
@@ -100,15 +100,18 @@ export default function RobotScene(props) {
 
   if (!rendered) {
     return (
-      <a-scene xr-mode-ui="XRMode: ar">
-        <Assets robot_list={robot_list} viewer={props.viewer}/>
+      <a-scene xr-mode-ui="XRMode: xr">
+        <Assets robot_assets={robot_assets} viewer={props.viewer}/>
       </a-scene>
     );
     }
 
   return (
     <>
-      <a-scene scene xr-mode-ui="XRMode: ar">
+      <a-scene 
+        scene 
+        xr-mode-ui="XRMode: xr"
+      >
         {showMenu && (<a-entity
           id="background"
           position="0 0 0"
@@ -195,7 +198,7 @@ export default function RobotScene(props) {
         {showMenu && (<a-entity id="leftHand" laser-controls="hand: left" raycaster="objects: .raycastable"></a-entity>)}
         {showMenu && (<a-entity id="rightHand" laser-controls="hand: right" raycaster="objects: .raycastable" line="color: #118A7E"></a-entity>)}
 
-        {/* VR Controller */}
+        {/* -------------- VR Controller -------------*/}
         {/* <a-entity oculus-touch-controls="hand: right" vr-controller-right visible="true"></a-entity>
         <a-entity oculus-touch-controls="hand: left" vr-controller-left visible="true"></a-entity> */}
 
@@ -211,9 +214,12 @@ export default function RobotScene(props) {
           </a-entity>
         </a-entity>
 
+        <a-entity vr-controller-hmd></a-entity>
+        
+
         {/* Robot Model*/}
-        {/* <Assets robot_list={robot_list} viewer={props.viewer} monitor={props.monitor}/> */}
-        <Assets robot_list={robot_list}/>
+        <Assets robot_assets={robot_assets} viewer={props.viewer} monitor={props.monitor}/>
+        
         <Select_Robot 
           {...robotProps} 
           // modelOpacity={props.modelOpacity}
@@ -281,7 +287,7 @@ export default function RobotScene(props) {
         ></a-curvedimage> */}
 
         {/* Plane Image For 720P camera frame (After undistortion)*/}
-        <a-plane
+        {/* <a-plane
           id="left-curved"
           height="4.0"
           width="7.0"
@@ -299,10 +305,10 @@ export default function RobotScene(props) {
           scale="0.6 0.6 0.2"
           stereo-plane="eye: right; videoId: rightVideo"
           visible="true"
-        ></a-plane>
+        ></a-plane> */}
 
         {/* Sub Camera Plane Image */}
-        <a-plane
+        {/* <a-plane
           id="subcam-curved"
           height="1.5"
           width="2.3"
@@ -320,7 +326,7 @@ export default function RobotScene(props) {
           scale="0.6 0.6 0.2"
           stereo-plane="eye: right; videoId: subVideo"
           visible="true"
-        ></a-plane>
+        ></a-plane> */}
 
         {/* Sphere video for fisheye camera (VR cam etc.)*/}
         {/* <a-sphere
@@ -410,7 +416,7 @@ export default function RobotScene(props) {
         </a-entity>
 
         {/* End Effector Cam */}
-        {/* <a-sphere 
+        <a-sphere 
           position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`} 
           scale="0.012 0.012 0.012" 
           color={stateCodeColorCam}
@@ -423,7 +429,13 @@ export default function RobotScene(props) {
           <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0500" radius="0.0015" color="red" /> 
           <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
           <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0700" radius="0.0015" color="blue" />
-        </a-entity> */}
+        </a-entity>
+
+        <a-entity id="fpsDisplay"
+          position="0 0 0.1"
+          text="value: -- fps; color: white; align: center"
+          fps-counter="for90fps: false">
+        </a-entity>
 
       </a-scene>
 

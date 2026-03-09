@@ -116,7 +116,7 @@ export default function WebInterface(props) {
               </div>
             </div>
           ))}
-          <div className="row mb-0">
+          {/* <div className="row mb-0">
             <div className="col-md-4">
               <label htmlFor="theta_tool" className="form-label">
                 <span className="form-control-plaintext">theta_tool</span>
@@ -137,7 +137,7 @@ export default function WebInterface(props) {
                 max={toolLimits.max}
               />
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 
@@ -170,7 +170,7 @@ export default function WebInterface(props) {
               </div>
             </div>
           ))}
-          <div className="row mb-0">
+          {/* <div className="row mb-0">
             <div className="col-md-4">
               <label htmlFor="theta_tool" className="form-label">
                 <span className="form-control-plaintext">theta_tool</span>
@@ -191,12 +191,12 @@ export default function WebInterface(props) {
                 max={toolLimits.max}
               />
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 
-      <div className="cam-arm">
-        <span>Cam Arm</span>
+      <div className="torso">
+        <span>Torso</span>
         <div className="joint controller-controll-panel row">
           {theta_body_cam.map((theta, idx) => (
             <div className="row mb-0" key={idx}>
@@ -225,7 +225,15 @@ export default function WebInterface(props) {
             </div>
           ))}
         </div>
-      </div>              
+      </div>
+
+      <div className="request-robot">
+        <button onClick={props.requestRobot}>
+          Request Robot
+        </button>
+      </div>
+
+
     </>
     )
   }

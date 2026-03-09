@@ -266,10 +266,6 @@ const G1_Body = (props) => {
     indicator_visibility = true,
   } = props;
 
-  const [theta0, theta1, theta2, theta3, theta4, theta5, theta6, theta7] = theta_body.map(rad2deg);
-  const [theta0_left, theta1_left, theta2_left, theta3_left, theta4_left, theta5_left, theta6_left, theta7_left] = theta_body_left.map(rad2deg);
-  const [theta0_cam, theta1_cam, theta2_cam] = theta_body_cam.map(rad2deg);
-
   const opacity = "0.8"; // 设置整体透明度
 
   return (
@@ -282,57 +278,57 @@ const G1_Body = (props) => {
       >
 
         {/* Waist */}
-        <a-entity j_id="waist_yaw" id={`${robotId}_waist_yaw`}  gltf-model={`#${robotId}_waist_yaw`} position={'0 0.0 0'} rotation={`0 ${theta0_cam+90} 0`} model-opacity={opacity}
+        <a-entity j_id="waist_yaw" id={`${robotId}_waist_yaw`}  gltf-model={`#${robotId}_waist_yaw`} position={'0 0.0 0'} rotation={`0 ${theta_body_cam[0]+90} 0`} model-opacity={opacity}
           >
-          <a-entity j_id="waist_roll" id={`${robotId}_waist_roll`} gltf-model={`#${robotId}_waist_roll`} position={'-0.00396 0.044 0'} rotation={`0 0 0`} model-opacity={opacity}
+          <a-entity j_id="waist_roll" id={`${robotId}_waist_roll`} gltf-model={`#${robotId}_waist_roll`} position={'-0.00396 0.044 0'} rotation={`${theta_body_cam[1]} 0 0`} model-opacity={opacity}
             >
-            <a-entity j_id="torso" id={`${robotId}_torso`}  gltf-model={`#${robotId}_torso`} position={'0 0.0 0.0'} rotation={`0 0 ${-theta2_cam}`} model-opacity={opacity}
+            <a-entity j_id="torso" id={`${robotId}_torso`}  gltf-model={`#${robotId}_torso`} position={'0 0.0 0.0'} rotation={`0 0 ${-theta_body_cam[2]}`} model-opacity={opacity}
               >
               {/* Right Arm J1 */}
-              <a-entity j_id="1" id={`${robotId}_arm_right_j1`} gltf-model={`#${robotId}_arm_right_j1`} position={'0.00396 0.24778 0.1'} rotation={`-16 0 ${-theta1}`} 
+              <a-entity j_id="1" id={`${robotId}_arm_right_j1`} gltf-model={`#${robotId}_arm_right_j1`} position={'0.00396 0.24778 0.1'} rotation={`-16 0 ${-theta_body[1]}`} 
                 ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(23, 242, 38, 1)" position={`0.075 0 0.0`} rotation={`0 0 90`} visible={indicator_visibility}></a-cylinder>
                 {/* Right Arm J2 */}
-                <a-entity j_id="2" id={`${robotId}_arm_right_j2`} gltf-model={`#${robotId}_arm_right_j2`} position={`0.0 -0.01383 0.038`} rotation={`${theta2+16} 0 0`} 
+                <a-entity j_id="2" id={`${robotId}_arm_right_j2`} gltf-model={`#${robotId}_arm_right_j2`} position={`0.0 -0.01383 0.038`} rotation={`${theta_body[2]+16} 0 0`} 
                   ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(242, 63, 23, 1)" position={`0.0 0.0 0.075`} rotation={`90 0 0`} visible={indicator_visibility}></a-cylinder>
                   {/* Right Arm J3 */}
-                  <a-entity j_id="3" id={`${robotId}_arm_right_j3`} gltf-model={`#${robotId}_arm_right_j3`} position={`0 -0.1032 0.00624`} rotation={`0 ${theta3} 0`} 
+                  <a-entity j_id="3" id={`${robotId}_arm_right_j3`} gltf-model={`#${robotId}_arm_right_j3`} position={`0 -0.1032 0.00624`} rotation={`0 ${theta_body[3]} 0`} 
                     ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(10, 41, 241, 1)" position={`0.075 0.0 0.0`} rotation={`0 0 90`} visible={indicator_visibility}></a-cylinder>
                     {/* Right ArmJ4 */}
-                    <a-entity j_id="4" id={`${robotId}_arm_right_j4`} gltf-model={`#${robotId}_arm_right_j4`} position={`0.01578 -0.08052 0.0`} rotation={`0 0 ${-theta4}`} 
+                    <a-entity j_id="4" id={`${robotId}_arm_right_j4`} gltf-model={`#${robotId}_arm_right_j4`} position={`0.01578 -0.08052 0.0`} rotation={`0 0 ${-theta_body[4]}`} 
                       ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(23, 242, 38, 1)" position={`0.075 0 0.0`} rotation={`0 0 90`} visible={indicator_visibility}></a-cylinder>
                       {/* Right Arm J5 */}
-                      <a-entity j_id="5" id={`${robotId}_arm_right_j5`} gltf-model={`#${robotId}_arm_right_j5`} position={`0.1 -0.010 0.00189`} rotation={`${theta5} 0 0`} 
+                      <a-entity j_id="5" id={`${robotId}_arm_right_j5`} gltf-model={`#${robotId}_arm_right_j5`} position={`0.1 -0.010 0.00189`} rotation={`${theta_body[5]} 0 0`} 
                         ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(242, 63, 23, 1)" position={`0.0 0.0 0.075`} rotation={`90 0 0`} visible={indicator_visibility}></a-cylinder>
                         {/* Right Arm J6 */}
-                        <a-entity j_id="6" id={`${robotId}_arm_right_j6`} gltf-model={`#${robotId}_arm_right_j6`} position={`0.038 0 0`} rotation={`0 0 ${-theta6}`} 
+                        <a-entity j_id="6" id={`${robotId}_arm_right_j6`} gltf-model={`#${robotId}_arm_right_j6`} position={`0.038 0 0`} rotation={`0 0 ${-theta_body[6]}`} 
                           ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(23, 242, 38, 1)" position={`0.075 0 0.0`} rotation={`0 0 90`} visible={indicator_visibility}></a-cylinder>
                           {/* Right Arm J7 */}
-                          <a-entity j_id="7" id={`${robotId}_arm_right_j7`} gltf-model={`#${robotId}_arm_right_j7`} position={`0.046 0.0 0.0`} rotation={`0 ${theta7} 0`} 
+                          <a-entity j_id="7" id={`${robotId}_arm_right_j7`} gltf-model={`#${robotId}_arm_right_j7`} position={`0.046 0.0 0.0`} rotation={`0 ${theta_body[7]} 0`} 
                             ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(10, 41, 241, 1)" position={`0.075 0.0 0.0`} rotation={`0 0 90`} visible={indicator_visibility}></a-cylinder>
                               {/* Right Hand */}
                               <a-entity j_id="hand_right_palm" id={`${robotId}_hand_right_palm`} gltf-model={`#${robotId}_hand_right_palm`} position={`0.0415 0.0 0.003`} rotation={`0 0 0`} 
                               >
                                 {/* Right Hand Thumb */}
-                                <a-entity j_id="hand_right_thumb_0" id={`${robotId}_hand_right_thumb_0`} gltf-model={`#${robotId}_hand_right_thumb_0`} position={`0.0255 0.0 0.0`} rotation={`0 0 ${theta_tool[0][0]}`} 
+                                <a-entity j_id="hand_right_thumb_0" id={`${robotId}_hand_right_thumb_0`} gltf-model={`#${robotId}_hand_right_thumb_0`} position={`0.0255 0.0 0.0`} rotation={`0 0 ${-theta_tool[0]}`} 
                                 >
-                                  <a-entity j_id="hand_right_thumb_1" id={`${robotId}_hand_right_thumb_1`} gltf-model={`#${robotId}_hand_right_thumb_1`} position={`-0.0025 0.0 -0.0193`} rotation={`0 ${-theta_tool[0][1]} 0`} 
+                                  <a-entity j_id="hand_right_thumb_1" id={`${robotId}_hand_right_thumb_1`} gltf-model={`#${robotId}_hand_right_thumb_1`} position={`-0.0025 0.0 -0.0193`} rotation={`0 ${theta_tool[1]} 0`} 
                                   >
-                                    <a-entity j_id="hand_right_thumb_2" id={`${robotId}_hand_right_thumb_2`} gltf-model={`#${robotId}_hand_right_thumb_2`} position={`0.00 0.0 -0.0458`} rotation={`0 ${-theta_tool[0][2]} 0`} 
+                                    <a-entity j_id="hand_right_thumb_2" id={`${robotId}_hand_right_thumb_2`} gltf-model={`#${robotId}_hand_right_thumb_2`} position={`0.00 0.0 -0.0458`} rotation={`0 ${theta_tool[2]} 0`} 
                                     >
                                     </a-entity>
                                   </a-entity>
                                 </a-entity>
                                 {/* Right Hand Index */}
-                                <a-entity j_id="hand_right_index_0" id={`${robotId}_hand_right_index_0`} gltf-model={`#${robotId}_hand_right_index_0`} position={`0.07771 0.02848 -0.00159`} rotation={`0 ${theta_tool[1][0]} 0`} 
+                                <a-entity j_id="hand_right_index_0" id={`${robotId}_hand_right_index_0`} gltf-model={`#${robotId}_hand_right_index_0`} position={`0.07771 0.02848 -0.00159`} rotation={`0 ${theta_tool[5]} 0`} 
                                 >
-                                  <a-entity j_id="hand_right_index_1" id={`${robotId}_hand_right_index_1`} gltf-model={`#${robotId}_hand_right_index_1`} position={`0.0458 0.0 0.0`} rotation={`0 ${theta_tool[1][1]} 0`} 
+                                  <a-entity j_id="hand_right_index_1" id={`${robotId}_hand_right_index_1`} gltf-model={`#${robotId}_hand_right_index_1`} position={`0.0458 0.0 0.0`} rotation={`0 ${theta_tool[6]} 0`} 
                                   >
                                   </a-entity>
                                 </a-entity>
                                 {/* Right Hand Middle */}
-                                <a-entity j_id="hand_right_middle_0" id={`${robotId}_hand_right_middle_0`} gltf-model={`#${robotId}_hand_right_middle_0`} position={`0.07771 -0.02848 -0.00159`} rotation={`0 ${theta_tool[2][0]} 0`} 
+                                <a-entity j_id="hand_right_middle_0" id={`${robotId}_hand_right_middle_0`} gltf-model={`#${robotId}_hand_right_middle_0`} position={`0.07771 -0.02848 -0.00159`} rotation={`0 ${theta_tool[3]} 0`} 
                                 >
-                                  <a-entity j_id="hand_right_middle_1" id={`${robotId}_hand_right_middle_1`} gltf-model={`#${robotId}_hand_right_middle_1`} position={`0.0458 0.0 0.0`} rotation={`0 ${theta_tool[2][1]} 0`} 
+                                  <a-entity j_id="hand_right_middle_1" id={`${robotId}_hand_right_middle_1`} gltf-model={`#${robotId}_hand_right_middle_1`} position={`0.0458 0.0 0.0`} rotation={`0 ${theta_tool[4]} 0`} 
                                   >
                                   </a-entity>
                                 </a-entity>
@@ -367,54 +363,54 @@ const G1_Body = (props) => {
                   <a-ring radius-inner="0.12" radius-outer="0.15" theta-start={rad2deg(joint_limits_right[1].min)} theta-length={rad2deg(joint_limits_right[1].max) - rad2deg(joint_limits_right[1].min)} color="rgba(232, 253, 118, 1)" 
                           position={'0.00396 0.24778 0.1'} rotation="-16 0 90" opacity={opacity} side="double" visible={indicator_visibility}></a-ring>
               {/* Head */}
-              <a-entity j_id="head" id={`${robotId}_head`} gltf-model={`#${robotId}_head`} position={'0 -0.05 0.0'} rotation={`0 ${theta1_cam-theta0_cam} 0`} model-opacity={opacity}
+              <a-entity j_id="head" id={`${robotId}_head`} gltf-model={`#${robotId}_head`} position={'0 -0.05 0.0'} rotation={`0 0 0`} model-opacity={opacity}
                 >
                 </a-entity>
               {/* Left Arm J1 */}
-              <a-entity j_id="1" id={`${robotId}_arm_left_j1`} gltf-model={`#${robotId}_arm_left_j1`} position={'0.00396 0.24778 -0.1'} rotation={`16 0 ${-theta1_left}`} 
+              <a-entity j_id="1" id={`${robotId}_arm_left_j1`} gltf-model={`#${robotId}_arm_left_j1`} position={'0.00396 0.24778 -0.1'} rotation={`16 0 ${-theta_body_left[1]}`} 
                 ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(23, 242, 38, 1)" position={`0.075 0 0.0`} rotation={`0 0 90`} visible={indicator_visibility}></a-cylinder>
                 {/* J2 */}
-                <a-entity j_id="2" id={`${robotId}_arm_left_j2`} gltf-model={`#${robotId}_arm_left_j2`} position={`0.0 -0.01383 -0.038`} rotation={`${theta2_left-16} 0 0`} 
+                <a-entity j_id="2" id={`${robotId}_arm_left_j2`} gltf-model={`#${robotId}_arm_left_j2`} position={`0.0 -0.01383 -0.038`} rotation={`${theta_body_left[2]-16} 0 0`} 
                   ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(242, 63, 23, 1)" position={`0.0 0.0 -0.075`} rotation={`90 0 0`} visible={indicator_visibility}></a-cylinder>
                   {/* J3 */}
-                  <a-entity j_id="3" id={`${robotId}_arm_left_j3`} gltf-model={`#${robotId}_arm_left_j3`} position={`0 -0.1032 -0.00624`} rotation={`0 ${theta3_left} 0`} 
+                  <a-entity j_id="3" id={`${robotId}_arm_left_j3`} gltf-model={`#${robotId}_arm_left_j3`} position={`0 -0.1032 -0.00624`} rotation={`0 ${theta_body_left[3]} 0`} 
                     ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(10, 41, 241, 1)" position={`0.075 0.0 0.0`} rotation={`0 0 90`} visible={indicator_visibility}></a-cylinder>
                     {/* J4 */}
-                    <a-entity j_id="4" id={`${robotId}_arm_left_j4`} gltf-model={`#${robotId}_arm_left_j4`} position={`0.01578 -0.08052 0.0`} rotation={`0 0 ${-theta4_left}`} 
+                    <a-entity j_id="4" id={`${robotId}_arm_left_j4`} gltf-model={`#${robotId}_arm_left_j4`} position={`0.01578 -0.08052 0.0`} rotation={`0 0 ${-theta_body_left[4]}`} 
                       ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(23, 242, 38, 1)" position={`0.075 0 0.0`} rotation={`0 0 90`} visible={indicator_visibility}></a-cylinder>
                       {/* J5 */}
-                      <a-entity j_id="5" id={`${robotId}_arm_left_j5`} gltf-model={`#${robotId}_arm_left_j5`} position={`0.1 -0.010 0.00189`} rotation={`${theta5_left} 0 0`} 
+                      <a-entity j_id="5" id={`${robotId}_arm_left_j5`} gltf-model={`#${robotId}_arm_left_j5`} position={`0.1 -0.010 -0.00189`} rotation={`${theta_body_left[5]} 0 0`} 
                         ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(242, 63, 23, 1)" position={`0.0 0.0 -0.075`} rotation={`90 0 0`} visible={indicator_visibility}></a-cylinder>
                         {/* J6 */}
-                        <a-entity j_id="6" id={`${robotId}_arm_left_j6`} gltf-model={`#${robotId}_arm_left_j6`} position={`0.038 0 0`} rotation={`0 0 ${-theta6_left}`} 
+                        <a-entity j_id="6" id={`${robotId}_arm_left_j6`} gltf-model={`#${robotId}_arm_left_j6`} position={`0.038 0 0`} rotation={`0 0 ${-theta_body_left[6]}`} 
                           ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(23, 242, 38, 1)" position={`0.075 0 0.0`} rotation={`0 0 90`} visible={indicator_visibility}></a-cylinder>
                           {/* J7 */}
-                          <a-entity j_id="7" id={`${robotId}_arm_left_j7`} gltf-model={`#${robotId}_arm_left_j7`} position={`0.046 0.0 0.0`} rotation={`0 ${theta7_left} 0`} 
+                          <a-entity j_id="7" id={`${robotId}_arm_left_j7`} gltf-model={`#${robotId}_arm_left_j7`} position={`0.046 0.0 0.0`} rotation={`0 ${theta_body_left[7]} 0`} 
                             ><a-cylinder radius={indicator_radius} height="0.15" color="rgba(10, 41, 241, 1)" position={`0.075 0.0 0.0`} rotation={`0 0 90`} visible={indicator_visibility}></a-cylinder>
                               {/* Left Hand */}
                               <a-entity j_id="hand_left_palm" id={`${robotId}_hand_left_palm`} gltf-model={`#${robotId}_hand_left_palm`} position={`0.0415 0.0 0.003`} rotation={`0 0 0`} 
                               >
                                 {/* Left Hand Thumb */}
-                                <a-entity j_id="hand_left_thumb_0" id={`${robotId}_hand_left_thumb_0`} gltf-model={`#${robotId}_hand_left_thumb_0`} position={`0.0255 0.0 0.0`} rotation={`0 0 ${theta_tool_left[0][0]}`} 
+                                <a-entity j_id="hand_left_thumb_0" id={`${robotId}_hand_left_thumb_0`} gltf-model={`#${robotId}_hand_left_thumb_0`} position={`0.0255 0.0 0.0`} rotation={`0 0 ${-theta_tool_left[0]}`} 
                                 >
-                                  <a-entity j_id="hand_left_thumb_1" id={`${robotId}_hand_left_thumb_1`} gltf-model={`#${robotId}_hand_left_thumb_1`} position={`-0.0025 0.0 0.0193`} rotation={`0 ${theta_tool_left[0][1]} 0`} 
+                                  <a-entity j_id="hand_left_thumb_1" id={`${robotId}_hand_left_thumb_1`} gltf-model={`#${robotId}_hand_left_thumb_1`} position={`-0.0025 0.0 0.0193`} rotation={`0 ${theta_tool_left[1]} 0`} 
                                   >
-                                    <a-entity j_id="hand_left_thumb_2" id={`${robotId}_hand_left_thumb_2`} gltf-model={`#${robotId}_hand_left_thumb_2`} position={`0.00 0.0 0.0458`} rotation={`0 ${theta_tool_left[0][2]} 0`} 
+                                    <a-entity j_id="hand_left_thumb_2" id={`${robotId}_hand_left_thumb_2`} gltf-model={`#${robotId}_hand_left_thumb_2`} position={`0.00 0.0 0.0458`} rotation={`0 ${theta_tool_left[2]} 0`} 
                                     >
                                     </a-entity>
                                   </a-entity>
                                 </a-entity>
                                 {/* Left Hand Index */}
-                                <a-entity j_id="hand_left_index_0" id={`${robotId}_hand_left_index_0`} gltf-model={`#${robotId}_hand_left_index_0`} position={`0.07771 0.02848 -0.00159`} rotation={`0 ${-theta_tool_left[1][0]} 0`} 
+                                <a-entity j_id="hand_left_index_0" id={`${robotId}_hand_left_index_0`} gltf-model={`#${robotId}_hand_left_index_0`} position={`0.07771 0.02848 -0.00159`} rotation={`0 ${theta_tool_left[5]} 0`} 
                                 >
-                                  <a-entity j_id="hand_left_index_1" id={`${robotId}_hand_left_index_1`} gltf-model={`#${robotId}_hand_left_index_1`} position={`0.0458 0.0 0.0`} rotation={`0 ${-theta_tool_left[1][1]} 0`} 
+                                  <a-entity j_id="hand_left_index_1" id={`${robotId}_hand_left_index_1`} gltf-model={`#${robotId}_hand_left_index_1`} position={`0.0458 0.0 0.0`} rotation={`0 ${theta_tool_left[6]} 0`} 
                                   >
                                   </a-entity>
                                 </a-entity>
                                 {/* Left Hand Middle */}
-                                <a-entity j_id="hand_left_middle_0" id={`${robotId}_hand_left_middle_0`} gltf-model={`#${robotId}_hand_left_middle_0`} position={`0.07771 -0.02848 -0.00159`} rotation={`0 ${-theta_tool_left[2][0]} 0`} 
+                                <a-entity j_id="hand_left_middle_0" id={`${robotId}_hand_left_middle_0`} gltf-model={`#${robotId}_hand_left_middle_0`} position={`0.07771 -0.02848 -0.00159`} rotation={`0 ${theta_tool_left[3]} 0`} 
                                 >
-                                  <a-entity j_id="hand_left_middle_1" id={`${robotId}_hand_left_middle_1`} gltf-model={`#${robotId}_hand_left_middle_1`} position={`0.0458 0.0 0.0`} rotation={`0 ${-theta_tool_left[2][1]} 0`} 
+                                  <a-entity j_id="hand_left_middle_1" id={`${robotId}_hand_left_middle_1`} gltf-model={`#${robotId}_hand_left_middle_1`} position={`0.0458 0.0 0.0`} rotation={`0 ${theta_tool_left[4]} 0`} 
                                   >
                                   </a-entity>
                                 </a-entity>

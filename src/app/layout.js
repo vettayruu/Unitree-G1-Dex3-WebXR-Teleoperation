@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Dual-Arm-AgileX-PiPER-Controller",
+  title: "Unitree-G1-Controller-LIU",
 };
 
 export default function RootLayout({ children }) {

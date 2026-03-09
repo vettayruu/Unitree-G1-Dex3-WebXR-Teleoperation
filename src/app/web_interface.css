@@ -1,6 +1,6 @@
 .right-arm{
     position: fixed;
-    top: 10px;
+    top: 5px;
     right: 10px;
     width: 250px;
     background-color:rgba(192,192,192,0.2);
@@ -13,7 +13,7 @@
 
 .left-arm{
     position: fixed;
-    top: 450px;
+    top: 425px;
     right: 10px;
     width: 250px;
     background-color:rgba(192,192,192,0.2);
@@ -24,9 +24,9 @@
     }
 }
 
-.cam-arm{
+.torso{
     position: fixed;
-    top: 10px;
+    top: 5px;
     right: 270px;
     width: 250px;
     background-color:rgba(192,192,192,0.2);
@@ -53,7 +53,7 @@
 .view-cam > span,
 .right-arm > span,
 .left-arm > span,
-.cam-arm > span {
+.torso > span {
   display: block;
   margin-bottom: 10px; 
   font-weight: bold;
@@ -111,4 +111,20 @@
   font-weight: bold;
   color: #00ffff;
   user-select: all;
+}
+
+.request-robot {
+    position: fixed;
+    top: 530px;
+    left: 10px;
+    width: 240px;
+    background-color:rgba(192,192,192,0.2);
+    padding: 10px;
+    display: grid;
+    button {
+        margin: 5px;
+        padding: 10px;
+        font-size: 1em;
+        cursor: pointer;
+    }
 }

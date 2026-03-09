@@ -1,43 +1,43 @@
 "use client";
 import 'aframe'
+let THREE;
+if (typeof window !== 'undefined' && window.AFRAME) {
+    THREE = window.AFRAME.THREE;
+}
+
 import * as React from 'react'
+import numeric from 'numeric';
+
 import { WebRTC_Video_Recv, WebRTC_Video_Send, WebRTC_Video_Send_Data, WebRTC_Data_Recv } from '../lib/WebRTC_Sora';
 import RobotScene from './RobotScene';
 import registerAframeComponents from './registerAframeComponents'; 
-import MQTT_Sub from './MQTT_Sub';
+import MQTT_Setup from './MQTT_Setup';
 import { mqttclient, idtopic, publishMQTT, subscribeMQTT, codeType } from '../lib/MetaworkMQTT'
-import numeric from 'numeric';
-import { IK_joint_velocity_limit, IK_joint_velocity, IK_finger } from '../modern_robotics/spatialKinematics.js';
+import { IK_joint_velocity_limit, IK_joint_velocity, IK_finger, Retarget } from '../modern_robotics/spatialKinematics.js';
+
 
 // On Windows, run the following command to allow script execution at first:
 // Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 
 /* ============================= Static Global Variables ==========================================*/
-const THREE = window.AFRAME.THREE;
 const mr = require('../modern_robotics/modern_robotics_core.js');
 const RobotKinematics = require('../modern_robotics/modern_robotics_Kinematics.js');
 
-// Load Robot Model Assets
-// Change your robot model: jaka_zu_5, agilex_piper, myCobot280, etc.
-const robot_list = [
-  // { robotId: "left_arm", robot_model: "unitree_g1_arm_left_body" },
-  { robotId: "body", robot_model: "unitree_g1_arm_right_body" },
-  // { robotId: "cam", robot_model: "myCobot280" }
+// Load Robot Model Assets, check 'Assets.js' for details
+const robot_assets = [
+    { robotId: "body", robot_model: "unitree_g1_dex3" },
 ];
 
-const toolLimit = { min: 0, max: 60 }; 
-
 const Euler_order = 'ZYX'; // Euler angle order
-
-const dt = 16.67/1000; // VR input period in seconds 
 
 // MQTT Topics
 const MQTT_REQUEST_TOPIC = "mgr/request";
 const MQTT_DEVICE_TOPIC = "dev/" + idtopic;
 const MQTT_CTRL_TOPIC = "control/"; 
 const MQTT_ROBOT_STATE_TOPIC = "robot/";
-const MQTT_SHARE_TOPIC = "share/";
-const MQTT_VR_TOPIC = "vr/";
+// const MQTT_COMMAND_TOPIC = "command/";
+// const MQTT_SHARE_TOPIC = "share/";
+// const MQTT_VR_TOPIC = "vr/";
 
 // IK State Codes
 const STATE_CODES = {
@@ -46,6 +46,16 @@ const STATE_CODES = {
   VELOCITY_LIMIT: 0x02,
   JOINT_LIMIT: 0x03,
 };
+
+// Robot Status Codes
+const JointReceiveStatus = Object.freeze({
+  WAITING: 0,          // 初期状態
+  ROBOT_REQUESTED: 1,  // 対象ロボットをリクエスト済み
+  ROBOT_RECEIVED: 2,   // 対象ロボットを受信済み SLRM Ready を待つ
+  SLRM_READY: 3,       // slrmReady になったので、ROBOTの state をsubscribe
+  JOINT_RECEIVED: 4,   // ROBOTから Joint を受信したのでIK worker に送信
+  READY: 5             // Robot Ready, Start MQTT Publish
+});
 
 /* ============================= Functions ==========================================*/
 const loadRobotParams = (robot_model) => {
@@ -93,16 +103,20 @@ function getAxisAngleFromQuatDiff(q_curr, q_init) {
     
     // 3. 提取单位轴 (x, y, z) / sin(theta/2)
     const s = Math.sqrt(1 - w * w);
-    let axis = [0, 0, 1]; // 默认轴，当 theta 趋近 0 时
+    // let axis = [0, 0, 1]; // 默认轴，当 theta 趋近 0 时
     
     if (s > 1e-6) {
-        axis = [q_rel.x / s, q_rel.y / s, q_rel.z / s];
+        const axis = [q_rel.x / s, q_rel.y / s, q_rel.z / s];
+        return { axis, theta };
+    } else {
+        // 当旋转角度非常小，轴的方向不确定，可以返回任意单位轴
+        return { axis: [0, 0, 1], theta: 0 };
     }
     
-    return { axis, theta };
+    // return { axis, theta };
 }
 
-function ScrewAxisToRMatrixOptimized(axis, theta) {
+function ScrewAxisToRMatrix(axis, theta) {
     const [nx, ny, nz] = axis;
     const s = Math.sin(theta);
     const c = Math.cos(theta);
@@ -117,33 +131,13 @@ function ScrewAxisToRMatrixOptimized(axis, theta) {
     ];
 }
 
-function getMiddleFingerR(dot) {
-    const d = Math.max(-1, Math.min(1, dot));
-    const bend = Math.sqrt(Math.max(0, 1 - d * d));
-
-    // 第一列 (末端X轴/指尖)：从 X 前转向 Z 上
-    const vX = [d, 0, bend];
-
-    // 第二列 (末端Y轴/侧向)：在这个弯曲动作中，侧向 Y 保持不变
-    const vY = [0, -1, 0];
-
-    // 第三列 (末端Z轴/掌心)：为了维持右手定则 (Z = X cross Y)
-    // 初始(dot=1)时为 [0, 0, 1]，当弯曲90度时变为 [-1, 0, 0]
-    const vZ = [-bend, 0, d];
-
-    return [
-        [vX[0], vY[0], vZ[0]],
-        [vX[1], vY[1], vZ[1]],
-        [vX[2], vY[2], vZ[2]]
-    ];
-}
-
 /* ============================= Main Component ==========================================*/
 export default function DynamicHome(props) {
   const [rendered, set_rendered] = React.useState(false)
+  const dtRef = React.useRef(0.01667);
 
-  const robotNameList = ["Model"]
-  const [robotName,set_robotName] = React.useState(robotNameList[0])
+  const robotNameList = ["UnitreeG1-remote-vr"]
+  const [robotName, set_robotName] = React.useState(robotNameList[0])
 
   // Load Robot Parameters
   const [robot_model_left, setRobotModelLeft] = React.useState("unitree_g1_arm_left_body");
@@ -250,14 +244,21 @@ export default function DynamicHome(props) {
     return controller_object_left;
   });
 
+  // HMD / Cam Controller
+  const [controller_object_cam, set_controller_object_cam] = React.useState(() => {
+    const controller_object_cam = new THREE.Object3D();
+    // console.log("Camera Object Created:", controller_object_cam);
+    return controller_object_cam;
+  });
+
   // Menu
-  const [showMenu, setShowMenu] = React.useState(false);
-  const [left_arm_mode, setLeftArmMode] = React.useState('free'); // 'free' or 'assist'
-  const [VR_Control_Mode, setControlMode] = React.useState('inSpace'); // 'inSpace' or 'inBody'
+  const [showMenu, setShowMenu] = React.useState(true);
+  const [left_arm_mode, setLeftArmMode] = React.useState('free'); // 'free' or 'assist', not used currently
+  const [VR_Control_Mode, setControlMode] = React.useState('inSpace'); // 'inSpace' or 'inBody', not used currently
   const [indicator, setIndicator] = React.useState('false');
   const [shareControl, setShareControl] = React.useState(false);
 
-  const [wholeBodyControl, setWholeBodyControl] = React.useState(false);
+  const [wholeBodyControl, setWholeBodyControl] = React.useState(false); // not used currently, reserved for future whole-body control extension
   React.useEffect(() => {
     if (robotParams.right !== null && robotParams.left !== null) {
       if (!wholeBodyControl) {
@@ -282,7 +283,7 @@ export default function DynamicHome(props) {
 
  // MQTT
   const [selectedMode, setSelectedMode] = React.useState('control'); 
-  const robotIDRef = React.useRef(idtopic); 
+  const robotIDRef = React.useRef(codeType); 
 
   // View Camera Pose
   const [view_cam_pose, setViewCamPose] = React.useState([0.24, 0.20, -0.67, 0, 150, 0]);
@@ -302,8 +303,8 @@ export default function DynamicHome(props) {
   const [DataRecv, setDataRecv] = React.useState(null);
 
   // Robot Tool
-  const toolNameList = ["No tool"]
-  const [toolName,set_toolName] = React.useState(toolNameList[0])
+  // const toolNameList = ["No tool"]
+  // const [toolName,set_toolName] = React.useState(toolNameList[0])
 
   // Change Robot
   const robotChange = ()=>{
@@ -319,26 +320,26 @@ export default function DynamicHome(props) {
 
   /* ---------------------- Control Parameters ------------------------------------*/
   // Right Arm 
-  const [robot_state, setRobotState] = React.useState(null);
-  const [theta_body, setThetaBody] = React.useState([]);
-  const [theta_tool, setThetaTool] = React.useState([[0, 0, 0], [0, 0], [0, 0]]);
+  const [theta_body, setThetaBody] = React.useState([0, 0, 0, 0, 0, 0, 0, 0]);
+  const [theta_tool, setThetaTool] = React.useState([0, 0, 0, 0, 0, 0, 0]);
   const [joint_limits_right, setJointLimitsRight] = React.useState([]);
   const [rightArmPosition, setRightArmPosition] = React.useState("0.0, 0.0, 0.0");
 
   // Left Arm
-  const [robot_state_left, setRobotStateLeft] = React.useState(null);
-  const [theta_body_left, setThetaBodyLeft] = React.useState([]); 
-  const [theta_tool_left, setThetaToolLeft] = React.useState([[0, 0, 0], [0, 0], [0, 0]]);
+  const [theta_body_left, setThetaBodyLeft] = React.useState([0, 0, 0, 0, 0, 0, 0, 0]);
+  const [theta_tool_left, setThetaToolLeft] = React.useState([0, 0, 0, 0, 0, 0, 0]);
   const [joint_limits_left, setJointLimitsLeft] = React.useState([]);
   const [leftArmPosition, setLeftArmPosition] = React.useState("0.0, 0.0, 0.0");
 
   // CAM Arm
-  const [robot_state_cam, setRobotStateCam] = React.useState(null);
-  const [theta_body_cam, setThetaBodyCam] = React.useState([]);
+  const [theta_body_cam, setThetaBodyCam] = React.useState([0, 0, 0]);
   const [joint_limits_cam, setJointLimitsCam] = React.useState([]);
 
   // Collision Check
   const [collision, setCollision] = React.useState(false);
+
+  // Robot State
+  const [robot_state, setRobotState] = React.useState(null);
 
   /* ---------------------- Right Arm Initialize ------------------------------------*/
   const [rightArmInitialized, setRightArmInitialized] = React.useState(false);
@@ -364,7 +365,7 @@ export default function DynamicHome(props) {
 
   /* ---------------------- Left Arm Initialize ------------------------------------*/
   const [leftArmInitialized, setLeftArmInitialized] = React.useState(false);
-  const [position_ee_left, setPositionEELeft] = React.useState([0.19978+0.0415,-0.14847,-0.19654+0.29178]);
+  const [position_ee_left, setPositionEELeft] = React.useState([0.19978+0.0415, 0.14847, -0.19654+0.29178]);
   const [euler_ee_left, setEulerEELeft] = React.useState([0,0,0]);
   const [R_ee_left, setREELeft] = React.useState(
     [[1,0,0],
@@ -386,12 +387,12 @@ export default function DynamicHome(props) {
 
   /* ------------------------- Cam Arm Initialize ------------------------------------*/
   const [camArmInitialized, setCamArmInitialized] = React.useState(false);
-  const [position_ee_cam, setPositionEECam] = React.useState([0,0,0]);
-  const [euler_ee_cam, setEulerEECam] = React.useState([0,0,0]);
+  const [position_ee_cam, setPositionEECam] = React.useState([-0.00396,0,0.044]);
+  const [euler_ee_cam, setEulerEECam] = React.useState([0,0,0]); //[-Math.PI/2-Math.PI/4,0,0]
   const [R_ee_cam, setREECam] = React.useState(
-    [1,0,0],
-    [0,1,0],
-    [0,0,1]
+    [[1,0,0],
+     [0,1,0],
+     [0,0,1]]
   );
 
   React.useEffect(() => {
@@ -406,34 +407,213 @@ export default function DynamicHome(props) {
     }
   }, [robotParams.cam]);
 
+
+  /* ======================== Waist Control (use hmd)) ================================*/
+  // const lastVRPosRef_cam = React.useRef(null);
+  // const lastQuatRef_cam = React.useRef(null);
+  // const thetaBodyCamRef = React.useRef(theta_body_cam);
+  // const positionEECamRef = React.useRef(position_ee_cam);
+  // const REECamRef = React.useRef(R_ee_cam);
+
+  // React.useEffect(() => {
+  //   if (!rendered || !vrModeRef.current || showMenu) return;
+  //   if (!thetaBodyCamRef.current || !positionEECamRef.current || !REECamRef.current) return;
+
+  //   const { position: p_raw, quaternion: q_raw } = controller_object_cam;
+  //   console.log("Cam Controller Raw Position:", p_raw);
+  //   console.log("Cam Controller Raw Quaternion:", q_raw);
+
+  //   if (!lastVRPosRef_cam.current) {
+  //       lastVRPosRef_cam.current = [p_raw.x, p_raw.y, p_raw.z];
+  //       lastQuatRef_cam.current = q_raw.clone(); 
+  //       return; 
+  //     }
+
+  //     // --- A. Delta Position ---
+  //     const pos_diff_world = three2world([
+  //       p_raw.x - lastVRPosRef_cam.current[0],
+  //       p_raw.y - lastVRPosRef_cam.current[1],
+  //       p_raw.z - lastVRPosRef_cam.current[2]
+  //     ]);
+
+  //     lastVRPosRef_cam.current[0] = p_raw.x;
+  //     lastVRPosRef_cam.current[1] = p_raw.y;
+  //     lastVRPosRef_cam.current[2] = p_raw.z;
+
+  //     // --- B. Axis-Angle ---
+  //     const { axis, theta } = getAxisAngleFromQuatDiff(q_raw, lastQuatRef_cam.current);
+  //     console.log("Cam Controller Rotation Axis:", axis);
+  //     console.log("Cam Controller Rotation Angle (rad):", theta);
+
+  //     lastQuatRef_cam.current.copy(q_raw);
+
+  //     // --- C. Target Pose ---
+  //     const newP = [
+  //       position_ee_left[0] + pos_diff_world[0],
+  //       position_ee_left[1] + pos_diff_world[1],
+  //       position_ee_left[2] + pos_diff_world[2]
+  //     ];
+
+  //     const axis_world = [-axis[2], -axis[0], axis[1]];
+  //     console.log("Cam Controller Rotation Axis in World Frame:", axis_world);
+
+  //     const R_rel = ScrewAxisToRMatrix(axis_world, theta);
+  //     console.log("Cam Controller Relative Rotation Matrix:", R_rel);
+  //     console.log("Current End-Effector Rotation Matrix:", R_ee_cam);
+
+  //     const newT = mr.RpToTrans(numeric.dot(R_rel, R_ee_cam), newP);
+  //     console.log("newT:", newT);
+
+  //     let new_theta_cam, success
+  //     [new_theta_cam, success] = mr.IKRetarget(
+  //       Slist_cam, 
+  //       M_cam, 
+  //       newT, 
+  //       thetaBodyCamRef.current,
+  //       1e-3, 1e-3
+  //     );    
+
+  //     // console.log("New Theta Cam:", new_theta_cam);
+  //     // Ref Update
+  //     thetaBodyCamRef.current = new_theta_cam;
+
+  //     const T_cam = mr.FKinSpace(M_cam, Slist_cam, new_theta_cam);
+  //     const [R_cam, p_cam] = mr.TransToRp(T_cam);
+      
+  //     positionEECamRef.current = p_cam;
+  //     REECamRef.current = R_cam;
+
+  //     const euler_ee_cam = worlr2three(mr.RotMatToEuler(R_cam, Euler_order))
+
+  //     setThetaBodyCam(new_theta_cam);
+  //     setErrorCodeCam(success ? 0 : 1);
+  //     setPositionEECam(p_cam);
+  //     setREECam(R_cam);
+  //     setEulerEECam(euler_ee_cam);
+
+  // }, [
+  //   controller_object_cam.position.x,
+  //   controller_object_cam.position.y,
+  //   controller_object_cam.position.z,
+  //   controller_object_cam.quaternion.x,
+  //   controller_object_cam.quaternion.y,
+  //   controller_object_cam.quaternion.z,
+  //   controller_object_cam.quaternion.w,
+  //   rendered, 
+  //   vrModeRef.current
+  // ]);
+
+  // React.useEffect(() => {
+  //   thetaBodyCamRef.current = theta_body_cam;
+  //   positionEECamRef.current = position_ee_cam;
+  //   REECamRef.current = R_ee_cam;
+  // }, [theta_body_cam, position_ee_cam, R_ee_cam]);
+    
+  const lastVRPosRef_cam = React.useRef(null);
+  const lastQuatRef_cam = React.useRef(null);
+  const thetaBodyCamRef = React.useRef(theta_body_cam);
+  const positionEECamRef = React.useRef(position_ee_cam);
+  const REECamRef = React.useRef(R_ee_cam);
+
+  React.useLayoutEffect(() => {
+    if (!rendered || !vrModeRef.current || showMenu || !wholeBodyControl ) return;
+
+    const q_raw = controller_object_cam.quaternion;
+
+    // --- 初始化参考姿态 ---
+    if (!lastQuatRef_cam.current) {
+      lastQuatRef_cam.current = q_raw.clone();
+      return;
+    }
+
+    // --- 计算相对四元数 ---
+    const q_rel = new THREE.Quaternion()
+      .copy(lastQuatRef_cam.current)
+      .invert()
+      .premultiply(q_raw);
+
+    // --- 提取欧拉角（YXZ 顺序适合人体腰部）---
+    const euler = new THREE.Euler().setFromQuaternion(q_rel, 'YXZ');
+
+    // --- 直接映射到关节角度 ---
+    // 假设 theta_body_cam = [waist_yaw, waist_pitch, waist_roll]
+    const new_theta_cam = [
+      euler.y,  // Yaw (左右转头)
+      -euler.z * 0.8,  // Pitch (俯仰)
+      -euler.x   // Roll (可选，一般不需要)
+    ];
+
+      // Ref Update
+      thetaBodyCamRef.current = new_theta_cam;
+
+      const T_cam = mr.FKinSpace(M_cam, Slist_cam, new_theta_cam);
+      const [R_cam, p_cam] = mr.TransToRp(T_cam);
+      
+      positionEECamRef.current = p_cam;
+      REECamRef.current = R_cam;
+      const euler_ee_cam = worlr2three(mr.RotMatToEuler(R_cam, Euler_order))
+
+      setThetaBodyCam(new_theta_cam);
+      setErrorCodeCam(0);
+      setPositionEECam(p_cam);
+      setREECam(R_cam);
+      setEulerEECam(euler_ee_cam);
+
+    // --- 关节限位 ---
+    // const limited_theta_cam = new_theta_cam.map((angle, i) => {
+    //   if (joint_limits_cam[i]) {
+    //     return Math.max(
+    //       joint_limits_cam[i][0],
+    //       Math.min(joint_limits_cam[i][1], angle)
+    //     );
+    //   }
+    //   return angle;
+    // });
+
+    // --- 更新状态 ---
+    // thetaBodyCamRef.current = limited_theta_cam;
+    // setThetaBodyCam(limited_theta_cam);
+
+  }, [
+    controller_object_cam.position.x,
+    controller_object_cam.position.y,
+    controller_object_cam.position.z,
+    controller_object_cam.quaternion.x,
+    controller_object_cam.quaternion.y,
+    controller_object_cam.quaternion.z,
+    controller_object_cam.quaternion.w,
+    rendered,
+    vrModeRef.current,
+    showMenu
+  ]);
+
   /*======================= VR Right Robot Arm Control ====================================*/
-  /* ---------------------- Right VR Controller Motion ------------------------------------*/
-  // Update VR controller position and rotation matrix
-  // !! Do not use Euler angle for control, since it can cause gimbal lock !!
-  // 优化后的控制逻辑：使用四元数差值
-  const lastVRPosRef = React.useRef(null);
-  const lastQuatRef = React.useRef(null); // 改为存储四元数副本
+  /*** Right Arm Unified Control Loop (Use Quaternion Diff to get rotation axis in space) ***/
+
+  const lastVRPosRef = React.useRef(null); // Last Position Reference for Delta Calculation
+  const lastQuatRef = React.useRef(null);  // Last Quaternion Reference for Rotation Calculation 
 
   const thetaBodyRef = React.useRef(theta_body);
   const positionEERef = React.useRef(position_ee);
   const REERef = React.useRef(R_ee);
+  const EulerEERef = React.useRef(euler_ee);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!rendered || !vrModeRef.current || showMenu || shareControl) return;
     if (!thetaBodyRef.current || !positionEERef.current || !REERef.current) return;
 
     if (trigger_on) {
       const { position: p_raw, quaternion: q_raw } = controller_object;
 
-      // --- 初始帧处理 (锚点锁定) ---
+      // --- Initial Frame ---
       if (!lastVRPosRef.current) {
         lastVRPosRef.current = [p_raw.x, p_raw.y, p_raw.z];
-        lastQuatRef.current = q_raw.clone(); // 记录按下瞬间的姿态
+        lastQuatRef.current = q_raw.clone(); // Record initial quaternion as reference
         return;
       }
 
-      // --- A. 计算位移增量 ---
-      const pos_diff_world = mr.three2world([
+      // --- A. Pisition Difference ---
+      const pos_diff_world = three2world([
         p_raw.x - lastVRPosRef.current[0],
         p_raw.y - lastVRPosRef.current[1],
         p_raw.z - lastVRPosRef.current[2]
@@ -443,63 +623,53 @@ export default function DynamicHome(props) {
       lastVRPosRef.current[1] = p_raw.y;
       lastVRPosRef.current[2] = p_raw.z;
 
-      // --- B. 直接从四元数计算旋转轴和角度 (关键优化) ---
+      // --- B. Get rotation axis and angle from quaterion difference ---
       const { axis, theta } = getAxisAngleFromQuatDiff(q_raw, lastQuatRef.current);
       
-      // 更新姿态锚点
+      // Update last quaternion reference
       lastQuatRef.current.copy(q_raw);
 
-      // --- C. 计算机械臂目标位姿 ---
-      const p_scale = 1.0;
-      const R_scale = 1.0;
-      
+      // --- C. Calculate Target SE3 ---
       const newP = [
-        position_ee[0] + pos_diff_world[0] * p_scale,
-        position_ee[1] + pos_diff_world[1] * p_scale,
-        position_ee[2] + pos_diff_world[2] * p_scale
+        position_ee[0] + pos_diff_world[0],
+        position_ee[1] + pos_diff_world[1],
+        position_ee[2] + pos_diff_world[2]
       ];
 
-      let newT;
-      if (VR_Control_Mode === 'inSpace') {
-        // 空间模式：注意这里可以直接应用坐标转换映射
-        // 如果你的轴需要映射：[-axis[2], -axis[0], axis[1]]
-        const axis_world = [-axis[2], -axis[0], axis[1]]; 
-        const R_rel = ScrewAxisToRMatrixOptimized(axis_world, theta * R_scale); 
-        newT = mr.RpToTrans(numeric.dot(R_rel, R_ee), newP);
-      } else {
-        // 身体模式
-        // const axis_body = [-axis[2], -axis[0], axis[1]]; 
-        const R_rel = ScrewAxisToRMatrixOptimized(axis, theta * R_scale); 
-        newT = mr.RpToTrans(numeric.dot(R_ee, R_rel), newP);
-      }
+      // let newT;
+      // if (VR_Control_Mode === 'inSpace') {
+      //   const axis_world = [-axis[2], -axis[0], axis[1]]; 
+      //   const R_rel = ScrewAxisToRMatrix(axis_world, theta); 
+      //   newT = mr.RpToTrans(numeric.dot(R_rel, R_ee), newP);
+      // } else {
+      //   const R_rel = ScrewAxisToRMatrix(axis, theta); 
+      //   newT = mr.RpToTrans(numeric.dot(R_ee, R_rel), newP);
+      // }
 
-      // --- D. 执行 IK 与 限速 ---
-      const { new_theta_body, error_code } = IK_joint_velocity(
+      const axis_world = [-axis[2], -axis[0], axis[1]]; 
+      const R_rel = ScrewAxisToRMatrix(axis_world, theta); 
+      const newT = mr.RpToTrans(numeric.dot(R_rel, R_ee), newP);
+
+      // --- D. IK ---
+      const { new_theta_body, error_code } = IK_joint_velocity_limit(
         newT, M_right, Slist_right, Blist_right, 
         joint_limits_right, 
-        // thetaBodyRef.current,
-        theta_body, 
+        thetaBodyRef.current,
+        // theta_body, 
         VR_Control_Mode, 
-        dt
+        dtRef.current
       );
 
-      // setThetaBody(new_theta_body);
-      // setErrorCode(error_code);
-
-      // ✅ 更新 ref（不触发重渲染）
-      thetaBodyRef.current = new_theta_body;
-
-      // 计算新的末端位姿
+      // Update refs with new values (without triggering re-render)
       const T_right = mr.FKinSpace(M_right, Slist_right, new_theta_body);
       const [R_right, p_right] = mr.TransToRp(T_right);
-      
-      // ✅ 更新 ref
-      positionEERef.current = p_right;
-      REERef.current = R_right;
-
       const euler_ee = worlr2three(mr.RotMatToEuler(R_right, Euler_order))
 
-      // ✅ 批量更新状态（只触发一次渲染）
+      thetaBodyRef.current = new_theta_body;
+      positionEERef.current = p_right;
+      REERef.current = R_right;
+      EulerEERef.current = euler_ee;
+
       setThetaBody(new_theta_body);
       setErrorCode(error_code);
       setPositionEE(p_right);
@@ -507,7 +677,7 @@ export default function DynamicHome(props) {
       setEuler(euler_ee);
 
     } else {
-      // --- 重置状态 ---
+      // --- Reset as trigger off ---
       if (lastVRPosRef.current) {
         lastVRPosRef.current = null;
         lastQuatRef.current = null;
@@ -525,105 +695,95 @@ export default function DynamicHome(props) {
     VR_Control_Mode
   ]);
 
+  // React for Render
   React.useEffect(() => {
     thetaBodyRef.current = theta_body;
     positionEERef.current = position_ee;
     REERef.current = R_ee;
   }, [theta_body, position_ee, R_ee]);
 
-  /*======================= VR Right Left Arm Control ====================================*/
-  /* ---------------------- Left VR Controller Motion ------------------------------------*/
-  /*** Left Arm Unified Control Loop (Optimized with Quaternion Diff) ***/
+  /*======================= VR Left Arm Control ====================================*/
   const lastVRPosRef_left = React.useRef(null);
-  const lastQuatRef_left = React.useRef(null); // 使用四元数存储姿态锚点
+  const lastQuatRef_left = React.useRef(null);
 
   const thetaBodyLeftRef = React.useRef(theta_body_left);
   const positionEELeftRef = React.useRef(position_ee_left);
   const REELeftRef = React.useRef(R_ee_left);
+  const EulerEELeftRef = React.useRef(euler_ee_left);
 
-  React.useEffect(() => {
-    // 1. 运行条件检查
+  React.useLayoutEffect(() => {
     if (!rendered || !vrModeRef.current || showMenu || shareControl) return;
     if (!thetaBodyLeftRef.current || !positionEELeftRef.current || !REELeftRef.current) return;
 
     if (trigger_on_left) {
       const { position: p_raw, quaternion: q_raw } = controller_object_left;
 
-      // --- 初始帧锚点锁定 ---
       if (!lastVRPosRef_left.current) {
         lastVRPosRef_left.current = [p_raw.x, p_raw.y, p_raw.z];
-        lastQuatRef_left.current = q_raw.clone(); // 记录起始四元数
+        lastQuatRef_left.current = q_raw.clone(); 
         return; 
       }
 
-      // --- A. 计算位移增量 (Delta Position) ---
-      const pos_diff_world = mr.three2world([
+      // --- A. Delta Position ---
+      const pos_diff_world = three2world([
         p_raw.x - lastVRPosRef_left.current[0],
         p_raw.y - lastVRPosRef_left.current[1],
         p_raw.z - lastVRPosRef_left.current[2]
       ]);
 
-      // 原地更新位移锚点
       lastVRPosRef_left.current[0] = p_raw.x;
       lastVRPosRef_left.current[1] = p_raw.y;
       lastVRPosRef_left.current[2] = p_raw.z;
 
-      // --- B. 计算旋转增量 (通过四元数差值提取 Axis-Angle) ---
-      // 调用之前定义的 getAxisAngleFromQuatDiff
+      // --- B. Axis-Angle ---
       const { axis, theta } = getAxisAngleFromQuatDiff(q_raw, lastQuatRef_left.current);
 
-      // 更新旋转锚点
       lastQuatRef_left.current.copy(q_raw);
 
-      // --- C. 计算机械臂目标位姿 (Target Pose) ---
-      const p_scale = 1.0;
-      const R_scale = 1.0;
+      // --- C. Target Pose ---
       const newP = [
-        position_ee_left[0] + pos_diff_world[0] * p_scale,
-        position_ee_left[1] + pos_diff_world[1] * p_scale,
-        position_ee_left[2] + pos_diff_world[2] * p_scale
+        position_ee_left[0] + pos_diff_world[0],
+        position_ee_left[1] + pos_diff_world[1],
+        position_ee_left[2] + pos_diff_world[2]
       ];
 
-      let newT;
-      if (VR_Control_Mode === 'inSpace') {
-        // 空间坐标系映射 (维持之前的轴映射逻辑)
-        const axis_world = [-axis[2], -axis[0], axis[1]];
-        const R_rel = ScrewAxisToRMatrixOptimized(axis_world, theta * R_scale);
-        newT = mr.RpToTrans(numeric.dot(R_rel, R_ee_left), newP);
-      } else {
-        // 身体坐标系映射
-        // const axis_body = three2world(axis); // 如果需要映射轴到身体坐标系，使用相同的转换
-        const R_rel = ScrewAxisToRMatrixOptimized(axis, theta * R_scale);
-        newT = mr.RpToTrans(numeric.dot(R_ee_left, R_rel), newP);
-      }
+      const axis_world = [-axis[2], -axis[0], axis[1]];
+      const R_rel = ScrewAxisToRMatrix(axis_world, theta);
+      const newT = mr.RpToTrans(numeric.dot(R_rel, R_ee_left), newP);
 
-      // --- D. 执行 IK 与 限速 ---
-      const { new_theta_body, error_code } = IK_joint_velocity(
+      // let newT;
+      // if (VR_Control_Mode === 'inSpace') {
+      //   const axis_world = [-axis[2], -axis[0], axis[1]];
+      //   const R_rel = ScrewAxisToRMatrix(axis_world, theta);
+      //   newT = mr.RpToTrans(numeric.dot(R_rel, R_ee_left), newP);
+      // } else {
+      //   const R_rel = ScrewAxisToRMatrix(axis, theta);
+      //   newT = mr.RpToTrans(numeric.dot(R_ee_left, R_rel), newP);
+      // }
+
+      // --- D. IK ---
+      const { new_theta_body, error_code } = IK_joint_velocity_limit(
         newT, 
         M_left, 
         Slist_left, 
         Blist_left, 
         joint_limits_left, 
-        theta_body_left, 
-        // thetaBodyLeftRef.current,
+        // theta_body_left, 
+        thetaBodyLeftRef.current,
         VR_Control_Mode,
-        dt
+        dtRef.current
       );
 
-      // ✅ 更新 ref（不触发重渲染）
-      thetaBodyLeftRef.current = new_theta_body;
-
-      // 计算新的末端位姿
       const T_left = mr.FKinSpace(M_left, Slist_left, new_theta_body);
       const [R_left, p_left] = mr.TransToRp(T_left);
-      
-      // ✅ 更新 ref
-      positionEELeftRef.current = p_left;
-      REELeftRef.current = R_left;
-
       const euler_ee_left = worlr2three(mr.RotMatToEuler(R_left, Euler_order))
 
-      // ✅ 批量更新状态（只触发一次渲染）
+      // Ref Update
+      thetaBodyLeftRef.current = new_theta_body;
+      positionEELeftRef.current = p_left;
+      REELeftRef.current = R_left;
+      EulerEELeftRef.current = euler_ee_left;
+
       setThetaBodyLeft(new_theta_body);
       setErrorCodeLeft(error_code);
       setPositionEELeft(p_left);
@@ -631,7 +791,7 @@ export default function DynamicHome(props) {
       setEulerEELeft(euler_ee_left);
 
     } else {
-      // --- Trigger 释放时重置 ---
+      // --- Trigger Off Reset ---
       if (lastVRPosRef_left.current) {
         lastVRPosRef_left.current = null;
         lastQuatRef_left.current = null;
@@ -646,10 +806,11 @@ export default function DynamicHome(props) {
     controller_object_left.quaternion.z,
     controller_object_left.quaternion.w,
     trigger_on_left,
-    VR_Control_Mode
+    VR_Control_Mode,
+    rendered
   ]);
 
-  // ✅ 同步 ref 初始值
+  // Refresh for Left Arm
   React.useEffect(() => {
     thetaBodyLeftRef.current = theta_body_left;
     positionEELeftRef.current = position_ee_left;
@@ -658,12 +819,14 @@ export default function DynamicHome(props) {
 
 
   /* ---------------------- Hand Control ------------------------------------*/
+  // Figer Points Distance
   const [thumb_index_right, setThumbIndexRight] = React.useState(0);
   const [middle_wrist_right, setMiddleWristRight] = React.useState(0);
   const [thumb_index_left, setThumbIndexLeft] = React.useState(0);
   const [middle_wrist_left, setMiddleWristLeft] = React.useState(0);
 
-  const [middle_dot_right, setMiddleDotRight] = React.useState([1]);
+  const thetaToolRightRef = React.useRef(theta_body);
+  const thetaToolLeftRef = React.useRef(theta_body_left);
 
   // const initialThetas = [
   //   [0, 0, 0], // thumb
@@ -718,21 +881,31 @@ export default function DynamicHome(props) {
 
   // }, [thumb_index_right, middle_wrist_right, middle_dot_right]);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!rendered || !vrModeRef.current || showMenu || shareControl) return;
-    const newThumbRight = [thumb_index_right * (30), thumb_index_right * (17), thumb_index_right * (46)];
+    const newThumbRight = [-thumb_index_right * (30), -thumb_index_right * (17), -thumb_index_right * (46)];
     const newIndexRight = [thumb_index_right * (62), thumb_index_right * (55)];
     const newMiddleRight = [middle_wrist_right * (75), middle_wrist_right * (75)];
-    setThetaTool([newThumbRight, newIndexRight, newMiddleRight]);
+    setThetaTool([...newThumbRight, ...newMiddleRight, ...newIndexRight]);
   }, [thumb_index_right, middle_wrist_right]);
 
   React.useEffect(() => {
+    thetaToolRightRef.current = theta_tool;
+  }, [theta_tool]);
+
+  React.useLayoutEffect(() => {
     if (!rendered || !vrModeRef.current || showMenu || shareControl) return;
-    const newThumbLeft = [thumb_index_left * (30), thumb_index_left * (17), thumb_index_left * (46)];
-    const newIndexLeft = [thumb_index_left * (62), thumb_index_left * (55)];
-    const newMiddleLeft = [middle_wrist_left * (75), middle_wrist_left * (75)];
-    setThetaToolLeft([newThumbLeft, newIndexLeft, newMiddleLeft]);
+    const newThumbLeft = [-thumb_index_left * (30), thumb_index_left * (17), thumb_index_left * (46)];
+    const newIndexLeft = [-thumb_index_left * (62), -thumb_index_left * (55)];
+    const newMiddleLeft = [-middle_wrist_left * (75), -middle_wrist_left * (75)];
+    const hand_joints = [...newThumbLeft, ...newMiddleLeft, ...newIndexLeft ]
+    console.log("Hand Joint Values (deg):", hand_joints);
+    setThetaToolLeft([...newThumbLeft, ...newMiddleLeft, ...newIndexLeft ]);
   }, [thumb_index_left, middle_wrist_left]);
+
+  React.useEffect(() => {
+    thetaToolLeftRef.current = theta_tool_left;
+  }, [theta_tool_left]);
 
   // Button
   React.useEffect(() => {
@@ -775,41 +948,13 @@ export default function DynamicHome(props) {
   //   }
   // }, [collision, theta_body, theta_body_left]);
 
-  /* ======================== CAM Arm Control ================================*/
-  React.useEffect(() => {
-    if (rendered && vrModeRef.current && !showMenu) {
-      const euler_sensitivity = 0.025
-      const position_sensitivity = 0.002
 
-      theta_body_cam[1] += -thumbstick_right[0] * euler_sensitivity
-      theta_body_cam[2] += -thumbstick_right[1] * euler_sensitivity
-      setThetaBodyCam(theta_body_cam);
-
-      // theta_body[0] = theta_body_cam[0]; 
-      // theta_body[2] = theta_body[2] + thumbstick_right[1] * euler_sensitivity
-      // setThetaBody(theta_body);
-
-      // theta_body_left[0] = theta_body_cam[0]
-      // theta_body_left[2] = theta_body_left[2] + thumbstick_left[1] * euler_sensitivity
-      // setThetaBodyLeft(theta_body_left);
-
-    }
-
-  }, [rendered, vrModeRef.current, thumbstick_left, thumbstick_right]);
-
-
-  /* ========================= Web Interface =========================*/
-  // 1. 增加一个用于存储 UI 快照的 Ref
+  /* ========================= Web Interface (Only for Web Control) =========================*/
   const lastInterfacePropsRef = React.useRef(null);
-
   const interfacePropos = React.useMemo(() => {
-    // --- 阻隔逻辑 ---
-    // 如果当前在 VR 模式，且我们已经存过一份快照，则直接返回快照
     if (vrModeRef.current && lastInterfacePropsRef.current) {
       return lastInterfacePropsRef.current;
     }
-
-    // --- 原始对象构造 ---
     const currentProps = {
       robotName, robotNameList, set_robotName,
       view_cam_pose, setViewCamPose,
@@ -825,18 +970,13 @@ export default function DynamicHome(props) {
       joint_limits_left, setJointLimitsLeft,
       theta_body_cam, setThetaBodyCam,
       joint_limits_cam, setJointLimitsCam,
+      requestRobot: () => requestRobot(mqttclient),
     };
-
-    // 更新快照，以便下次进入 VR 时使用
     lastInterfacePropsRef.current = currentProps;
-    
     return currentProps;
-
-    // 注意：虽然逻辑上阻隔了，但 React 要求依赖项必须完整
   }, [
     robotName, robotNameList, set_robotName,
     view_cam_pose, setViewCamPose,
-    // vrModeRef.current 不需要放这里，因为 Ref 改变不触发 memo
     selectedMode, setSelectedMode,
     theta_body, setThetaBody,
     theta_tool, setThetaTool,
@@ -848,11 +988,11 @@ export default function DynamicHome(props) {
     joint_limits_left, setJointLimitsLeft,
     theta_body_cam, setThetaBodyCam,
     joint_limits_cam, setJointLimitsCam,
-    // 必须添加一个触发开关，比如进入 VR 瞬间产生的 State 变化
-    rendered 
+    rendered,
+    mqttclient
   ]);
 
-  /* =============== VRController Inputs (Aframe Components) =================*/
+  /* =========================== Aframe Components ==============================*/
   React.useEffect(() => {
     registerAframeComponents({
       set_rendered,
@@ -879,11 +1019,13 @@ export default function DynamicHome(props) {
       // Right Hand
       setThumbIndexRight,
       setMiddleWristRight,
-      setMiddleDotRight,
 
       // Left Hand
       setThumbIndexLeft,
       setMiddleWristLeft,
+
+      // HMD
+      set_controller_object_cam,
 
       //Collision Check
       // collision,
@@ -905,131 +1047,21 @@ export default function DynamicHome(props) {
     });
   }, []);
 
+
   /* ============================== MQTT ==========================================*/
+  // Robot Request
+  const [robotRequested, setRobotRequested] = React.useState(false); // Request Flag for Robot State Initialization
 
-  // const thetaBodyMQTT = React.useRef(theta_body);
-  // React.useEffect(() => {
-  //   thetaBodyMQTT.current = theta_body;
-  // }, [theta_body]);
+  const requestRobot = (mqclient) => {
+    const requestInfo = {
+      devId: idtopic,
+      type: codeType,
+    }
+    publishMQTT(MQTT_REQUEST_TOPIC, JSON.stringify(requestInfo));
+    setRobotRequested(true);
+  }
 
-  // const thetaToolMQTT = React.useRef(theta_tool);
-  // React.useEffect(() => {
-  //   thetaToolMQTT.current = theta_tool;
-  // }, [theta_tool]);
-
-  // const thetaBodyLeftMQTT = React.useRef(theta_body_left);
-  // React.useEffect(() => {
-  //   thetaBodyLeftMQTT.current = theta_body_left;
-  // }, [theta_body_left]);
-
-  // const thetaToolLeftMQTT = React.useRef(theta_tool_left);
-  // React.useEffect(() => {
-  //   thetaToolLeftMQTT.current = theta_tool_left;
-  // }, [theta_tool_left]);
-
-  // const thetaBodyCamMQTT = React.useRef(theta_body_cam);
-  // React.useEffect(() => {
-  //   thetaBodyCamMQTT.current = theta_body_cam.map(val => Number(val.toFixed(2)));
-  // }, [theta_body_cam]);
-
-  
-  /* ---------------------- Robot Control MQTT message ------------------------------------*/
-
-  /* Animation Frame for MQTT Publish */
-  // React.useEffect(() => {
-  //   window.requestAnimationFrame(onAnimationMQTT);
-  // }, []);
-  // const onAnimationMQTT = (time) =>{
-  //   const robot_state_json = JSON.stringify({
-  //     time: time,
-  //     joint: thetaBodyMQTT.current,
-  //     tool: thetaToolMQTT.current,
-  //     joint_left: thetaBodyLeftMQTT.current,
-  //     tool_left: thetaToolLeftMQTT.current,
-  //     cam: thetaBodyCamMQTT.current
-  //   });
-  //   // publishMQTT(MQTT_ROBOT_STATE_TOPIC + robotIDRef.current , robot_state_json); 
-  //   // console.log("onAnimationMQTT published:", robot_state_json);
-  //   window.requestAnimationFrame(onAnimationMQTT); 
-  // }
-
-  /* VR Frame for MQTT Publish */
-  const receiveStateRef = React.useRef(true); // VR MQTT switch
-
-  // // Publish control JSON messages (entire)
-  // React.useEffect(() => {
-  //     const ctl_json = JSON.stringify({
-  //       timestamp: Date.now(),
-  //       joint: thetaBodyMQTT.current,
-  //       tool: thetaToolMQTT.current,
-  //       joint_left: thetaBodyLeftMQTT.current,
-  //       tool_left: thetaToolLeftMQTT.current,
-  //       cam: thetaBodyCamMQTT.current
-  //     });
-  //     if ((mqttclient != null) && receiveStateRef.current && !shareControl && !showMenu) {
-  //       publishMQTT(MQTT_CTRL_TOPIC + robotIDRef.current, ctl_json);
-  //       // console.log("onXRFrameMQTT published:", MQTT_CTRL_TOPIC + robotIDRef.current, ctl_json);
-  //     }
-  // }, [
-  //   thetaBodyMQTT.current, 
-  //   thetaToolMQTT.current, 
-  //   thetaBodyLeftMQTT.current, 
-  //   thetaToolLeftMQTT.current, 
-  //   thetaBodyCamMQTT.current
-  // ]);
-
-  // Publish control JSON messages (individual)
-  // React.useEffect(() => {
-  //   const json_msg = JSON.stringify({
-  //     timestamp: Date.now(),
-  //     joint: thetaBodyMQTT.current,
-  //   });
-  //   if ((mqttclient != null) && receiveStateRef.current && rendered && !showMenu && !shareControl) {
-  //     publishMQTT(MQTT_CTRL_TOPIC + 'right/' + 'joint/' + robotIDRef.current, json_msg);
-  //   }
-  // }, [thetaBodyMQTT.current]);
-
-  // React.useEffect(() => {
-  //   const json_msg = JSON.stringify({
-  //     timestamp: Date.now(),
-  //     tool: thetaToolMQTT.current,
-  //   });
-  //   if ((mqttclient != null) && receiveStateRef.current && rendered && !showMenu) {
-  //     publishMQTT(MQTT_CTRL_TOPIC + 'right/' + 'tool/' + robotIDRef.current, json_msg);
-  //   }
-  // }, [thetaToolMQTT.current, robot_state]);
-
-  // React.useEffect(() => {
-  //   const json_msg = JSON.stringify({
-  //     timestamp: Date.now(),
-  //     joint: thetaBodyLeftMQTT.current,
-  //   });
-  //   if ((mqttclient != null) && receiveStateRef.current && rendered && !showMenu) {
-  //     publishMQTT(MQTT_CTRL_TOPIC + 'left/' + 'joint/' + robotIDRef.current, json_msg);
-  //   }
-  // }, [thetaBodyLeftMQTT.current]);
-
-  // React.useEffect(() => {
-  //   const json_msg = JSON.stringify({
-  //     timestamp: Date.now(),
-  //     tool: thetaToolLeftMQTT.current,
-  //   });
-  //   if ((mqttclient != null) && receiveStateRef.current && rendered && !showMenu) {
-  //     publishMQTT(MQTT_CTRL_TOPIC + 'left/' + 'tool/' + robotIDRef.current, json_msg);
-  //   }
-  // }, [thetaToolLeftMQTT.current, robot_state_left]);
-
-  // React.useEffect(() => {
-  //   const json_msg = JSON.stringify({
-  //     timestamp: Date.now(),
-  //     joint: thetaBodyCamMQTT.current,
-  //   });
-  //   if ((mqttclient != null) && receiveStateRef.current && rendered && !showMenu) {
-  //     publishMQTT(MQTT_CTRL_TOPIC + 'cam/' + 'joint/' + robotIDRef.current, json_msg);
-  //   }
-  // }, [thetaBodyCamMQTT.current]);
-
-  // /* ---------------------- Visual Assistance MQTT message ------------------------------------*/
+  // /* ---------------------- Visual Assistance MQTT message ---------------------*/
   // React.useEffect(() => {
   //     let share_control_flag;
   //     if (shareControl) {
@@ -1056,38 +1088,6 @@ export default function DynamicHome(props) {
   //     }
 
   // }, [thumbstick_right, shareControl]);
-
-  // Robot Request MQTT
-  const requestRobot = (mqclient) => {
-    const requestInfo = {
-      devId: idtopic,
-      type: codeType,
-    }
-    publishMQTT(MQTT_REQUEST_TOPIC, JSON.stringify(requestInfo));
-  }
-
-  /* ---------------------- Feedback Update ------------------------------------*/
-  // Update theta_body when robot_state is "initialize"
-  const [theta_body_feedback, setThetaBodyFeedback] = React.useState([]);
-  React.useEffect(() => {
-    if (robot_state === "initialize") {
-      setThetaBody(theta_body_feedback)
-    }
-  }, [robot_state, theta_body_feedback]);
-
-  // const [theta_body_left_feedback, setThetaBodyLeftFeedback] = React.useState([0, 0, 0, 0, 0, 0]);
-  // React.useEffect(() => {
-  //   if (robot_state_left === "initialize") {
-  //     setThetaBodyLeft(theta_body_left_feedback)
-  //   }
-  // }, [robot_state_left]);
-
-  const [theta_body_cam_feedback, setThetaBodyCamFeedback] = React.useState([]);
-  React.useEffect(() => {
-    if (robot_state_cam === "initialize") {
-      setThetaBodyCam(theta_body_cam_feedback)
-    }
-  }, [robot_state_cam]);
   
   /* ---------------------- Option MQTT message -------------------------------*/
   // Send VR Controller Pose Message for Robot Control
@@ -1102,7 +1102,7 @@ export default function DynamicHome(props) {
   //   }
   // }, [vr_controller_p_diff, vr_controller_R_relative]);
 
-  MQTT_Sub({
+  MQTT_Setup({
     // MQTT Client and Topics
     props,
     requestRobot,
@@ -1111,24 +1111,45 @@ export default function DynamicHome(props) {
     MQTT_CTRL_TOPIC, 
     MQTT_ROBOT_STATE_TOPIC,
 
-    // Right Arm
-    thetaBodyMQTT: setThetaBody,
-    thetaToolMQTT: setThetaTool,
-    thetaBodyFeedback: setThetaBodyFeedback,
+    // Robot State
     robot_state: setRobotState,
 
-    // Left Arm
-    thetaBodyLeftMQTT: setThetaBodyLeft,
-    thetaToolLeftMQTT: setThetaToolLeft,
-    // thetaBodyLeftFeedback: setThetaBodyLeftFeedback,
-    robot_state_left: setRobotStateLeft,
-
-    // Cam Arm
-    thetaBodyCamMQTT: setThetaBodyCam,
-    thetaBodyCamFeedback: setThetaBodyCamFeedback,
-    robot_state_cam: setRobotStateCam
-
   });
+
+  React.useEffect(() => {
+    if (robot_state == null) return;
+
+    if (robotRequested) {
+      // Publish Controller Info
+      publishMQTT("dev/" + robotIDRef.current, JSON.stringify({ controller: "browser", devId: idtopic }))
+
+      // Update robot state as Robot Request
+      setThetaBodyLeft(robot_state.left.arm)
+      setThetaToolLeft(robot_state.left.hand)
+      setThetaBody(robot_state.right.arm)
+      setThetaTool(robot_state.right.hand)
+
+      console.log("Left Arm State Updated:", robot_state.left.arm);
+      console.log("Left Hand State Updated:", robot_state.left.hand);
+      console.log("Right Arm State Updated:", robot_state.right.arm);
+      console.log("Right Hand State Updated:", robot_state.right.hand);
+
+      const T_left = mr.FKinSpace(M_left, Slist_left, robot_state.left.arm);
+      const [R_left, p_left] = mr.TransToRp(T_left);
+
+      const T_right = mr.FKinSpace(M_right, Slist_right, robot_state.right.arm);
+      const [R_right, p_right] = mr.TransToRp(T_right);
+
+      setPositionEELeft(p_left);
+      setREELeft(R_left);
+      setPositionEE(p_right);
+      setREE(R_right);
+
+      // Reset request flag
+      setRobotRequested(false);
+    }
+
+  }, [robot_state, robotRequested]);
 
 
   /* ============================== WebRTC ==========================================*/
@@ -1229,106 +1250,96 @@ export default function DynamicHome(props) {
   // ]);
 
 
-  /* ============================= Robot State Update ==========================================*/
-  // Robot State Update Props
-  const robotProps = React.useMemo(() => ({
-    robotNameList, robotName, theta_body, theta_tool, theta_body_left, theta_tool_left, theta_body_cam
-  }), [robotNameList, robotName, theta_body, theta_tool, theta_body_left, theta_tool_left, theta_body_cam]);
+  /* ================================== Robot State Update =====================================*/
+  // const robotProps = React.useMemo(() => ({
+  //   robotNameList, robotName, theta_body, theta_tool, theta_body_left, theta_tool_left, theta_body_cam
+  // }), [robotNameList, robotName, theta_body, theta_tool, theta_body_left, theta_tool_left, theta_body_cam]);
 
-  // // VR Frame Update
-  // const [frameCount, tick] = React.useReducer(x => x + 1, 0);
+  const robotProps = {
+    robotNameList,
+    robotName,
+    theta_body: mr.rad2deg(thetaBodyRef.current),
+    theta_tool:thetaToolRightRef.current,
+    theta_body_left: mr.rad2deg(thetaBodyLeftRef.current),
+    theta_tool_left:thetaToolLeftRef.current,
+    theta_body_cam: mr.rad2deg(thetaBodyCamRef.current),
+  };
 
-  // const lastRenderTimeRef = React.useRef(performance.now());
-  // const FRAME_MIN_TIME = 1000/25; // 目标 60Hz
+  // React.useEffect(() => {
+  //   window.robotRefs = {
+  //     theta_body:thetaBodyRef,
+  //     theta_tool:thetaToolRightRef,
+  //     theta_body_left:thetaBodyLeftRef,
+  //     theta_tool_left:thetaToolLeftRef,
+  //     theta_body_cam,
+  //   };
+  // }, []);
 
-  // // 使用 useCallback 确保函数引用稳定，防止在渲染中反复重建
-  // const onXRFrameMQTT = React.useCallback((time, frame) => {
-  //   if (vrModeRef.current) {
-  //     // 1. 始终优先请求下一帧，确保循环的连续性
-  //     frame.session.requestAnimationFrame(onXRFrameMQTT);
+  /* ================================== VR Animation Loop =====================================*/
+  const receiveStateRef = React.useRef(true); // VR MQTT switch
+  const [, tick] = React.useReducer(x => x + 1, 0);
+  const [, setNow] = React.useState(Date.now());
 
-  //     const currentTime = performance.now();
-  //     const deltaTime = currentTime - lastRenderTimeRef.current;
+  const lastRenderTimeRef = React.useRef(0);
+  const lastUIUpdateTimeRef = React.useRef(0);
+  const lastMQTTPublishTimeRef = React.useRef(0);
+  // const sequenceNumberRef = React.useRef(0); // Check packet loss
 
-  //     // 2. 帧率节流判断
-  //     if (deltaTime >= FRAME_MIN_TIME) {
-  //       // 这里的补偿算法可以抵消 requestAnimationFrame 的时间漂移
-  //       lastRenderTimeRef.current = currentTime - (deltaTime % FRAME_MIN_TIME);
-        
-  //       // 3. 触发 React 更新：使用 useReducer 的 tick 代替 performance.now()
-  //       // 这样 React 只需要处理一个简单的整数自增，而不是复杂的浮点数
-  //       tick(); 
-  //     }
-  //   }
-  // }, []); // 依赖项为空，确保该函数永远不会改变
+  const showMenuRef = React.useRef(showMenu);
+  const shareControlRef = React.useRef(shareControl);
+  React.useEffect(() => {
+    showMenuRef.current = showMenu;
+  }, [showMenu]);
 
-  // ✅ 保留 tick，但降低频率
-const [frameCount, tick] = React.useReducer(x => x + 1, 0);
+  React.useEffect(() => {
+    shareControlRef.current = shareControl;
+  }, [shareControl]);
 
-const lastRenderTimeRef = React.useRef(performance.now());
-const lastUIUpdateTimeRef = React.useRef(performance.now());
-const lastMQTTPublishTimeRef = React.useRef(performance.now());
+  const MQTT_PUBLISH_INTERVAL = 1000 / 20; // MQTT Publish FPS (20Hz)
 
-const FRAME_MIN_TIME = 1000 / 50; // XR 循环 90Hz
-const UI_UPDATE_INTERVAL = 1000 / 50; // UI 更新 20Hz (降低 React 渲染频率)
-const MQTT_PUBLISH_INTERVAL = 1000 / 30; // MQTT 发布 25Hz
+  const onXRFrameMQTT = React.useCallback((time, frame) => {
+    if (!vrModeRef.current) return;
+    frame.session.requestAnimationFrame(onXRFrameMQTT);
 
-// ✅ 优化后的 XR 帧回调
-const onXRFrameMQTT = React.useCallback((time, frame) => {
-  if (!vrModeRef.current) return;
+    const dt = (time - lastRenderTimeRef.current) / 1000; // ms -> s
+    dtRef.current = dt;
+    
+    lastRenderTimeRef.current = time;
+    // setNow(performance.now()); 
+    tick(); // Trigger re-render
 
-  // 1. 请求下一帧
-  frame.session.requestAnimationFrame(onXRFrameMQTT);
+    // MQTT Publish
+    if (time - lastMQTTPublishTimeRef.current >= MQTT_PUBLISH_INTERVAL) {
+      lastMQTTPublishTimeRef.current = time;
 
-  const currentTime = performance.now();
-  const deltaTime = currentTime - lastRenderTimeRef.current;
+      if (mqttclient && receiveStateRef.current && !showMenuRef.current && !shareControlRef.current) {
+        const time = Date.now();
+        // const seq = sequenceNumberRef.current++; // Check packet loss
 
-  if (deltaTime < FRAME_MIN_TIME) return;
-  lastRenderTimeRef.current = currentTime - (deltaTime % FRAME_MIN_TIME);
+        const ctrl_msg = {
+          header: {
+            timestamp: time,
+            devId: idtopic,
+          },
+          left: {
+            arm: thetaBodyLeftRef.current,
+            hand: mr.deg2rad(thetaToolLeftRef.current),
+          },
+          right: {
+            arm: thetaBodyRef.current,
+            hand: mr.deg2rad(thetaToolRightRef.current),
+          }
+        };
 
-  // 2. ✅ MQTT 发布（25Hz）
-  const mqttDeltaTime = currentTime - lastMQTTPublishTimeRef.current;
-  if (mqttDeltaTime >= MQTT_PUBLISH_INTERVAL) {
-    lastMQTTPublishTimeRef.current = currentTime;
+        publishMQTT(
+          MQTT_CTRL_TOPIC + robotIDRef.current, // Topic: control/{robotID}
+          JSON.stringify(ctrl_msg) // Message: {timestamp, devId, left: {arm, hand}, right: {arm, hand}}
+        );
 
-    if (mqttclient != null && receiveStateRef.current && !showMenu && !shareControl) {
-      const timestamp = Date.now();
-      
-      publishMQTT(
-        MQTT_CTRL_TOPIC + 'right/joint/' + robotIDRef.current,
-        JSON.stringify({ timestamp, joint: thetaBodyRef.current })
-      );
-
-      // publishMQTT(
-      //   MQTT_CTRL_TOPIC + 'right/tool/' + robotIDRef.current,
-      //   JSON.stringify({ timestamp, tool: thetaToolMQTT.current })
-      // );
-
-      publishMQTT(
-        MQTT_CTRL_TOPIC + 'left/joint/' + robotIDRef.current,
-        JSON.stringify({ timestamp, joint: thetaBodyLeftRef.current })
-      );
-
-      // publishMQTT(
-      //   MQTT_CTRL_TOPIC + 'left/tool/' + robotIDRef.current,
-      //   JSON.stringify({ timestamp, tool: thetaToolLeftMQTT.current })
-      // );
-
-      // publishMQTT(
-      //   MQTT_CTRL_TOPIC + 'cam/joint/' + robotIDRef.current,
-      //   JSON.stringify({ timestamp, joint: thetaBodyCamMQTT.current })
-      // );
+      }
     }
-  }
 
-  // 3. ✅ UI 更新（20Hz，降低 React 渲染压力）
-  const uiDeltaTime = currentTime - lastUIUpdateTimeRef.current;
-  if (uiDeltaTime >= UI_UPDATE_INTERVAL) {
-    lastUIUpdateTimeRef.current = currentTime;
-    tick(); // 只在这里调用，频率降低到 20Hz
-  }
-
-}, []); // 空依赖，确保函数稳定
+  }, []);
 
   // Robot Secene Render
   return (
@@ -1356,7 +1367,7 @@ const onXRFrameMQTT = React.useCallback((time, frame) => {
       /> */}
 
       <RobotScene
-        robot_list={robot_list}
+        robot_assets={robot_assets}
         rendered={rendered}
 
         robotProps={robotProps}
@@ -1368,22 +1379,22 @@ const onXRFrameMQTT = React.useCallback((time, frame) => {
 
         // Right Arm
         state_codes={error_code}
-        position_ee={worlr2three(position_ee)}
-        euler_ee={euler_ee}
+        position_ee={worlr2three(positionEERef.current)}
+        euler_ee={EulerEERef.current}
         rightArmPosition={rightArmPosition}
         joint_limits_right={joint_limits_right}
 
         // Left Arm
         state_codes_left={error_code_left}
-        position_ee_left={worlr2three(position_ee_left)}
-        euler_ee_left={euler_ee_left}
+        position_ee_left={worlr2three(positionEELeftRef.current)}
+        euler_ee_left={EulerEELeftRef.current}
         leftArmPosition={leftArmPosition}
         joint_limits_left={joint_limits_left}
 
         // CAM Arm
-        // state_codes_cam={error_code_cam}
-        // position_ee_cam={eeShowData.camPos}
-        // euler_ee_cam={eeShowData.camEuler}
+        state_codes_cam={error_code_cam}
+        position_ee_cam={worlr2three(positionEECamRef.current)}
+        euler_ee_cam={euler_ee_cam}
 
         indicator={indicator}
         webcamStream1={webcamStream1}

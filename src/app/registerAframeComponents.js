@@ -28,7 +28,9 @@ export default function registerAframeComponents(options) {
     // Right Hand
     setThumbIndexRight,
     setMiddleWristRight,
-    setMiddleDotRight,
+
+    // HMD
+    set_controller_object_cam,
 
     // Left Hand
     setThumbIndexLeft,
@@ -153,6 +155,41 @@ export default function registerAframeComponents(options) {
     }
   });
 
+
+  AFRAME.registerComponent('vr-controller-hmd', {
+    init: function () {
+      this.hmdProxy = new THREE.Object3D();
+    },
+
+    tick: function () {
+      const xr = this.el.sceneEl.renderer.xr;
+      const frame = this.el.sceneEl.frame;
+      
+      if (!frame || !xr.enabled) return;
+
+      // 获取参考空间
+      const refSpace = xr.getReferenceSpace();
+      // 'viewer' 是 WebXR 标准中代表头显的专用名称
+      const viewerPose = frame.getViewerPose(refSpace);
+
+      if (viewerPose) {
+        // viewerPose 包含多个 view（通常左右眼各一个）
+        // 但它的 transform 属性代表了头部的中心位置
+        const pose = viewerPose.transform;
+
+        this.hmdProxy.position.set(pose.position.x, pose.position.y, pose.position.z);
+        this.hmdProxy.quaternion.set(pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
+        // this.hmdProxy.updateMatrixWorld();
+
+        // 同步到你的逻辑中
+        set_controller_object_cam(this.hmdProxy);
+        // console.log('HMD Position:', this.hmdProxy.position);
+        // console.log('HMD Rotation:', this.hmdProxy.quaternion);
+      }
+    }
+  });
+
+
   AFRAME.registerComponent('jtext', {
     schema: {
       text: { type: 'string', default: '' },
@@ -205,16 +242,73 @@ export default function registerAframeComponents(options) {
       this.el.addEventListener('enter-vr', () => {
         vrModeRef.current = true;
         console.log('enter-vr');
-        if (!props.viewer) {
-          let xrSession = this.el.renderer.xr.getSession();
-          xrSession.requestAnimationFrame(onXRFrameMQTT);
+
+        const xrSession = this.el.renderer.xr.getSession();
+
+        if (xrSession) {
+          // --- Request VR FPS ---
+          this.optimizeFPS(xrSession);
+
+          if (!props.viewer) {
+            xrSession.requestAnimationFrame(onXRFrameMQTT);
+          }
         }
+
         setViewCamPose([0, -0.7, 0.3, 0, 0, 0]);
       });
+
       this.el.addEventListener('exit-vr', () => {
         vrModeRef.current = false;
         console.log('exit-vr');
       });
+    },
+
+    optimizeFPS: function (session) {
+      if (session.supportedFrameRates) {
+        // Quest 3 FPS [60, 72, 80, 90, 120]. Note: higher fps usually cause overheating and battery drain.
+        const targetFPS = 60; 
+        
+        // Find max supported FPS (if 72 is not supported, fall back to highest available)
+        const maxSupported = Math.max(...session.supportedFrameRates);
+        const finalTarget = session.supportedFrameRates.includes(targetFPS) ? targetFPS : maxSupported;
+
+        session.updateTargetFrameRate(finalTarget)
+          .then(() => {
+            console.log(`🚀 FPS Request Success: Target FPS ${finalTarget}Hz (Current FPS: ${session.frameRate}Hz)`);
+          })
+          .catch((err) => {
+            console.warn('❌ FPS Request Failed:', err);
+          });
+      } else {
+        console.log('ℹ️ Current Environment does not support WebXR Frame Rate API');
+      }
+
+      // ✅ 降低渲染分辨率（减少 GPU 负载）
+      const renderer = this.el.renderer;
+      const xr = renderer.xr;
+      
+      // 设置分辨率缩放比例（0.5-1.0，越小性能越好但画质越差）
+      const resolutionScale = 0.7; // 推荐 0.7-0.9，Quest 3 默认是 1.0
+      
+      if (xr && xr.enabled) {
+        // WebXR 的分辨率缩放
+        const baseLayer = session.renderState.baseLayer;
+        if (baseLayer) {
+          const currentWidth = baseLayer.framebufferWidth;
+          const currentHeight = baseLayer.framebufferHeight;
+          
+          session.updateRenderState({
+            baseLayer: new XRWebGLLayer(session, renderer.getContext(), {
+              framebufferScaleFactor: resolutionScale
+            })
+          });
+          
+          console.log(`📐 分辨率缩放: ${(resolutionScale * 100).toFixed(0)}% (${currentWidth}x${currentHeight} → ${Math.floor(currentWidth * resolutionScale)}x${Math.floor(currentHeight * resolutionScale)})`);
+        }
+      }
+      
+      // ✅ 设置 A-Frame 渲染器的像素比率（备用方案）
+      renderer.setPixelRatio(resolutionScale);
     }
   });
 
@@ -617,43 +711,69 @@ export default function registerAframeComponents(options) {
 
   AFRAME.registerComponent('fps-counter', {
     schema: {
-      for90fps: {default: true}
+      for90fps: { default: true },
+      updateInterval: { default: 10 } // 每 N 帧更新一次
     },
 
     init: function () {
-      this.el.setAttribute('text', {align: 'center', side: 'double'});
+      this.el.setAttribute('text', {
+        align: 'center',
+        side: 'double',
+        color: 'green',
+        value: '-- fps',
+        width: 2
+      });
+      
       this.frameCount = 0;
       this.frameDuration = 0;
+      this.currentFPS = 0;
+      this.fpsHistory = []; // ✅ 记录历史帧率，用于计算平均值
+      this.maxHistoryLength = 30;
     },
 
     tick: function (t, dt) {
-      var color;
-      var fps;
-
-      color = 'green';
-      if (this.data.for90fps) {
-        if (fps < 85) { color = 'yellow'; }
-        if (fps < 80) { color = 'orange'; }
-        if (fps < 75) { color = 'red'; }
-      } else {
-        if (fps < 55) { color = 'yellow'; }
-        if (fps < 50) { color = 'orange'; }
-        if (fps < 45) { color = 'red'; }
-      }
-
-      if (color) {
-        this.el.setAttribute('text', 'color', color);
-      }
-
       this.frameCount++;
       this.frameDuration += dt;
 
-      if (this.frameCount === 10) {
-        fps = 1000 / (this.frameDuration / this.frameCount);
-        this.el.setAttribute('text', 'value', fps.toFixed(0) + ' fps');
+      // ✅ 每隔 N 帧计算一次 FPS
+      if (this.frameCount >= this.data.updateInterval) {
+        const fps = 1000 / (this.frameDuration / this.frameCount);
+        this.currentFPS = fps;
+
+        // ✅ 平滑 FPS 显示（移动平均）
+        this.fpsHistory.push(fps);
+        if (this.fpsHistory.length > this.maxHistoryLength) {
+          this.fpsHistory.shift();
+        }
+        const avgFPS = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
+
+        // ✅ 根据 FPS 动态调整颜色
+        let color = 'green';
+        if (this.data.for90fps) {
+          if (avgFPS < 85) { color = 'yellow'; }
+          if (avgFPS < 80) { color = 'orange'; }
+          if (avgFPS < 75) { color = 'red'; }
+        } else {
+          if (avgFPS < 55) { color = 'yellow'; }
+          if (avgFPS < 45) { color = 'orange'; }
+          if (avgFPS < 30) { color = 'red'; }
+        }
+
+        // ✅ 一次性更新文本和颜色（减少 DOM 操作）
+        this.el.setAttribute('text', {
+          value: `${avgFPS.toFixed(0)} fps`,
+          color: color
+        });
+
+        // 重置计数器
         this.frameCount = 0;
         this.frameDuration = 0;
       }
+    },
+
+    // ✅ 新增：外部可获取当前 FPS
+    getFPS: function () {
+      return this.currentFPS;
     }
   });
 
@@ -683,7 +803,7 @@ export default function registerAframeComponents(options) {
 
     // ✅ 添加菜单手势状态管理
     this.menuGestureState = {
-      isGestureActive: false,      // 当前手势是否激活
+      isGestureActive: false,       // 当前手势是否激活
       gestureStartTime: 0,          // 手势开始时间
       lastToggleTime: 0,            // 上次切换菜单的时间
       HOLD_DURATION: 500,           // 需要保持手势的时间（毫秒）
@@ -793,7 +913,7 @@ export default function registerAframeComponents(options) {
       const state = this.menuGestureState;
 
       // 检测手势是否满足触发条件
-      const isGestureDetected = dThumbPinky < 0.025; // 2.5cm 触发距离
+      const isGestureDetected = dThumbPinky < 0.03; // 3.0cm 触发距离
 
       if (isGestureDetected) {
         if (!state.isGestureActive) {

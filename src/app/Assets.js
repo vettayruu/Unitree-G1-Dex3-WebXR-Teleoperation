@@ -72,7 +72,7 @@ const robotAssets = {
     { id: "middle_1", src: "/unitree_g1/right_hand_middle_1.glb" },
   ],
 
-  unitree_g1_arm_right_body: [
+  unitree_g1_dex3: [
     { id: "head", src: "/unitree_g1/head.glb" },
     { id: "torso", src: "/unitree_g1/torso.glb" },
     { id: "waist_yaw", src: "/unitree_g1/waist_yaw.glb" },
@@ -134,15 +134,15 @@ const robotAssets = {
 };
 
 
-const Assets = ({ robot_list }) => {
-  if (!robot_list || robot_list.length === 0) {
-    console.warn("No robots provided in robot_list.");
+const Assets = ({ robot_assets }) => {
+  if (!robot_assets || robot_assets.length === 0) {
+    console.warn("No robots provided in robot_assets.");
     return null;
   }
 
   return (
     <a-assets>
-      {robot_list.map(({ robotId, robot_model }) => {
+      {robot_assets.map(({ robotId, robot_model }) => {
         if (!robot_model) {
           console.warn(`No robot_model defined for robotId: ${robotId}`);
           return null;
