@@ -32,6 +32,8 @@ export default function WebInterface(props) {
   const {theta_body_cam} = props
   const {joint_limits_cam} = props
 
+  const {robotID} = props
+
   const setViewCamPose = (index) => (e) => {
     let value = Number.parseFloat(e.target.value || 0);
     const newPose = [...view_cam_pose];
@@ -44,7 +46,7 @@ export default function WebInterface(props) {
   return (
     <>
       <div className="user-uuid">
-        MQTT Control ID: <span>{idtopic}</span>
+        USER ID: <span>{idtopic}</span>
       </div>
 
       <div className="webrtc-channel">
@@ -201,15 +203,15 @@ export default function WebInterface(props) {
           {theta_body_cam.map((theta, idx) => (
             <div className="row mb-0" key={idx}>
               <div className="col-md-4">
-                <label htmlFor={`theta_${idx}`} className="form-label">
-                  <span className="form-control-plaintext">{`theta_${idx}`}</span>
+                <label htmlFor={`waist_${idx}`} className="form-label">
+                  <span className="form-control-plaintext">{`waist_${idx}`}</span>
                 </label>
               </div>
               <div className="col-md-8">
                 <input
                   type="number"
                   className="form-control"
-                  id={`theta_${idx}`}
+                  id={`waist_${idx}`}
                   value={rad2deg(theta).toFixed(2)}
                   onChange={e => {
                     const degValue = Number.parseFloat(e.target.value || 0);
@@ -232,6 +234,11 @@ export default function WebInterface(props) {
           Request Robot
         </button>
       </div>
+      
+      <div className="robot-id">
+        Robot ID: <span> {robotID} </span>
+      </div>
+
 
 
     </>

@@ -47,16 +47,6 @@ const STATE_CODES = {
   JOINT_LIMIT: 0x03,
 };
 
-// Robot Status Codes
-const JointReceiveStatus = Object.freeze({
-  WAITING: 0,          // 初期状態
-  ROBOT_REQUESTED: 1,  // 対象ロボットをリクエスト済み
-  ROBOT_RECEIVED: 2,   // 対象ロボットを受信済み SLRM Ready を待つ
-  SLRM_READY: 3,       // slrmReady になったので、ROBOTの state をsubscribe
-  JOINT_RECEIVED: 4,   // ROBOTから Joint を受信したのでIK worker に送信
-  READY: 5             // Robot Ready, Start MQTT Publish
-});
-
 /* ============================= Functions ==========================================*/
 const loadRobotParams = (robot_model) => {
   const rk = new RobotKinematics(robot_model);
@@ -219,7 +209,7 @@ export default function DynamicHome(props) {
   const vrModeRef = React.useRef(false); // VR mode flag
   
   // Right Controller
-  const [trigger_on,set_trigger_on] = React.useState(false)
+  const [trigger_on, set_trigger_on] = React.useState(false)
   const [grip_on, set_grip_on] = React.useState(false)
   const [button_a_on, set_button_a_on] = React.useState(false)
   const [button_b_on, set_button_b_on] = React.useState(false)
@@ -232,7 +222,7 @@ export default function DynamicHome(props) {
     });
 
   // Left Controller
-  const [trigger_on_left,set_trigger_on_left] = React.useState(false)
+  const [trigger_on_left, set_trigger_on_left] = React.useState(false)
   const [grip_on_left, set_grip_on_left] = React.useState(false)
   const [button_x_on, set_button_x_on] = React.useState(false)
   const [button_y_on, set_button_y_on] = React.useState(false)
@@ -283,7 +273,7 @@ export default function DynamicHome(props) {
 
  // MQTT
   const [selectedMode, setSelectedMode] = React.useState('control'); 
-  const robotIDRef = React.useRef(codeType); 
+  const [robotID, setRobotID] = React.useState(null);
 
   // View Camera Pose
   const [view_cam_pose, setViewCamPose] = React.useState([0.24, 0.20, -0.67, 0, 150, 0]);
@@ -599,10 +589,10 @@ export default function DynamicHome(props) {
   const EulerEERef = React.useRef(euler_ee);
 
   React.useLayoutEffect(() => {
-    if (!rendered || !vrModeRef.current || showMenu || shareControl) return;
+    if (!rendered || !vrModeRef.current ) return;
     if (!thetaBodyRef.current || !positionEERef.current || !REERef.current) return;
 
-    if (trigger_on) {
+    if (trigger_on && !showMenu) {
       const { position: p_raw, quaternion: q_raw } = controller_object;
 
       // --- Initial Frame ---
@@ -678,7 +668,7 @@ export default function DynamicHome(props) {
 
     } else {
       // --- Reset as trigger off ---
-      if (lastVRPosRef.current) {
+      if (lastVRPosRef.current || showMenu) {
         lastVRPosRef.current = null;
         lastQuatRef.current = null;
       }
@@ -712,10 +702,10 @@ export default function DynamicHome(props) {
   const EulerEELeftRef = React.useRef(euler_ee_left);
 
   React.useLayoutEffect(() => {
-    if (!rendered || !vrModeRef.current || showMenu || shareControl) return;
+    if (!rendered || !vrModeRef.current) return;
     if (!thetaBodyLeftRef.current || !positionEELeftRef.current || !REELeftRef.current) return;
 
-    if (trigger_on_left) {
+    if (trigger_on_left && !showMenu) {
       const { position: p_raw, quaternion: q_raw } = controller_object_left;
 
       if (!lastVRPosRef_left.current) {
@@ -792,7 +782,7 @@ export default function DynamicHome(props) {
 
     } else {
       // --- Trigger Off Reset ---
-      if (lastVRPosRef_left.current) {
+      if (lastVRPosRef_left.current || showMenu) {
         lastVRPosRef_left.current = null;
         lastQuatRef_left.current = null;
       }
@@ -971,6 +961,7 @@ export default function DynamicHome(props) {
       theta_body_cam, setThetaBodyCam,
       joint_limits_cam, setJointLimitsCam,
       requestRobot: () => requestRobot(mqttclient),
+      robotID,
     };
     lastInterfacePropsRef.current = currentProps;
     return currentProps;
@@ -989,7 +980,8 @@ export default function DynamicHome(props) {
     theta_body_cam, setThetaBodyCam,
     joint_limits_cam, setJointLimitsCam,
     rendered,
-    mqttclient
+    mqttclient,
+    robotID,
   ]);
 
   /* =========================== Aframe Components ==============================*/
@@ -1057,7 +1049,7 @@ export default function DynamicHome(props) {
       devId: idtopic,
       type: codeType,
     }
-    publishMQTT(MQTT_REQUEST_TOPIC, JSON.stringify(requestInfo));
+    publishMQTT(MQTT_REQUEST_TOPIC, JSON.stringify(requestInfo), 1);
     setRobotRequested(true);
   }
 
@@ -1106,7 +1098,7 @@ export default function DynamicHome(props) {
     // MQTT Client and Topics
     props,
     requestRobot,
-    robotIDRef,
+    robotID: setRobotID,
     MQTT_DEVICE_TOPIC, 
     MQTT_CTRL_TOPIC, 
     MQTT_ROBOT_STATE_TOPIC,
@@ -1116,18 +1108,33 @@ export default function DynamicHome(props) {
 
   });
 
+  const connectionWatchdogRef = React.useRef(null);
+
   React.useEffect(() => {
-    if (robot_state == null) return;
+    if (robotID == null) return;
+
+    if (connectionWatchdogRef.current) {
+      clearTimeout(connectionWatchdogRef.current);
+    }
+
+    // Watchdog Timer: If no robot state update for 3 seconds, consider connection lost
+    connectionWatchdogRef.current = setTimeout(() => {
+      console.warn("Connection lost. No robot message update for 3 seconds. Please request again.");
+      setRobotID(null);
+      setRobotState(null); 
+    }, 3000); // 3000ms = 3s
 
     if (robotRequested) {
-      // Publish Controller Info
-      publishMQTT("dev/" + robotIDRef.current, JSON.stringify({ controller: "browser", devId: idtopic }))
-
+      // User Info
+      publishMQTT("dev/" + robotID, JSON.stringify({ controller: "browser", devId: idtopic }), 1)
+      
       // Update robot state as Robot Request
+      if (robot_state == null) return;
+
       setThetaBodyLeft(robot_state.left.arm)
-      setThetaToolLeft(robot_state.left.hand)
+      setThetaToolLeft(mr.rad2deg(robot_state.left.hand))
       setThetaBody(robot_state.right.arm)
-      setThetaTool(robot_state.right.hand)
+      setThetaTool(mr.rad2deg(robot_state.right.hand))
 
       console.log("Left Arm State Updated:", robot_state.left.arm);
       console.log("Left Hand State Updated:", robot_state.left.hand);
@@ -1149,7 +1156,13 @@ export default function DynamicHome(props) {
       setRobotRequested(false);
     }
 
-  }, [robot_state, robotRequested]);
+    return () => {
+      if (connectionWatchdogRef.current) {
+        clearTimeout(connectionWatchdogRef.current);
+      }
+    };
+
+  }, [robot_state, robotID, robotRequested]);
 
 
   /* ============================== WebRTC ==========================================*/
@@ -1332,8 +1345,9 @@ export default function DynamicHome(props) {
         };
 
         publishMQTT(
-          MQTT_CTRL_TOPIC + robotIDRef.current, // Topic: control/{robotID}
-          JSON.stringify(ctrl_msg) // Message: {timestamp, devId, left: {arm, hand}, right: {arm, hand}}
+          MQTT_CTRL_TOPIC + idtopic, // Topic: control/user-id
+          JSON.stringify(ctrl_msg), // Message: {timestamp, devId, left: {arm, hand}, right: {arm, hand}}
+          0 // QoS
         );
 
       }

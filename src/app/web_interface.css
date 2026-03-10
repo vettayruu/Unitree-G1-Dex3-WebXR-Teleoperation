@@ -126,5 +126,32 @@
         padding: 10px;
         font-size: 1em;
         cursor: pointer;
-    }
+    };
 }
+
+.robot-id {
+  position: fixed;
+  top: 610px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 5px;
+  font-family: monospace;
+  font-size: 12px;
+  z-index: 10000;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.robot-id:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.robot-id span {
+  font-weight: bold;
+  color: #00ff00;
+  user-select: all;
+}
+
