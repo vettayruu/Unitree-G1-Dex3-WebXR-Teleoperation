@@ -3,8 +3,8 @@
 ## Quick Start
 - [Step 1: Run HTTPS Server](#step-1-run-https-server)
 - [Step 2: Build MQTT Broker](#step-2-build-mqtt-broker)
-- [Step 3: Simulator Setup](#simulator-setup)
-- [Step 4: Operate the Robot in Simulator](#run-the-robot-in-simulator)
+- [Step 3: Simulator Setup](#step-3-simulator-setup)
+- [Step 4: Operate the Robot in Simulator](#step-4-operate-the-robot-in-simulator)
 
 ---
 ## Step 1: Run HTTPS Server
@@ -103,27 +103,27 @@ If robot request successfully, the `Robot ID` will show the connected robot ID.
 The operation is based on hand tracking. Gestures are desgined for robot control.
 
 <div align="center">
-  <img src=".Readme_img/G1_show_menu.jpg" alt="sim" width="1000"/>
+  <img src="./Readme_img/G1_show_menu.jpg" alt="sim" width="480"/>
   <p><em>Figure: Gesture show menu.</em></p>
 </div>
 
 <div align="center">
-  <img src=".Readme_img/G1_trigger_off.jpg" alt="sim" width="1000"/>
+  <img src="./Readme_img/G1_trigger_off.jpg" alt="sim" width="480"/>
   <p><em>Figure: Gesture trigger off.</em></p>
 </div>
 
 <div align="center">
-  <img src=".Readme_img/G1_trigger_on.jpg" alt="sim" width="1000"/>
+  <img src="./Readme_img/G1_trigger_on.jpg" alt="sim" width="480"/>
   <p><em>Figure: Gesture trigger on.</em></p>
 </div>
 
 <div align="center">
-  <img src=".Readme_img/G1_grip_menu.jpg" alt="sim" width="1000"/>
+  <img src="./Readme_img/G1_grip.jpg" alt="sim" width="480"/>
   <p><em>Figure: Gesture grip (thumb and index).</em></p>
 </div>
 
 <div align="center">
-  <img src=".Readme_img/G1_middle_grip.jpg" alt="sim" width="1000"/>
+  <img src="./Readme_img/G1_middle_grip.jpg" alt="sim" width="480"/>
   <p><em>Figure: Gesture grip (middle).</em></p>
 </div>
 
