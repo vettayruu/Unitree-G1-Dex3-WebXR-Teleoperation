@@ -103,27 +103,27 @@ If robot request successfully, the `Robot ID` will show the connected robot ID.
 The operation is based on hand tracking. Gestures are desgined for robot control.
 
 <div align="center">
-  <img src=".Readme_img/G1_show_menu.png" alt="sim" width="1000"/>
+  <img src=".Readme_img/G1_show_menu.jpg" alt="sim" width="1000"/>
   <p><em>Figure: Gesture show menu.</em></p>
 </div>
 
 <div align="center">
-  <img src=".Readme_img/G1_trigger_off.png" alt="sim" width="1000"/>
+  <img src=".Readme_img/G1_trigger_off.jpg" alt="sim" width="1000"/>
   <p><em>Figure: Gesture trigger off.</em></p>
 </div>
 
 <div align="center">
-  <img src=".Readme_img/G1_trigger_on.png" alt="sim" width="1000"/>
+  <img src=".Readme_img/G1_trigger_on.jpg" alt="sim" width="1000"/>
   <p><em>Figure: Gesture trigger on.</em></p>
 </div>
 
 <div align="center">
-  <img src=".Readme_img/G1_grip_menu.png" alt="sim" width="1000"/>
+  <img src=".Readme_img/G1_grip_menu.jpg" alt="sim" width="1000"/>
   <p><em>Figure: Gesture grip (thumb and index).</em></p>
 </div>
 
 <div align="center">
-  <img src=".Readme_img/G1_middle_grip.png" alt="sim" width="1000"/>
+  <img src=".Readme_img/G1_middle_grip.jpg" alt="sim" width="1000"/>
   <p><em>Figure: Gesture grip (middle).</em></p>
 </div>
 
