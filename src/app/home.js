@@ -1358,10 +1358,11 @@ export default function DynamicHome(props) {
   // Robot Secene Render
   return (
     <>
-      {/* <WebRTC_Video_Recv 
+      <WebRTC_Video_Recv 
         onVideoStream1={setWebcamStream1}
         onVideoStream2={setWebcamStream2}
-        onVideoStream3={setWebcamStream3} /> */}
+        // onVideoStream3={setWebcamStream3} 
+      />
 
       {/* <WebRTC_Video_Send 
         VR_Left_Stream={vrLeftStream}

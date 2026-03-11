@@ -270,11 +270,11 @@ export default function RobotScene(props) {
           position="-0.30 1.2 -1.50"
           rotation="0 -115 0"
           scale="-1 1 1"
-          stereo-curvedvideo="eye: left; videoId: leftVideo"
+          stereo-video="eye: left; videoId: leftVideo"
           visible="true"
-        ></a-curvedimage>
+        ></a-curvedimage> */}
 
-        <a-curvedimage
+        {/* <a-curvedimage
           id="right-curved"
           height="9.0"
           radius="5.7"
@@ -282,9 +282,28 @@ export default function RobotScene(props) {
           position="0.20. 1.2 -1.50"
           rotation="0 -121 0"
           scale="-1 1 1"
-          stereo-curvedvideo="eye: right; videoId: rightVideo"
+          stereo-video="eye: right; videoId: rightVideo"
           visible="true"
         ></a-curvedimage> */}
+
+        {/* <a-entity
+          id="left-concave-bowl"
+          geometry="
+            primitive: sphere; 
+            radius: 10; 
+            phiStart: 45;     
+            phiLength: 90;    
+            thetaStart: 45;    
+            thetaLength: 90;   
+            segmentsWidth: 50;
+            segmentsHeight: 50
+          "
+          position="-2 1.2 -5"
+          rotation="0 0 0" 
+          scale="-1 1 1"
+          stereo-video="eye: left; videoId: leftVideo"
+          visible="true">
+        </a-entity> */}
 
         {/* Plane Image For 720P camera frame (After undistortion)*/}
         {/* <a-plane
@@ -331,21 +350,28 @@ export default function RobotScene(props) {
         {/* Sphere video for fisheye camera (VR cam etc.)*/}
         {/* <a-sphere
           id="left-curved"
-          // radius="800"
-          position="-0.28 1.0 -0.5"
-          scale="-0.05 0.062 0.015"
+          // radius="100"
+          position="0 1.7 0"
+          scale="-1 1 1"
           stereo-spherevideo="eye: left; videoId: leftVideo"
-          geometry="primitive: sphere; radius: 8; thetaStart: 0; thetaLength: 180"
-        ></a-sphere>
-
-        <a-sphere
-          id="right-curved"
-          // radius="8"
-          position="0.28 1.0 -0.5"
-          scale="-0.05 0.062 0.015"
-          stereo-spherevideo="eye: right; videoId: rightVideo"
-          geometry="primitive: sphere; radius: 8; thetaStart: 0; thetaLength: 180"
+          geometry="primitive: sphere; radius: 100; segmentsWidth: 60; segmentsHeight:40; thetaLength:180"
         ></a-sphere> */}
+
+        {/* <a-entity
+          id="left-vrcam"
+          stereo-spherevideo="eye: left; videoId: leftVideo; radius: 10"
+          position="0 1.5 0"
+          rotation="0 0 0" 
+          scale="-1 1 1">
+        </a-entity>
+
+        <a-entity
+          id="right-vrcam"
+          stereo-spherevideo="eye: right; videoId: rightVideo; radius: 10"
+          position="0 1.5 0"
+          rotation="0 0 0"
+          scale="-1 1 1">
+        </a-entity> */}
         
         
         {/* Light */}
@@ -430,12 +456,13 @@ export default function RobotScene(props) {
           <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
           <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0700" radius="0.0015" color="blue" />
         </a-entity>
-
-        <a-entity id="fpsDisplay"
+        
+        {/* Show FPS */}
+        {/* <a-entity id="fpsDisplay"
           position="0 0 0.1"
           text="value: -- fps; color: white; align: center"
           fps-counter="for90fps: false">
-        </a-entity>
+        </a-entity> */}
 
       </a-scene>
 

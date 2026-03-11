@@ -472,7 +472,7 @@ export default function registerAframeComponents(options) {
     }
   });
 
-  AFRAME.registerComponent('stereo-curvedvideo', {
+  AFRAME.registerComponent('stereo-video', {
     schema: {
       eye: { type: 'string', default: 'left' }, // left / right / both
       videoId: { type: 'string' }
@@ -532,54 +532,119 @@ export default function registerAframeComponents(options) {
     }
   });
 
+  // // For ZED Mini
+  // AFRAME.registerComponent('stereo-curvedvideo', {
+  //   schema: {
+  //     eye: { type: 'string', default: 'left' }, // 'left', 'right', or 'both'
+  //     videoId: { type: 'string', default: '' }  // ID of the <video> element
+  //   },
+  //   init: function () {
+  //     const videoEl = document.getElementById(this.data.videoId);
+  //     if (!videoEl || videoEl.tagName !== 'VIDEO') {
+  //       console.warn('Video element not found:', this.data.videoId);
+  //       return;
+  //     }
+
+  //     this.videoEl = videoEl;
+  //     this.videoEl.setAttribute('crossorigin', 'anonymous');
+  //     this.videoEl.setAttribute('playsinline', 'true');
+  //     this.videoEl.play();
+
+  //     // Set hemisphere geometry
+  //     this.el.setAttribute('geometry', {
+  //       primitive: 'sphere',
+  //       radius: 50, 
+  //       segmentsWidth: 64,
+  //       segmentsHeight: 32,
+  //       thetaStart: 45, 
+  //       thetaLength: 75,
+  //       phiStart: 185,
+  //       phiLength: 145
+  //     });
+
+  //     this.el.setAttribute('material', {
+  //       shader: 'flat',
+  //       src: new THREE.VideoTexture(this.videoEl),
+  //       side: 'double' 
+  //     });
+  //   },
+  //   update: function () {
+  //     const mesh = this.el.getObject3D('mesh');
+  //     if (!mesh) return;
+
+  //     switch (this.data.eye) {
+  //       case 'left':
+  //         mesh.layers.set(1);
+  //         break;
+  //       case 'right':
+  //         mesh.layers.set(2);
+  //         break;
+  //       default:
+  //         mesh.layers.set(0); // both
+  //     }
+  //   }
+  // });
+
+  // For FishEye Camera
   AFRAME.registerComponent('stereo-spherevideo', {
     schema: {
-      eye: { type: 'string', default: 'left' }, // 'left', 'right', or 'both'
-      videoId: { type: 'string', default: '' }  // ID of the <video> element
+      eye: { type: 'string', default: 'left' },
+      videoId: { type: 'string', default: '' },
+      radius: { type: 'number', default: 10 } // 建议 10m 左右，减少调焦压力
     },
+
     init: function () {
       const videoEl = document.getElementById(this.data.videoId);
-      if (!videoEl || videoEl.tagName !== 'VIDEO') {
+      if (!videoEl) {
         console.warn('Video element not found:', this.data.videoId);
         return;
       }
 
       this.videoEl = videoEl;
-      this.videoEl.setAttribute('crossorigin', 'anonymous');
-      this.videoEl.setAttribute('playsinline', 'true');
-      this.videoEl.play();
 
-      // Set hemisphere geometry
+      // 针对鱼眼/沉浸式模式调整几何体
+      // thetaLength 180 代表从头顶覆盖到脚下
+      // phiLength 180 代表覆盖前方 180 度视野
       this.el.setAttribute('geometry', {
         primitive: 'sphere',
-        radius: 50, 
+        radius: this.data.radius,
         segmentsWidth: 64,
-        segmentsHeight: 32,
-        thetaStart: 45, 
-        thetaLength: 75,
-        phiStart: 185,
-        phiLength: 145
+        segmentsHeight: 64, // 增加垂直分段以平滑鱼眼畸变
+        phiStart: 0,        // 从中心开始
+        phiLength: 180,     // 覆盖半球
+        thetaStart: 0,
+        thetaLength: 180
       });
+
+      // 创建 Texture
+      const texture = new THREE.VideoTexture(this.videoEl);
+      texture.colorSpace = THREE.SRGBColorSpace; // 确保色彩正确
 
       this.el.setAttribute('material', {
         shader: 'flat',
-        src: new THREE.VideoTexture(this.videoEl),
-        side: 'double' 
+        src: texture,
+        side: 'front' // 'front' or 'back'
       });
+
+      // 初始设置图层
+      this.updateLayer();
     },
+
     update: function () {
+      this.updateLayer();
+    },
+
+    updateLayer: function () {
       const mesh = this.el.getObject3D('mesh');
       if (!mesh) return;
 
-      switch (this.data.eye) {
-        case 'left':
-          mesh.layers.set(1);
-          break;
-        case 'right':
-          mesh.layers.set(2);
-          break;
-        default:
-          mesh.layers.set(0); // both
+      // A-Frame 默认相机左眼 Layer 1, 右眼 Layer 2
+      if (this.data.eye === 'left') {
+        mesh.layers.set(1);
+      } else if (this.data.eye === 'right') {
+        mesh.layers.set(2);
+      } else {
+        mesh.layers.set(0);
       }
     }
   });
