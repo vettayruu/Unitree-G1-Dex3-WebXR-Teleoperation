@@ -216,7 +216,7 @@ class MQTT_Client():
 
 
 if __name__ == '__main__':
-    mode = "local" # "local" or "uclab"
+    mode = "uclab" # "local" or "uclab"
     client = MQTT_Client(mode)
     client.create_shared_memories()
     client.connect_mqtt()
