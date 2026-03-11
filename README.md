@@ -5,9 +5,6 @@
 - [Step 2: Build MQTT Broker](#step-2-build-mqtt-broker)
 - [Step 3: Simulator Setup](#simulator-setup)
 - [Step 4: Operate the Robot in Simulator](#run-the-robot-in-simulator)
-- [Controller Operations](#controller-operations)
-- [Citations](#citations)
-- [Python Packages](#python-packages)
 
 ---
 ## Step 1: Run HTTPS Server
