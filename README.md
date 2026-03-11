@@ -1,10 +1,10 @@
-# Unitree-G1-Dex3 WebXR Teleoperation System
+# Unitree-G1-Dex3 WebXR Teleoperation Operation Manual
 
 ## Quick Start
 - [Step 1: Run HTTPS Server](#step-1-run-https-server)
 - [Step 2: Build MQTT Broker](#step-2-build-mqtt-broker)
-- [Step 3: Debug with WebXR and Simulator](#step-3-debug-with-webxr-and-simulator)
-- [Step 4: Run Your Robot](#step-4-run-your-robot)
+- [Step 3: Simulator Setup](#simulator-setup)
+- [Step 4: Operate the Robot in Simulator](#run-the-robot-in-simulator)
 - [Controller Operations](#controller-operations)
 - [Citations](#citations)
 - [Python Packages](#python-packages)
@@ -44,26 +44,13 @@ After starting, you will see two URLs:
 **Open the browser in your VR device and enter `https://192.168.197.**:****` to access the web interface.**
 
 ---
-## Step 2: MQTT Communication
+## Step 2: Build MQTT Broker
 Follow the repository: [https://github.com/vettayruu/Metawork_MQTT_Protocol]
 
 ---
-## Step 3: Debug with WebXR and Simulator
+## Step 3: Simulator Setup
 
-### 🥽 Install WebXR Plugin
-
-If you don't have a VR device, you can use WebXR tools for debugging.
-
-On Chrome, you can install the **Immersive Web Emulator** WebXR plugin:
-
-[Immersive Web Emulator (Chrome Web Store)](https://chromewebstore.google.com/detail/immersive-web-emulator/cgffilbpcibhmcfbgggfhfolhkfbhmik)
-
-After installation, press **F12** to open Developer Tools.  
-You will find the **WebXR** tab in the developer tools bar, which allows you to emulate VR devices and test WebXR features directly in your browser.
-
-### 🧪 Run in Simulator
-
-You can also simulate teleoperation using [CoppeliaSim](https://www.coppeliarobotics.com/).
+[CoppeliaSim](https://www.coppeliarobotics.com/) is used in this project.
 
 1. **Download CoppeliaSim**
 
@@ -79,253 +66,45 @@ You can also simulate teleoperation using [CoppeliaSim](https://www.coppeliarobo
 
 3. **Load the simulation scene**
 
-   In CoppeliaSim, open the scene file `"piper_robot_sample.ttt"` located in the `Simulation` folder.
+   In folder `Robot_Control/Sim` find the file `g1_scene.zip` and unzip it.
+   In CoppeliaSim, `File/Open scene...` to load this scene file.
 
-4. **Start the simulation**
+5. **Start the simulation**
 
    Click the "Play" button in CoppeliaSim to start the simulation.
 
-5. **Open the VR Teleoperation Web Interface in Chrome**
-
-   Visit:
-   ```
-   https://192.168.197.**:****
-   ```
-   > Check your terminal to confirm the IP address.
-
-   Click the `AR` button to enter AR mode.
-
-6. **Connect to the MQTT Broker**
-
-   The `MQTT Control ID` is displayed at the top of the web page. Each device has a unique ID.  
-   Copy this ID and replace `UserUUID` in `./Robot_Control/MQTT/MQTT_Client.py`.
-
-   In VR, copying the ID directly may be difficult. Alternatively, you can check your control ID using:
-   ```bash
-   python MQTT_Topic_list.py
-   ```
-   Each topic published by the VR device will be shown here.
-
-7. **Run the Simulator Control Script**
-   ```bash
-   python MQTT_Simulation.py
-   ```
-
-Now you can control the robot via WebXR.
-
 <div align="center">
-  <img src="./Readme_imgs/sim.png" alt="sim" width="1000"/>
-  <p><em>Figure 4: Simulation in Coppeliasim.</em></p>
+  <img src="./G1_Sim.png" alt="sim" width="1000"/>
+  <p><em>Figure: G1 Simulation in Coppeliasim.</em></p>
 </div>
 
-## Step 4: Run Your Robot
+---
+## Step 4: Operate the Robot in Simulator
 
-After enter the VR mode, follow the steps below to control the **AgileX-PiPER** robot via MQTT. Currently, the PiPEER robot can only run on **Ubuntu**.
-
-1. **Start the PiPER SDK UI**
-      
-   🌐 Download the PiPER SDK UI
-   
-   ```arduion
-   https://github.com/agilexrobotics/Piper_sdk_ui.git
-   ```
-
-   Open PiPER SDK UI
-   ```bash
-   cd Piper_sdk_ui
-   python piper_ui.py 
-   ```
-
-   To reset the robot, open the PiPER SDK Tools and perform the following operations:
-
-      (0) Click **Find CAN Port**
-      
-      (1) Click **Reset**
-      
-      (2) Click **Enable**
-      
-      (3) Click **Go Zero**
-      
-   🔁 If the robot fails to go to the zero position, repeat steps (1)~(3) a few times until successful.
-
-   To reset the tool, Click **Gripper Zero**
-
-   In this project, right arm use `can0` port and left arm use `can1` port.
-
-2. **Set the Robot to the Initial Working Position**
-
-   In the `Robot_Control` folder, run the following scripts to initialize each arm:
-
-   - **Right Arm:**
-     ```bash
-     python Initalize_arm_right.py
-     ```
-
-   - **Left Arm:**
-     ```bash
-     python Initalize_arm_left.py
-     ```
-
-   - **Cam Arm:**
-     ```bash
-     python Initalize_arm_cam.py
-     ```
-
-3. **Retrieve your USER_UUID**
-
-   > Note: Each device has a unique USER_UUID.  
-   > Follow Step 3 in this guide to obtain your USER_UUID.
-
-4. **Run the Robot Controller Script**
-
-   - **Control the Right Arm via MQTT:**
-     ```bash
-     python MQTT_teleoperation_right.py
-     ```
-
-   - **Control the Left Arm via MQTT:**
-     ```bash
-     python MQTT_teleoperation_left.py
-     ```
-
-   - **Control the Cam Arm via MQTT:**
-     ```bash
-     python MQTT_teleoperation_cam.py
-     ```
-
-> (Optional) If you have a [SORA WebRTC SFU](https://sora.shiguredo.jp/) server, you can also try teleoperation using WebRTC's data channel:
-> 
-> - **Right Arm via WebRTC:**
->   ```bash
->   python WebRTC_teleoperation_right.py
->   ```
-> 
-> **Other WebRTC applications and their features:**
->
-> - [LiveKit](https://github.com/livekit/client-sdk-js):  
->   Open-source, scalable WebRTC platform. Provides SDKs for multiple languages and supports advanced features like recording and media routing. Suitable for real-time communication and robotics teleoperation.
->
-> - [Amazon KVS](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js/tree/master):  
->   Node.js-based, cloud-hosted by AWS. Offers secure, scalable signaling and media relay. Good for integration with AWS infrastructure and IoT devices.
->
-> - [aiortc](https://github.com/aiortc/aiortc):  
->   Python-based, free and open-source. Lightweight and easy to customize, but requires users to implement signaling and media handling logic. Suitable for research and rapid prototyping.
->
-> - Other Open Source WebRTCs (keep updating):
->   https://github.com/rtc-io/rtc-quickconnect 
-
-5. **Visual Assistance**
-
-   Run the following script to enable YOLO-based visual assistance:
-   ```bash
-   python MQTT_visual_assistance.py
-   ```
-
-   There are two modes available: **teleoperation** and **visual assistance**.  
-   You can switch modes by pressing the right thumbstick down.
-   
-
-## Controller Operations
-
-🎮 The following input mappings are used to operate the PiPER robot via the VR controller:
-
-| Input Combination                              | Action                                 |
-|------------------------------------------------|----------------------------------------|
-| Trigger Right + Motion                         | Right Arm Move                         |
-| Button A                                       | Right Gripper Grasp                    |
-| Button B                                       | Right Gripper Release                  |
-| Trigger Left + Motion                          | Left Arm Move                          |
-| Button X                                       | Left Gripper Grasp                     |
-| Button Y                                       | Left Gripper Release                   |
-| Grip Left + Left thumbstick moved (↕️ ↔️)      | Cam Arm Translation Up/Down/Left/Right |
-| Grip Left + Right thumbstick moved (↕️)        | Cam Arm Translation Forward/Back       |
-| Grip Right + Right thumbstick moved (↕️ ↔️)    | Cam Arm Rotation Y/X                   |
-| Grip Right + Left thumbstick moved (↕️)        | Cam Arm Rotation Z                     |
-| Left thumbstick down                           | Call Menu                              |
-| Right thumbstick down                          | Change mode (Teleoperation/Visual Assistance) |
-| Right thumbstick moved (⬆️)                    | Visual Assistance Move Flag Signal     |
-| Right thumbstick moved (⬇️)                    | Robot Return                           |
-
-> Make sure the controller is tracked and visible to the VR camera to ensure accurate input.
-
-
-### ⚠️ Notifications
-
-1. **Keep the VR controller within camera view**  
-   The pose of the VR controller is estimated using both the onboard **accelerometer** and the **tracking camera** located on the side of the VR headset.  
-   > ⚠️ If the controller goes out of view, pose estimation may become inaccurate, resulting in input drift.
-
-2. **Wait for system initialization**  
-   After putting on the VR headset or restarting the system, **always wait until initialization is complete**.  
-   Skipping this step may result in control drift or unstable input.
-   
-   > ⚠️ If the controller appears frozen or unresponsive, it may indicate a tracking issue.
-   
-   > ✅ If you can see the controller moving in sync with your hand, it is functioning correctly.  
-
-## Citations
-
-The inverse kinematics (IK) implementation in this project is based on the **Modern Robotics** library by Kevin Lynch et al.
-
-- 📘 Book: *Modern Robotics: Mechanics, Planning, and Control*  
-- 💻 Source Code: [NxRLab/ModernRobotics GitHub Repository](https://github.com/NxRLab/ModernRobotics)
-
-⚠️ In the original library, the function `AxisAng3` has a bug when the input vector is a zero vector.
-
-**Please change the function to:**
-```python
-def AxisAng3(expc3):
-    norm = np.linalg.norm(expc3)
-    if NearZero(norm):
-        return (Normalize(expc3), 0)
-    else:
-        return (Normalize(expc3), np.linalg.norm(expc3))
+### 1. Run the MQTT Client
+In folder `Robot_Control/MQTT`, run
+```Python
+MQTT_Client.py
 ```
 
-Or use the modified library in `Robot_Control/Modern_Robotics/core.py`.
-
-## Python Packages
-
-It is recommended to use a `conda` environment to manage dependencies, for example:
-
-```bash
-conda create -n Modern_Robotics_Control_IK python=3.12
-conda activate Modern_Robotics_Control_IK
+Then, in folder `Robot_Control`, run
+```Python
+MQTT_Simulation_Left.py
+MQTT_Simulation_Right.py
 ```
 
-If you forgot your conda environment name:
-```bash
-conda info --envs
-```
-to check your conda environemnt list.
+### 2. Request Robot
+On the webpage, click `Request Robot` to build communication with the robot.
+If robot request successfully, the `Robot ID` will show the connected robot ID.
 
-### Dependencies
-📐 Math & Utilities
-```bash
-pip install numpy
-```
+<div align="center">
+  <img src="./G1_request_robot.png" alt="sim" width="1000"/>
+  <p><em>Figure: Request Robot.</em></p>
+</div>
 
-📷 Visual (OpenCV, YOLO)
-```bash
-pip install opencv-python
-pip install ultralytics
-```
+### 3. Operation
+The operation is based on hand tracking. Gestures are desgined for robot control.
 
-📡 Communication (MQTT, WebRTC)
-```bash
-pip install paho-mqtt
-pip install sora-sdk
-```
 
-🤖 Robotics
-```bash
-pip install piper-sdk
-pip install modern-robotics
-```
-
-🧪 Simulator (CoppeliaSim Remote API)
-```bash
-pip install coppeliasim-zmqremoteapi-client
-```
 
 
