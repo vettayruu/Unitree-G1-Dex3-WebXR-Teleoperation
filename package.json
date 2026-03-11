@@ -1,9 +1,9 @@
 {
-  "name": "Unitree-G1-control-LIU",
+  "name": "unitree-g1-control-liu",
   "version": "0.1.1",
   "private": true,
   "customInfo": {
-    "robotid": "Unitree-G1-control-LIU",
+    "type": "Unitree-G1-Dex3",
     "developer": "uclab-liust",
     "description": "Web-based VR Teleoperation System for Unitree G1 Robot"
   },
