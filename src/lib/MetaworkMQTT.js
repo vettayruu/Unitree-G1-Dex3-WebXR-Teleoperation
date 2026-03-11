@@ -3,12 +3,10 @@ import mqtt from 'mqtt'
 import package_info from '../../package.json' // load version
 import {userUUID} from './cookie_id';
 
-export const codeType = package_info.name; // software name
+// export const codeType = package_info.name; // software name
+export const codeType = package_info.customInfo.type; 
 export const version = package_info.version; // version number
-export const robotid = package_info.customInfo.robotid; // request robot id, currently same as codeType, but can be different in the future
-console.log("Code Type:", codeType);
-console.log("Version:", version);
-console.log("Request Robot ID:", robotid);
+console.log("Robot Type:", codeType);
 
 // global private variable
 export var mqttclient = null;
@@ -77,6 +75,6 @@ export const subscribeMQTT = (topic) => {
     });
 }
 
-export const publishMQTT = (topic, msg) => {
-    mqttclient.publish(topic, msg);
+export const publishMQTT = (topic, msg, qos) => {
+    mqttclient.publish(topic, msg, {qos: qos});
 }
