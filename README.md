@@ -95,7 +95,7 @@ On the webpage, click `Request Robot` to build communication with the robot.
 If robot request successfully, the `Robot ID` will show the connected robot ID.
 
 <div align="center">
-  <img src="./G1_request_robot.png" alt="sim" width="1000"/>
+  <img src="./Readme_img/G1_request_robot.png" alt="sim" width="1000"/>
   <p><em>Figure: Request Robot.</em></p>
 </div>
 
