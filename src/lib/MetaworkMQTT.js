@@ -14,8 +14,8 @@ console.log("Request Robot ID:", robotid);
 export var mqttclient = null;
 export var idtopic = userUUID;
 
-// const MQTT_BROKER_URL = "wss://sora2.uclab.jp/mqws"; // For Nagoya-U UCLab Development
-const MQTT_BROKER_URL = "wss://192.168.197.36:8333"; // For Local Development, change to your broker address
+const MQTT_BROKER_URL = "wss://sora2.uclab.jp/mqws"; // For Nagoya-U UCLab Development
+// const MQTT_BROKER_URL = "wss://192.168.197.36:8333"; // For Local Development, change to your broker address
 
 export const connectMQTT = (callback) => {
     if (mqttclient == null) {
