@@ -25,7 +25,7 @@ if __name__ == "__main__":
         omega = 36.0
         dt = 0.005  # Control FPS: 200Hz, 5ms
 
-        print("Robot Hand Running...")
+        print("Robot Arm Running...")
 
         while True:
             # Get joint control message from shared memory
@@ -52,3 +52,4 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print("Robot Arm Stopped.")
+
