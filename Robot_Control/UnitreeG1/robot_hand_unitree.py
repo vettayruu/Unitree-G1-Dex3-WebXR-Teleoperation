@@ -19,75 +19,132 @@ class Dex3_1_Right_JointIndex(IntEnum):
     kRightHandThumb0 = 0
     kRightHandThumb1 = 1
     kRightHandThumb2 = 2
-    kRightHandIndex0 = 3
-    kRightHandIndex1 = 4
-    kRightHandMiddle0 = 5
-    kRightHandMiddle1 = 6
+    kRightHandMiddle0 = 3
+    kRightHandMiddle1 = 4
+    kRightHandIndex0 = 5
+    kRightHandIndex1 = 6
+
+
+LEFT_HAND_OFFSET = {
+    0: -0.051821254, 1: 0.020018041, 2: 0.017435133,
+    3: -0.070589177, 4: -0.030280081,
+    5: -0.062465608, 6: -0.025254435
+}
+
+LEFT_HAND_KP = {
+    0: 1.0, 1: 1.0, 2: 1.2,
+    3: 0.85, 4: 1.2,
+    5: 1.0, 6: 1.2
+}
+
+LEFT_HAND_KD = {
+    0: 0.15, 1: 0.2, 2: 0.2,
+    3: 0.15, 4: 0.2,
+    5: 0.15, 6: 0.2
+}
+
+RIGHT_HAND_OFFSET = {
+    0: -0.25989729166030884, 1: -0.024336032569408417, 2: -0.08899030834436417,
+    3: 0.0743151307106018, 4: 0.01779387705028057,
+    5: 0.0906544178724289, 6: 0.016621936112642288
+}
+
+RIGHT_HAND_KP = {
+    0: 1.0, 1: 1.0, 2: 1.2,
+    3: 0.85, 4: 1.2,
+    5: 1.0, 6: 1.2
+}
+
+RIGHT_HAND_KD = {
+    0: 0.15, 1: 0.2, 2: 0.2,
+    3: 0.15, 4: 0.2,
+    5: 0.15, 6: 0.2
+}
 
 class Dex3Control:
-    def __init__(self, kp=1.5, kd=0.2):
-        # 1. 初始化发布者 (左右手 Topic 不同)
+    def __init__(self):
+        # Publisher and Subscriber
         self.left_publisher = ChannelPublisher("rt/dex3/left/cmd", HandCmd_)
         self.left_publisher.Init()
         self.right_publisher = ChannelPublisher("rt/dex3/right/cmd", HandCmd_)
         self.right_publisher.Init()
 
-        # --- 新增：初始化订阅者 (读取状态) ---
-        # 话题名称通常为 rt/dex3/left/state 和 rt/dex3/right/state
         self.left_subscriber = ChannelSubscriber("rt/dex3/left/state", HandState_)
         self.left_subscriber.Init()
         self.right_subscriber = ChannelSubscriber("rt/dex3/right/state", HandState_)
         self.right_subscriber.Init()
 
-        # 2. 预初始化消息体
+        self.left_offset = LEFT_HAND_OFFSET
+        self.right_offset = RIGHT_HAND_OFFSET
+
+        # 2. Command Message
         self.left_msg = unitree_hg_msg_dds__HandCmd_()
         self.right_msg = unitree_hg_msg_dds__HandCmd_()
 
-        # 配置默认 KP, KD 和 模式
-        self._init_hand_msg(self.left_msg, Dex3_1_Left_JointIndex, kp, kd)
-        self._init_hand_msg(self.right_msg, Dex3_1_Right_JointIndex, kp, kd)
+        # 3. Control Parameter Initialize
+        self._init_hand_msg(self.left_msg, Dex3_1_Left_JointIndex, LEFT_HAND_KP, LEFT_HAND_KD)
+        self._init_hand_msg(self.right_msg, Dex3_1_Right_JointIndex, RIGHT_HAND_KP, RIGHT_HAND_KD)
 
-    def _init_hand_msg(self, msg, joint_indices, kp, kd):
-        """初始化电机为伺服位置模式 (0x01)"""
-        for j in joint_indices:
-            # 模式打包：status=0x01 (位置控制)
-            msg.motor_cmd[j].mode = (j & 0x0F) | (0x01 << 4)
-            msg.motor_cmd[j].q = 0.0
-            msg.motor_cmd[j].kp = kp
-            msg.motor_cmd[j].kd = kd
+    def _init_hand_msg(self, msg, joint_indices, kp_dict, kd_dict):
+        for logical_idx, joint_enum in enumerate(joint_indices):
+            j_id = joint_enum.value
 
+            # Get number from dictionary，default Kp=1.0, Kd=0.2
+            # Note: Kp should not be set too high, as it may cause the finger motor to lose power.
+            kp = kp_dict.get(logical_idx, 1.0)
+            kd = kd_dict.get(logical_idx, 0.2)
+
+            # Mode：status=0x01 (Position Control)
+            msg.motor_cmd[j_id].mode = (j_id & 0x0F) | (0x01 << 4)
+            msg.motor_cmd[j_id].q = 0.0
+            msg.motor_cmd[j_id].kp = kp
+            msg.motor_cmd[j_id].kd = kd
+
+            # print(f"Joint {j_id} initialized with KP: {kp}, KD: {kd}")
+
+    # Execute without offset
     def execute_left(self, q):
-        """单独执行左手控制 (7位关节角)"""
         for idx, joint_id in enumerate(Dex3_1_Left_JointIndex):
             self.left_msg.motor_cmd[joint_id].q = float(q[idx])
         self.left_publisher.Write(self.left_msg)
 
     def execute_right(self, q):
-        """单独执行右手控制 (7位关节角)"""
         for idx, joint_id in enumerate(Dex3_1_Right_JointIndex):
             self.right_msg.motor_cmd[joint_id].q = float(q[idx])
         self.right_publisher.Write(self.right_msg)
 
+    # Execute with calibration offset
+    def execute_left_offset(self, q):
+        for idx, joint_id in enumerate(Dex3_1_Left_JointIndex):
+            # control signal = target + offset
+            offset = self.left_offset.get(idx, 0.0)
+            self.left_msg.motor_cmd[joint_id].q = float(q[idx]) + offset
+        self.left_publisher.Write(self.left_msg)
+
+    def execute_right_offset(self, q):
+        for idx, joint_id in enumerate(Dex3_1_Right_JointIndex):
+            offset = self.right_offset.get(idx, 0.0)
+            self.right_msg.motor_cmd[joint_id].q = float(q[idx]) + offset
+            self.right_msg.motor_cmd[joint_id].kp = RIGHT_HAND_KP[joint_id]
+        self.right_publisher.Write(self.right_msg)
+
     def execute_dual(self, left_q, right_q):
-        """同时执行双手控制"""
-        self.execute_left(left_q)
-        self.execute_right(right_q)
+        self.execute_left_offset(left_q)
+        self.execute_right_offset(right_q)
 
     def get_states_left(self):
-        """获取左手当前 7 个关节的真实角度"""
         msg = self.left_subscriber.Read()
         if msg is None:
             return None
 
-        # 根据定义的索引提取 q 值 (弧度)
         q_list = [msg.motor_state[j.value].q for j in Dex3_1_Left_JointIndex]
         return np.array(q_list)
 
     def get_states_right(self):
-        """获取右手当前 7 个关节的真实角度"""
         msg = self.right_subscriber.Read()
         if msg is None:
             return None
 
         q_list = [msg.motor_state[j.value].q for j in Dex3_1_Right_JointIndex]
         return np.array(q_list)
+
