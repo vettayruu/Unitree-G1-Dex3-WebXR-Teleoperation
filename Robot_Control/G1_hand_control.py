@@ -9,43 +9,41 @@ if __name__ == "__main__":
     ChannelFactoryInitialize(0)  # 0 for real robot, 1 for simulation
     hand = Dex3Control()
 
+    shm_left_hand = shared_memory.SharedMemory(name='Left_Hand')
+    shm_right_hand = shared_memory.SharedMemory(name='Right_Hand')
+
+    left_hand_data = np.ndarray((16,), dtype=np.float32, buffer=shm_left_hand.buf)
+    right_hand_data = np.ndarray((16,), dtype=np.float32, buffer=shm_right_hand.buf)
+
+    alpha_hand = 0.7  # range 0-1, the larget the faster
+    dt = 0.005  # 200Hz
+
+    curr_left_hand_cmd = hand.get_states_left()
+    curr_right_hand_cmd = hand.get_states_right()
+
+    print("Robot Hand Running with 1st-order Filter...")
+
     try:
-        shm_left_hand = shared_memory.SharedMemory(name='Left_Hand')
-        shm_right_hand = shared_memory.SharedMemory(name='Right_Hand')
-
-        left_hand_data = np.ndarray((16,), dtype=np.float32, buffer=shm_left_hand.buf)
-        right_hand_data = np.ndarray((16,), dtype=np.float32, buffer=shm_right_hand.buf)
-
-        omega = 65
-        dt = 0.005 # Control FPS: 200Hz, 5ms
-
-        curr_left_hand_joint = hand.get_states_left()
-        curr_left_hand_vel = np.zeros_like(curr_left_hand_joint)
-
-        curr_right_hand_joint = hand.get_states_right()
-        curr_right_hand_vel = np.zeros_like(curr_right_hand_joint)
-
-        print("Robot Hand Running...")
-
         while True:
+            # 1. Get target from shared memory
             left_target = left_hand_data[0:7].copy()
             right_target = right_hand_data[0:7].copy()
 
-            for _ in range(10):
-                accel_left = (omega ** 2) * (left_target - curr_left_hand_joint) - (2 * omega) * curr_left_hand_vel
-                curr_left_hand_vel += accel_left * dt
-                curr_left_hand_joint += curr_left_hand_vel * dt
+            # 2. Filter
+            # new_cmd = (1 - alpha) * last_cmd + alpha * target
+            curr_left_hand_cmd = (1.0 - alpha_hand) * curr_left_hand_cmd + alpha_hand * left_target
+            curr_right_hand_cmd = (1.0 - alpha_hand) * curr_right_hand_cmd + alpha_hand * right_target
 
-                accel_right = (omega ** 2) * (right_target - curr_right_hand_joint) - (2 * omega) * curr_right_hand_vel
-                curr_right_hand_vel += accel_right * dt
-                curr_right_hand_joint += curr_right_hand_vel * dt
+            # 3. Execute command
+            hand.execute_dual(curr_left_hand_cmd, curr_right_hand_cmd)
 
-                hand.execute_dual(curr_left_hand_joint, curr_right_hand_joint)
-
-                time.sleep(dt)
-
+            # 4. Update robot hand state
             left_hand_data[8:15] = hand.get_states_left()
             right_hand_data[8:15] = hand.get_states_right()
 
+            time.sleep(dt)
+
     except KeyboardInterrupt:
+        shm_left_hand.close()
+        shm_right_hand.close()
         print("Robot Hand Stopped.")
