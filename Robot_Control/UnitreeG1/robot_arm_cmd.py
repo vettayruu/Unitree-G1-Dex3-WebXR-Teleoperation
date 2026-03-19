@@ -19,7 +19,7 @@ G1_NUM_MOTOR = 29
 Kp = [
     0.5, 0.5, 0.5, 0.5, 0.1, 0.1,  # leg left
     0.5, 0.5, 0.5, 0.5, 0.1, 0.1,  # leg right
-    100, 0.5, 0.5,  # waist
+    80, 0.5, 0.5,  # waist
     88, 88, 80, 85, 30, 35, 35,  # arm left
     88, 88, 80, 85, 30, 35, 35,  # arm right
 ]
@@ -180,9 +180,13 @@ class Custom:
             prev_q = self.low_cmd.motor_cmd[joint_idx].q
             self.low_cmd.motor_cmd[joint_idx].q = (1.0 - self.alpha) * prev_q + self.alpha * target_q
 
+        # Left Arm and Right Arm
         for i in range(7):
             apply_smooth(15 + i, left_data[1 + i])
             apply_smooth(22 + i, right_data[1 + i])
+
+        # Waist Yaw
+        apply_smooth(12, left_data[0])
 
     def LowStateHandler(self, msg: LowState_):
         self.low_state = msg
