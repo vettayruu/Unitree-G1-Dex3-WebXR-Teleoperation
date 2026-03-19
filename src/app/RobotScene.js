@@ -68,7 +68,7 @@ export default function RobotScene(props) {
   // Webcam Stream
   React.useEffect(() => {
     if (props.webcamStream1) {
-      const videoEl = document.getElementById('leftVideo');
+      const videoEl = document.getElementById('stereoVideo');
       if (videoEl && videoEl.srcObject !== props.webcamStream1) {
         videoEl.srcObject = props.webcamStream1;
         videoEl.play();
@@ -76,25 +76,25 @@ export default function RobotScene(props) {
     }
   }, [props.webcamStream1]);
 
-  React.useEffect(() => {
-    if (props.webcamStream2) {
-      const videoEl = document.getElementById('rightVideo');
-      if (videoEl && videoEl.srcObject !== props.webcamStream2) {
-        videoEl.srcObject = props.webcamStream2;
-        videoEl.play();
-      }
-    }
-  }, [props.webcamStream2]);
+  // React.useEffect(() => {
+  //   if (props.webcamStream2) {
+  //     const videoEl = document.getElementById('rightVideo');
+  //     if (videoEl && videoEl.srcObject !== props.webcamStream2) {
+  //       videoEl.srcObject = props.webcamStream2;
+  //       videoEl.play();
+  //     }
+  //   }
+  // }, [props.webcamStream2]);
 
-  React.useEffect(() => {
-    if (props.webcamStream3) {
-      const videoEl = document.getElementById('subVideo');
-      if (videoEl && videoEl.srcObject !== props.webcamStream3) {
-        videoEl.srcObject = props.webcamStream3;
-        videoEl.play();
-      }
-    }
-  }, [props.webcamStream3]);
+  // React.useEffect(() => {
+  //   if (props.webcamStream3) {
+  //     const videoEl = document.getElementById('subVideo');
+  //     if (videoEl && videoEl.srcObject !== props.webcamStream3) {
+  //       videoEl.srcObject = props.webcamStream3;
+  //       videoEl.play();
+  //     }
+  //   }
+  // }, [props.webcamStream3]);
 
 
 
@@ -232,146 +232,44 @@ export default function RobotScene(props) {
 
         {/* Remote Cam*/}
         <a-assets>
-          <video id="leftVideo" autoPlay playsInline crossOrigin="anonymous" muted></video>
-          <video id="rightVideo" autoPlay playsInline crossOrigin="anonymous" muted></video>
-          <video id="subVideo" autoPlay playsInline crossOrigin="anonymous" muted></video>
+          <video id="stereoVideo" autoPlay playsInline crossOrigin="anonymous" muted></video>
         </a-assets>
 
-        {/* Plane or curved image for pinhole camera (ZED camera etc.) */}
-        {/* Curved Image For 720P camera frame (Before undistortion) */}
-        {/* <a-curvedimage
-          id="left-curved"
-          height="7.0"
-          radius="5.7"
-          theta-length="120"
-          position="0.2 1.6 -1.0"
-          rotation="0 -115 0"
-          scale="-1 1 1"
-          stereo-curvedvideo="eye: left; videoId: leftVideo">
-        </a-curvedimage>
-
-        <a-curvedimage
-          id="right-curved"
-          height="7.0"
-          radius="5.7"
-          theta-length="120"
-          position="0.2 1.6 -1.0"
-          rotation="0 -120.3 0"
-          scale="-1 1 1"
-          stereo-curvedvideo="eye: right; videoId: rightVideo">
-        </a-curvedimage> */}
-
-        {/* For 1080P */}
-        {/* <a-curvedimage
-          id="left-curved"
-          height="9.0"
-          radius="5.7"
-          theta-length="180"
-          position="-0.30 1.2 -1.50"
-          rotation="0 -115 0"
-          scale="-1 1 1"
-          stereo-video="eye: left; videoId: leftVideo"
-          visible="true"
-        ></a-curvedimage> */}
-
-        {/* <a-curvedimage
-          id="right-curved"
-          height="9.0"
-          radius="5.7"
-          theta-length="180"
-          position="0.20. 1.2 -1.50"
-          rotation="0 -121 0"
-          scale="-1 1 1"
-          stereo-video="eye: right; videoId: rightVideo"
-          visible="true"
-        ></a-curvedimage> */}
-
-        {/* <a-entity
-          id="left-concave-bowl"
-          geometry="
-            primitive: sphere; 
-            radius: 10; 
-            phiStart: 45;     
-            phiLength: 90;    
-            thetaStart: 45;    
-            thetaLength: 90;   
-            segmentsWidth: 50;
-            segmentsHeight: 50
+        <a-entity
+          stereo-split="
+            eye: left; 
+            videoId: stereoVideo;
+            geometryType: sphere;
+            radius: 100;
+            segmentsWidth: 64;
+            segmentsHeight: 64;
+            phiStart: 9.3;
+            phiLength: 160;
+            thetaStart: 30;
+            thetaLength: 130;
           "
-          position="-2 1.2 -5"
-          rotation="0 0 0" 
+          position="-0.35 0.5 12"
           scale="-1 1 1"
-          stereo-video="eye: left; videoId: leftVideo"
-          visible="true">
-        </a-entity> */}
-
-        {/* Plane Image For 720P camera frame (After undistortion)*/}
-        {/* <a-plane
-          id="left-curved"
-          height="4.0"
-          width="7.0"
-          position="-0.16 1.0 -2.3" // 1080p position="-0.19 1.0 -2.3"; 720p position="0.16 1.0 -2.3"
-          scale="0.6 0.6 0.2"
-          stereo-plane="eye: left; videoId: leftVideo"
-          visible="true"
-        ></a-plane>
-
-        <a-plane
-          id="right-curved"
-          height="4.0"
-          width="7.0"
-          position="0.16 1.0 -2.3" // 1080p position="0.19 1.0 -2.3"; 720p position="0.16 1.0 -2.3"
-          scale="0.6 0.6 0.2"
-          stereo-plane="eye: right; videoId: rightVideo"
-          visible="true"
-        ></a-plane> */}
-
-        {/* Sub Camera Plane Image */}
-        {/* <a-plane
-          id="subcam-curved"
-          height="1.5"
-          width="2.3"
-          position="1.1 0.0 -2.0" // 1080p position="0.19 1.0 -2.3"; 720p position="0.16 1.0 -2.3"
-          scale="0.6 0.6 0.2"
-          stereo-plane="eye: left; videoId: subVideo"
-          visible="true"
-        ></a-plane>
-
-        <a-plane
-          id="subcam-curved"
-          height="1.5"
-          width="2.3"
-          position="1.1 0.0 -2.0" // 1080p position="0.19 1.0 -2.3"; 720p position="0.16 1.0 -2.3"
-          scale="0.6 0.6 0.2"
-          stereo-plane="eye: right; videoId: subVideo"
-          visible="true"
-        ></a-plane> */}
-
-        {/* Sphere video for fisheye camera (VR cam etc.)*/}
-        {/* <a-sphere
-          id="left-curved"
-          // radius="100"
-          position="0 1.7 0"
-          scale="-1 1 1"
-          stereo-spherevideo="eye: left; videoId: leftVideo"
-          geometry="primitive: sphere; radius: 100; segmentsWidth: 60; segmentsHeight:40; thetaLength:180"
-        ></a-sphere> */}
-
-        {/* <a-entity
-          id="left-vrcam"
-          stereo-spherevideo="eye: left; videoId: leftVideo; radius: 10"
-          position="0 1.5 0"
-          rotation="0 0 0" 
-          scale="-1 1 1">
-        </a-entity>
+          rotation="0 180 0"
+        ></a-entity>
 
         <a-entity
-          id="right-vrcam"
-          stereo-spherevideo="eye: right; videoId: rightVideo; radius: 10"
-          position="0 1.5 0"
-          rotation="0 0 0"
-          scale="-1 1 1">
-        </a-entity> */}
+          stereo-split="
+            eye: right; 
+            videoId: stereoVideo;
+            geometryType: sphere;
+            radius: 100;
+            segmentsWidth: 64;
+            segmentsHeight: 64;
+            phiStart: 10.7; 
+            phiLength: 160;
+            thetaStart: 30;
+            thetaLength: 130;
+          "
+          position="0.35 0.5 12"
+          scale="-1 1 1"
+          rotation="0 180 0"
+        ></a-entity>
         
         
         {/* Light */}

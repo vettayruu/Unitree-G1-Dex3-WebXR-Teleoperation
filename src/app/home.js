@@ -6,9 +6,9 @@ if (typeof window !== 'undefined' && window.AFRAME) {
 }
 
 import * as React from 'react'
-import numeric from 'numeric';
+import numeric, { t } from 'numeric';
 
-import { WebRTC_Video_Recv, WebRTC_Video_Send, WebRTC_Video_Send_Data, WebRTC_Data_Recv } from '../lib/WebRTC_Sora';
+import { WebRTC_G1_VRCam, WebRTC_Video_Send, WebRTC_Video_Send_Data, WebRTC_Data_Recv } from '../lib/WebRTC_Sora';
 import RobotScene from './RobotScene';
 import registerAframeComponents from './registerAframeComponents'; 
 import MQTT_Setup from './MQTT_Setup';
@@ -811,87 +811,129 @@ export default function DynamicHome(props) {
   /* ---------------------- Hand Control ------------------------------------*/
   // Figer Points Distance
   const [thumb_index_right, setThumbIndexRight] = React.useState(0);
-  const [middle_wrist_right, setMiddleWristRight] = React.useState(0);
+  const [thumb_middle_right, setThumbMiddleRight] = React.useState(0);
+  const [index_meta_right, setIndexMetaRight] = React.useState(0);
+  const [middle_meta_right, setMiddleMetaRight] = React.useState(0);
+  const [thumb_index_inter_right, setThumbIndexInterRight] = React.useState(0);
+  const [handGestureModeRight, setHandGestureModeRight] = React.useState('free'); // 'free', 'thumb-index', 'thumb-middle', 'all'
+
   const [thumb_index_left, setThumbIndexLeft] = React.useState(0);
-  const [middle_wrist_left, setMiddleWristLeft] = React.useState(0);
+  const [thumb_middle_left, setThumbMiddleLeft] = React.useState(0);
+  const [index_meta_left, setIndexMetaLeft] = React.useState(0);
+  const [middle_meta_left, setMiddleMetaLeft] = React.useState(0);
+  const [thumb_index_inter_left, setThumbIndexInterLeft] = React.useState(0);
+  const [handGestureModeLeft, setHandGestureModeLeft] = React.useState('free'); // 'free', 'thumb-index', 'thumb-middle', 'all'
 
-  const thetaToolRightRef = React.useRef(theta_body);
-  const thetaToolLeftRef = React.useRef(theta_body_left);
-
-  // const initialThetas = [
-  //   [0, 0, 0], // thumb
-  //   [0, 0],    // index
-  //   [0, 0] // middle
-  // ];
-  // const [theta_tool, setThetaTool] = React.useState(initialThetas);
-
-  // const lastThetaRef = React.useRef(Math.acos(middle_dot_right || 1));
-  // const middleThetalistRef = React.useRef([0, 0]);
-  // // theta_tool is deg
-  // React.useEffect(() => {
-  //   if (!rendered || !vrModeRef.current || showMenu || shareControl) return;
-
-  //   const newThumbRight = [thumb_index_right * (30/0.095), thumb_index_right * (17/0.095), thumb_index_right * (42/0.095)];
-  //   const newIndexRight = [thumb_index_right * (60/0.1), thumb_index_right * (50/0.095)];
-  //   // const newMiddleRight = [middle_wrist_right * (75/0.1), middle_wrist_right * (75/0.1)];
-    
-  //   const d_current = Math.max(-1, Math.min(1, 
-  //     Array.isArray(middle_dot_right) ? middle_dot_right[0] : middle_dot_right
-  //   ));
-  //   const theta_current = Math.acos(d_current);
-
-  //   const theta_dot = (theta_current - lastThetaRef.current) / dt;
-  //   lastThetaRef.current = theta_current;
-
-  //   const L = 0.083; 
-  //   const vz = -(theta_dot) * (L * Math.cos(theta_current));
-  //   const vx_linked = (theta_dot) * (L * Math.sin(theta_current));
-
-  //   const Vs_target = [0, 0, theta_dot, vx_linked, 0, vz];
-
-  //   const currentThetas = middleThetalistRef.current;
-
-  //   const Js = mr.JacobianSpace(Slist_index, currentThetas);
-
-  //   const q_dot = numeric.dot(mr.matPinv(Js), Vs_target);
-
-  //   const newMiddleThetas = currentThetas.map((theta, i) => {
-  //       return theta + q_dot[i] * dt * 3.0;
-  //   });
-
-  //   // 先转度数并限位
-  //   const newMiddleThetasDeg = mr.rad2deg(newMiddleThetas).map(deg => 
-  //     Math.max(0, Math.min(90, deg))
-  //   );
-
-  //   // ✅ 关键：更新限位后的弧度值到 Ref
-  //   middleThetalistRef.current = newMiddleThetasDeg.map(deg => mr.deg2rad(deg));
-
-  //   setThetaTool([newThumbRight, newIndexRight, newMiddleThetasDeg]);
-
-  // }, [thumb_index_right, middle_wrist_right, middle_dot_right]);
+  const thetaToolRightRef = React.useRef(theta_tool);
+  const thetaToolLeftRef = React.useRef(theta_tool_left);
 
   React.useLayoutEffect(() => {
     if (!rendered || !vrModeRef.current || showMenu || shareControl) return;
-    const newThumbRight = [-thumb_index_right * (30), -thumb_index_right * (17), -thumb_index_right * (46)];
-    const newIndexRight = [thumb_index_right * (62), thumb_index_right * (55)];
-    const newMiddleRight = [middle_wrist_right * (75), middle_wrist_right * (75)];
+
+    let newThumbRight = [0, 0, 0];
+    let newMiddleRight = [0, 0];
+    let newIndexRight = [0, 0];
+
+    const pinchThreshold = 0.78; 
+    const releaseThreshold = 0.75; 
+
+    if (handGestureModeRight === 'free') {
+        const isIndexPinching = thumb_index_right > pinchThreshold;
+        const isMiddlePinching = thumb_middle_right > pinchThreshold;
+
+        if (isIndexPinching && thumb_index_right > thumb_middle_right) {
+            setHandGestureModeRight('thumb-index');
+        } else if (isMiddlePinching) {
+            setHandGestureModeRight('thumb-middle');
+        }
+    }
+
+    switch (handGestureModeRight) {
+        case 'thumb-index':
+            newThumbRight = [-thumb_index_right * 30, -thumb_index_right * 17, -thumb_index_right * 46];
+            newIndexRight = [thumb_index_right * 62, thumb_index_right * 55];
+            newMiddleRight = [middle_meta_right * 75, middle_meta_right * 75];
+            if (thumb_index_right < releaseThreshold) setHandGestureModeRight('free');
+            break;
+        case 'thumb-middle':
+            newThumbRight = [thumb_middle_right * 30, -thumb_middle_right * 17, -thumb_middle_right * 46];
+            newMiddleRight = [thumb_middle_right * 62, thumb_middle_right * 55];
+            newIndexRight = [index_meta_right * 75, index_meta_right * 75];
+            if (thumb_middle_right < releaseThreshold) setHandGestureModeRight('free');
+            break;
+        default: // 'free'
+            newThumbRight = [0, -thumb_index_inter_right * 45, -thumb_index_inter_right * 75];
+            newIndexRight = [index_meta_right * 75, index_meta_right * 75];
+            newMiddleRight = [middle_meta_right * 75, middle_meta_right * 75];
+            break;
+    }
+
     setThetaTool([...newThumbRight, ...newMiddleRight, ...newIndexRight]);
-  }, [thumb_index_right, middle_wrist_right]);
+
+  }, [
+    thumb_index_right, 
+    thumb_middle_right, 
+    thumb_index_inter_right,
+    index_meta_right, 
+    middle_meta_right, 
+    handGestureModeRight
+  ]);
 
   React.useEffect(() => {
     thetaToolRightRef.current = theta_tool;
   }, [theta_tool]);
 
   React.useLayoutEffect(() => {
-    if (!rendered || !vrModeRef.current || showMenu || shareControl) return;
-    const newThumbLeft = [-thumb_index_left * (30), thumb_index_left * (17), thumb_index_left * (46)];
-    const newIndexLeft = [-thumb_index_left * (62), -thumb_index_left * (55)];
-    const newMiddleLeft = [-middle_wrist_left * (75), -middle_wrist_left * (75)];
-    const hand_joints = [...newThumbLeft, ...newMiddleLeft, ...newIndexLeft ]
-    console.log("Hand Joint Values (deg):", hand_joints);
-    setThetaToolLeft([...newThumbLeft, ...newMiddleLeft, ...newIndexLeft ]);
-  }, [thumb_index_left, middle_wrist_left]);
+      if (!rendered || !vrModeRef.current || showMenu || shareControl) return;
+
+      let newThumbLeft = [0, 0, 0];
+      let newMiddleLeft = [0, 0];
+      let newIndexLeft = [0, 0];
+
+      const pinchThreshold = 0.78; 
+      const releaseThreshold = 0.75; 
+
+      if (handGestureModeLeft === 'free') {
+          const isIndexPinching = thumb_index_left > pinchThreshold;
+          const isMiddlePinching = thumb_middle_left > pinchThreshold;
+
+          if (isIndexPinching && thumb_index_left > thumb_middle_left) {
+              setHandGestureModeLeft('thumb-index');
+          } else if (isMiddlePinching) {
+              setHandGestureModeLeft('thumb-middle');
+          }
+      }
+
+      switch (handGestureModeLeft) {
+          case 'thumb-index':
+              newThumbLeft = [-thumb_index_left * 30, thumb_index_left * 17, thumb_index_left * 46];
+              newIndexLeft = [-thumb_index_left * 62, -thumb_index_left * 55];
+              newMiddleLeft = [-middle_meta_left * 75, -middle_meta_left * 75];
+              if (thumb_index_left < releaseThreshold) setHandGestureModeLeft('free');
+              break;
+          case 'thumb-middle':
+              newThumbLeft = [thumb_middle_left * 30, thumb_middle_left * 17, thumb_middle_left * 46];
+              newMiddleLeft = [-thumb_middle_left * 62, -thumb_middle_left * 55];
+              newIndexLeft = [-index_meta_left * 75, -index_meta_left * 75];
+              if (thumb_middle_left < releaseThreshold) setHandGestureModeLeft('free');
+              break;
+          default: // 'free'
+              newThumbLeft = [0, thumb_index_inter_left * 45, thumb_index_inter_left * 75];
+              newIndexLeft = [-index_meta_left * 75, -index_meta_left * 75];
+              newMiddleLeft = [-middle_meta_left * 75, -middle_meta_left * 75];
+              break;
+      }
+
+      setThetaToolLeft([...newThumbLeft, ...newMiddleLeft, ...newIndexLeft]);
+
+    }, [
+      thumb_index_left, 
+      thumb_middle_left, 
+      thumb_index_inter_left,
+      index_meta_left, 
+      middle_meta_left, 
+      handGestureModeLeft
+    ]);
 
   React.useEffect(() => {
     thetaToolLeftRef.current = theta_tool_left;
@@ -1010,11 +1052,17 @@ export default function DynamicHome(props) {
 
       // Right Hand
       setThumbIndexRight,
-      setMiddleWristRight,
+      setThumbMiddleRight,
+      setIndexMetaRight,
+      setMiddleMetaRight,
+      setThumbIndexInterRight,
 
       // Left Hand
       setThumbIndexLeft,
-      setMiddleWristLeft,
+      setThumbMiddleLeft,
+      setIndexMetaLeft,
+      setMiddleMetaLeft,
+      setThumbIndexInterLeft,
 
       // HMD
       set_controller_object_cam,
@@ -1308,7 +1356,7 @@ export default function DynamicHome(props) {
     shareControlRef.current = shareControl;
   }, [shareControl]);
 
-  const MQTT_PUBLISH_INTERVAL = 1000 / 20; // MQTT Publish FPS (20Hz)
+  const MQTT_PUBLISH_INTERVAL = 1000 / 30; // MQTT Publish FPS (30Hz)
 
   const onXRFrameMQTT = React.useCallback((time, frame) => {
     if (!vrModeRef.current) return;
@@ -1358,9 +1406,9 @@ export default function DynamicHome(props) {
   // Robot Secene Render
   return (
     <>
-      <WebRTC_Video_Recv 
+      <WebRTC_G1_VRCam 
         onVideoStream1={setWebcamStream1}
-        onVideoStream2={setWebcamStream2}
+        // onVideoStream2={setWebcamStream2}
         // onVideoStream3={setWebcamStream3} 
       />
 

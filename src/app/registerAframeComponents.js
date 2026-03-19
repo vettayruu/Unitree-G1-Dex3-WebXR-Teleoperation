@@ -27,14 +27,20 @@ export default function registerAframeComponents(options) {
 
     // Right Hand
     setThumbIndexRight,
-    setMiddleWristRight,
+    setThumbMiddleRight,
+    setIndexMetaRight,
+    setMiddleMetaRight,
+    setThumbIndexInterRight,
 
     // HMD
     set_controller_object_cam,
 
     // Left Hand
     setThumbIndexLeft,
-    setMiddleWristLeft,
+    setThumbMiddleLeft,
+    setIndexMetaLeft,
+    setMiddleMetaLeft,
+    setThumbIndexInterLeft,
 
     // Menu
     setShowMenu,
@@ -532,6 +538,184 @@ export default function registerAframeComponents(options) {
     }
   });
 
+  // AFRAME.registerComponent('stereo-split', {
+  //   schema: {
+  //     eye: { type: 'string', default: 'left' }, // 'left', 'right', or 'both'
+  //     videoId: { type: 'string', default: '' },  // ID of the <video> element
+  //     width: { type: 'number', default: 1 },
+  //     height: { type: 'number', default: 1 },
+  //   },
+  //   init() {
+  //     const videoEl = document.getElementById(this.data.videoId);
+  //     if (!videoEl || videoEl.tagName !== 'VIDEO') {
+  //       console.warn('Video element not found or invalid:', this.data.videoId);
+  //       return;
+  //     }
+
+  //     this.videoEl = videoEl;
+  //     this.videoEl.setAttribute('crossorigin', 'anonymous');
+  //     this.videoEl.setAttribute('playsinline', 'true');
+  //     this.videoEl.play();
+
+  //     const texture = new THREE.VideoTexture(this.videoEl);
+  //     texture.colorSpace = THREE.SRGBColorSpace;
+
+  //     // 关键：根据 eye 设置纹理的 repeat 和 offset
+  //     if (this.data.eye === 'left') {
+  //       texture.repeat.set(0.5, 1);
+  //       texture.offset.set(0, 0);
+  //     } else if (this.data.eye === 'right') {
+  //       texture.repeat.set(0.5, 1);
+  //       texture.offset.set(0.5, 0);
+  //     }
+
+  //     this.el.setAttribute('material', {
+  //       shader: 'flat',
+  //       src: texture,
+  //       side: 'double'
+  //     });
+
+  //     this.el.setAttribute('geometry', {
+  //       primitive: 'plane',
+  //       width: this.data.width,
+  //       height: this.data.height,
+  //     });
+
+  //     this.update();
+  //   },
+  //   update() {
+  //     const mesh = this.el.getObject3D('mesh');
+  //     if (!mesh) return;
+
+  //     switch (this.data.eye) {
+  //       case 'left':
+  //         mesh.layers.set(1); // A-Frame 左眼图层
+  //         break;
+  //       case 'right':
+  //         mesh.layers.set(2); // A-Frame 右眼图层
+  //         break;
+  //       default:
+  //         mesh.layers.set(0); // 双眼可见
+  //     }
+  //   }
+  // });
+
+    AFRAME.registerComponent('stereo-split', {
+    schema: {
+      // --- 核心参数 ---
+      eye: { type: 'string', default: 'left' },
+      videoId: { type: 'string', default: '' },
+
+      // --- 几何体类型 ---
+      // 您可以保留这个，以便在 'plane', 'cylinder', 'sphere' 之间切换
+      geometryType: { type: 'string', default: 'sphere' }, 
+
+      // --- 通用参数 ---
+      radius: { type: 'number', default: 100 },
+      
+      // --- 球面 (sphere) 参数 ---
+      segmentsWidth: { type: 'number', default: 64 },
+      segmentsHeight: { type: 'number', default: 64 },
+      phiStart: { type: 'number', default: 0 },
+      phiLength: { type: 'number', default: 360 },
+      thetaStart: { type: 'number', default: 0 },
+      thetaLength: { type: 'number', default: 180 },
+
+      // --- 平面 (plane) 参数 (备用) ---
+      width: { type: 'number', default: 1 },
+      height: { type: 'number', default: 1 },
+    },
+
+    init: function () {
+      const videoEl = document.getElementById(this.data.videoId);
+      if (!videoEl || videoEl.tagName !== 'VIDEO') {
+        console.warn('Video element not found or invalid:', this.data.videoId);
+        return;
+      }
+
+      this.videoEl = videoEl;
+      this.videoEl.setAttribute('crossorigin', 'anonymous');
+      this.videoEl.setAttribute('playsinline', 'true');
+      this.videoEl.play();
+
+      const texture = new THREE.VideoTexture(this.videoEl);
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      // 根据 eye 设置纹理的 repeat 和 offset
+      if (this.data.eye === 'left') {
+        texture.repeat.set(0.5, 1);
+        texture.offset.set(0, 0);
+      } else if (this.data.eye === 'right') {
+        texture.repeat.set(0.5, 1);
+        texture.offset.set(0.5, 0);
+      }
+
+      this.el.setAttribute('material', {
+        shader: 'flat',
+        src: texture,
+        side: 'double' // 对于球面或曲面，'double' 或 'back' 通常是必须的
+      });
+
+      this.updateGeometry();
+      this.updateLayer();
+    },
+
+    update: function (oldData) {
+      // 如果几何体相关参数变化，则更新几何体
+      // (这里简单处理，每次update都更新)
+      this.updateGeometry();
+      this.updateLayer();
+    },
+
+    updateGeometry: function () {
+      const data = this.data;
+      let geometryParams;
+
+      switch (data.geometryType) {
+        case 'sphere':
+          geometryParams = {
+            primitive: 'sphere',
+            radius: data.radius,
+            segmentsWidth: data.segmentsWidth,
+            segmentsHeight: data.segmentsHeight,
+            phiStart: data.phiStart,
+            phiLength: data.phiLength,
+            thetaStart: data.thetaStart,
+            thetaLength: data.thetaLength,
+          };
+          break;
+        
+        // 这里可以保留其他几何体类型作为备用
+        case 'plane':
+        default:
+          geometryParams = {
+            primitive: 'plane',
+            width: data.width,
+            height: data.height,
+          };
+          break;
+      }
+      
+      this.el.setAttribute('geometry', geometryParams);
+    },
+
+    updateLayer: function () {
+      const mesh = this.el.getObject3D('mesh');
+      if (!mesh) return;
+
+      switch (this.data.eye) {
+        case 'left':
+          mesh.layers.set(1);
+          break;
+        case 'right':
+          mesh.layers.set(2);
+          break;
+        default:
+          mesh.layers.set(0);
+      }
+    }
+  });
+
   // // For ZED Mini
   // AFRAME.registerComponent('stereo-curvedvideo', {
   //   schema: {
@@ -860,6 +1044,7 @@ export default function registerAframeComponents(options) {
       wrist: new THREE.Object3D(),
       thumbTip: new THREE.Object3D(),
       indexTip: new THREE.Object3D(),
+      indexInter: new THREE.Object3D(),
       indexMeta: new THREE.Object3D(),
       middleTip: new THREE.Object3D(),
       middleMeta: new THREE.Object3D(),
@@ -903,6 +1088,7 @@ export default function registerAframeComponents(options) {
       const thumbTipPose = frame.getJointPose(hand.get('thumb-tip'), refSpace);
       const indexTipPose = frame.getJointPose(hand.get('index-finger-tip'), refSpace);
       const indexMetaPose = frame.getJointPose(hand.get('index-finger-metacarpal'), refSpace);
+      const indexInterPose = frame.getJointPose(hand.get('index-finger-phalanx-intermediate'), refSpace);
       const middleTipPose = frame.getJointPose(hand.get('middle-finger-tip'), refSpace);
       const middleMetaPose = frame.getJointPose(hand.get('middle-finger-metacarpal'), refSpace);
       const pinkyTipPose = frame.getJointPose(hand.get('pinky-finger-tip'), refSpace);
@@ -912,7 +1098,6 @@ export default function registerAframeComponents(options) {
       }
 
       // Update joint positions and orientations
-      // ...existing code...
       const { position: pWrist, orientation: qWrist } = wristPose.transform;
       this.jointObjects.wrist.position.set(pWrist.x, pWrist.y, pWrist.z);
       this.jointObjects.wrist.quaternion.set(qWrist.x, qWrist.y, qWrist.z, qWrist.w);
@@ -929,6 +1114,10 @@ export default function registerAframeComponents(options) {
       this.jointObjects.indexMeta.position.set(pIndexMeta.x, pIndexMeta.y, pIndexMeta.z);
       this.jointObjects.indexMeta.quaternion.set(qIndexMeta.x, qIndexMeta.y, qIndexMeta.z, qIndexMeta.w);
 
+      const { position: pIndexInter, orientation: qIndexInter } = indexInterPose.transform;
+      this.jointObjects.indexInter.position.set(pIndexInter.x, pIndexInter.y, pIndexInter.z);
+      this.jointObjects.indexInter.quaternion.set(qIndexInter.x, qIndexInter.y, qIndexInter.z, qIndexInter.w);
+
       const { position: pMiddleTip, orientation: qMiddleTip } = middleTipPose.transform;
       this.jointObjects.middleTip.position.set(pMiddleTip.x, pMiddleTip.y, pMiddleTip.z);
       this.jointObjects.middleTip.quaternion.set(qMiddleTip.x, qMiddleTip.y, qMiddleTip.z, qMiddleTip.w);
@@ -943,24 +1132,57 @@ export default function registerAframeComponents(options) {
 
       // Retargeting
       const dThumbIndex = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.indexTip.position);
+      const dIndexTipMeta = this.jointObjects.indexTip.position.distanceTo(this.jointObjects.indexMeta.position);
+
+      const dThumbMiddle = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.middleTip.position);
       const dMiddleTipMeta = this.jointObjects.middleTip.position.distanceTo(this.jointObjects.middleMeta.position);
+
+      const dThumbIndexInter = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.indexInter.position);
       
-      let thumbRatio = 0;
-      let middleRatio = 0;
+      let thumbIndexTipRatio = 0;
+      let thumbMiddleRatio = 0;
+      let indexMetaRatio = 0;
+      let middleMetaRatio = 0;
+      let thumbIndexInterRatio = 0;
+
       if (dThumbIndex < 0.02) {
-        thumbRatio = 1;
+        thumbIndexTipRatio = 1;
       } else if (dThumbIndex > 0.08) {
-        thumbRatio = 0;
+        thumbIndexTipRatio = 0;
       } else {
-        thumbRatio = 1 - (dThumbIndex - 0.02) / (0.08 - 0.02);
+        thumbIndexTipRatio = 1 - (dThumbIndex - 0.02) / (0.08 - 0.02);
+      }
+
+      if (dIndexTipMeta < 0.07) {
+        indexMetaRatio = 1;
+      } else if (dIndexTipMeta > 0.14) {
+        indexMetaRatio = 0;
+      } else {
+        indexMetaRatio = 1 - (dIndexTipMeta - 0.07) / (0.14 - 0.07);
+      }
+
+      if (dThumbMiddle < 0.025) {
+        thumbMiddleRatio = 1;
+      } else if (dThumbMiddle > 0.012) {
+        thumbMiddleRatio = 0;
+      } else {
+        thumbMiddleRatio = 1 - (dThumbMiddle - 0.025) / (0.012 - 0.025);
       }
       
       if (dMiddleTipMeta < 0.07) {
-        middleRatio = 1;
+        middleMetaRatio = 1;
       } else if (dMiddleTipMeta > 0.14) {
-        middleRatio = 0;
+        middleMetaRatio = 0;
       } else {
-        middleRatio = 1 - (dMiddleTipMeta - 0.07) / (0.14 - 0.07);
+        middleMetaRatio = 1 - (dMiddleTipMeta - 0.07) / (0.14 - 0.07);
+      }
+
+      if (dThumbIndexInter < 0.025) {
+        thumbIndexInterRatio = 1;
+      } else if (dThumbIndexInter > 0.10) {
+        thumbIndexInterRatio = 0;
+      } else {
+        thumbIndexInterRatio = 1 - (dThumbIndexInter - 0.02) / (0.10 - 0.025);
       }
 
       // Hand Trigger
@@ -1023,13 +1245,19 @@ export default function registerAframeComponents(options) {
       if (this.data.hand === 'right') {
         set_trigger_on(isTriggered);
         set_controller_object(this.jointObjects.wrist);
-        setThumbIndexRight(Math.max(0, Math.min(1, thumbRatio)));
-        setMiddleWristRight(Math.max(0, Math.min(1, middleRatio)));
+        setThumbIndexRight(Math.max(0, Math.min(1, thumbIndexTipRatio)));
+        setThumbMiddleRight(Math.max(0, Math.min(1, thumbMiddleRatio)));
+        setIndexMetaRight(Math.max(0, Math.min(1, indexMetaRatio)));
+        setMiddleMetaRight(Math.max(0, Math.min(1, middleMetaRatio)));
+        setThumbIndexInterRight(Math.max(0, Math.min(1, thumbIndexInterRatio)));
       } else {
         set_trigger_on_left(isTriggered);
         set_controller_object_left(this.jointObjects.wrist);
-        setThumbIndexLeft(Math.max(0, Math.min(1, thumbRatio)));
-        setMiddleWristLeft(Math.max(0, Math.min(1, middleRatio)));
+        setThumbIndexLeft(Math.max(0, Math.min(1, thumbIndexTipRatio)));
+        setThumbMiddleLeft(Math.max(0, Math.min(1, thumbMiddleRatio)));
+        setIndexMetaLeft(Math.max(0, Math.min(1, indexMetaRatio)));
+        setMiddleMetaLeft(Math.max(0, Math.min(1, middleMetaRatio)));
+        setThumbIndexInterLeft(Math.max(0, Math.min(1, thumbIndexInterRatio)));
       }
     }
   },
