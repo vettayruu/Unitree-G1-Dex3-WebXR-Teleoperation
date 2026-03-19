@@ -399,71 +399,40 @@ export default function DynamicHome(props) {
 
 
   /* ======================== Waist Control (use hmd)) ================================*/
-  // const lastVRPosRef_cam = React.useRef(null);
-  // const lastQuatRef_cam = React.useRef(null);
-  // const thetaBodyCamRef = React.useRef(theta_body_cam);
-  // const positionEECamRef = React.useRef(position_ee_cam);
-  // const REECamRef = React.useRef(R_ee_cam);
+  const lastVRPosRef_cam = React.useRef(null);
+  const lastQuatRef_cam = React.useRef(null);
+  const thetaBodyCamRef = React.useRef(theta_body_cam);
+  const positionEECamRef = React.useRef(position_ee_cam);
+  const REECamRef = React.useRef(R_ee_cam);
 
-  // React.useEffect(() => {
-  //   if (!rendered || !vrModeRef.current || showMenu) return;
-  //   if (!thetaBodyCamRef.current || !positionEECamRef.current || !REECamRef.current) return;
+  // React.useLayoutEffect(() => {
+  //   if (!rendered || !vrModeRef.current || showMenu || !wholeBodyControl ) return;
 
-  //   const { position: p_raw, quaternion: q_raw } = controller_object_cam;
-  //   console.log("Cam Controller Raw Position:", p_raw);
-  //   console.log("Cam Controller Raw Quaternion:", q_raw);
+  //   const q_raw = controller_object_cam.quaternion;
 
-  //   if (!lastVRPosRef_cam.current) {
-  //       lastVRPosRef_cam.current = [p_raw.x, p_raw.y, p_raw.z];
-  //       lastQuatRef_cam.current = q_raw.clone(); 
-  //       return; 
-  //     }
+  //   // --- 初始化参考姿态 ---
+  //   if (!lastQuatRef_cam.current) {
+  //     lastQuatRef_cam.current = q_raw.clone();
+  //     return;
+  //   }
 
-  //     // --- A. Delta Position ---
-  //     const pos_diff_world = three2world([
-  //       p_raw.x - lastVRPosRef_cam.current[0],
-  //       p_raw.y - lastVRPosRef_cam.current[1],
-  //       p_raw.z - lastVRPosRef_cam.current[2]
-  //     ]);
+  //   // --- 计算相对四元数 ---
+  //   const q_rel = new THREE.Quaternion()
+  //     .copy(lastQuatRef_cam.current)
+  //     .invert()
+  //     .premultiply(q_raw);
 
-  //     lastVRPosRef_cam.current[0] = p_raw.x;
-  //     lastVRPosRef_cam.current[1] = p_raw.y;
-  //     lastVRPosRef_cam.current[2] = p_raw.z;
+  //   // --- 提取欧拉角（YXZ 顺序适合人体腰部）---
+  //   const euler = new THREE.Euler().setFromQuaternion(q_rel, 'YXZ');
 
-  //     // --- B. Axis-Angle ---
-  //     const { axis, theta } = getAxisAngleFromQuatDiff(q_raw, lastQuatRef_cam.current);
-  //     console.log("Cam Controller Rotation Axis:", axis);
-  //     console.log("Cam Controller Rotation Angle (rad):", theta);
+  //   // --- 直接映射到关节角度 ---
+  //   // 假设 theta_body_cam = [waist_yaw, waist_pitch, waist_roll]
+  //   const new_theta_cam = [
+  //     euler.y,  // Yaw (左右转头)
+  //     -euler.z * 0.8,  // Pitch (俯仰)
+  //     -euler.x   // Roll (可选，一般不需要)
+  //   ];
 
-  //     lastQuatRef_cam.current.copy(q_raw);
-
-  //     // --- C. Target Pose ---
-  //     const newP = [
-  //       position_ee_left[0] + pos_diff_world[0],
-  //       position_ee_left[1] + pos_diff_world[1],
-  //       position_ee_left[2] + pos_diff_world[2]
-  //     ];
-
-  //     const axis_world = [-axis[2], -axis[0], axis[1]];
-  //     console.log("Cam Controller Rotation Axis in World Frame:", axis_world);
-
-  //     const R_rel = ScrewAxisToRMatrix(axis_world, theta);
-  //     console.log("Cam Controller Relative Rotation Matrix:", R_rel);
-  //     console.log("Current End-Effector Rotation Matrix:", R_ee_cam);
-
-  //     const newT = mr.RpToTrans(numeric.dot(R_rel, R_ee_cam), newP);
-  //     console.log("newT:", newT);
-
-  //     let new_theta_cam, success
-  //     [new_theta_cam, success] = mr.IKRetarget(
-  //       Slist_cam, 
-  //       M_cam, 
-  //       newT, 
-  //       thetaBodyCamRef.current,
-  //       1e-3, 1e-3
-  //     );    
-
-  //     // console.log("New Theta Cam:", new_theta_cam);
   //     // Ref Update
   //     thetaBodyCamRef.current = new_theta_cam;
 
@@ -472,14 +441,13 @@ export default function DynamicHome(props) {
       
   //     positionEECamRef.current = p_cam;
   //     REECamRef.current = R_cam;
-
   //     const euler_ee_cam = worlr2three(mr.RotMatToEuler(R_cam, Euler_order))
 
-  //     setThetaBodyCam(new_theta_cam);
-  //     setErrorCodeCam(success ? 0 : 1);
-  //     setPositionEECam(p_cam);
-  //     setREECam(R_cam);
-  //     setEulerEECam(euler_ee_cam);
+  //     // setThetaBodyCam(new_theta_cam);
+  //     // setErrorCodeCam(0);
+  //     // setPositionEECam(p_cam);
+  //     // setREECam(R_cam);
+  //     // setEulerEECam(euler_ee_cam);
 
   // }, [
   //   controller_object_cam.position.x,
@@ -489,93 +457,10 @@ export default function DynamicHome(props) {
   //   controller_object_cam.quaternion.y,
   //   controller_object_cam.quaternion.z,
   //   controller_object_cam.quaternion.w,
-  //   rendered, 
-  //   vrModeRef.current
+  //   rendered,
+  //   vrModeRef.current,
+  //   showMenu
   // ]);
-
-  // React.useEffect(() => {
-  //   thetaBodyCamRef.current = theta_body_cam;
-  //   positionEECamRef.current = position_ee_cam;
-  //   REECamRef.current = R_ee_cam;
-  // }, [theta_body_cam, position_ee_cam, R_ee_cam]);
-    
-  const lastVRPosRef_cam = React.useRef(null);
-  const lastQuatRef_cam = React.useRef(null);
-  const thetaBodyCamRef = React.useRef(theta_body_cam);
-  const positionEECamRef = React.useRef(position_ee_cam);
-  const REECamRef = React.useRef(R_ee_cam);
-
-  React.useLayoutEffect(() => {
-    if (!rendered || !vrModeRef.current || showMenu || !wholeBodyControl ) return;
-
-    const q_raw = controller_object_cam.quaternion;
-
-    // --- 初始化参考姿态 ---
-    if (!lastQuatRef_cam.current) {
-      lastQuatRef_cam.current = q_raw.clone();
-      return;
-    }
-
-    // --- 计算相对四元数 ---
-    const q_rel = new THREE.Quaternion()
-      .copy(lastQuatRef_cam.current)
-      .invert()
-      .premultiply(q_raw);
-
-    // --- 提取欧拉角（YXZ 顺序适合人体腰部）---
-    const euler = new THREE.Euler().setFromQuaternion(q_rel, 'YXZ');
-
-    // --- 直接映射到关节角度 ---
-    // 假设 theta_body_cam = [waist_yaw, waist_pitch, waist_roll]
-    const new_theta_cam = [
-      euler.y,  // Yaw (左右转头)
-      -euler.z * 0.8,  // Pitch (俯仰)
-      -euler.x   // Roll (可选，一般不需要)
-    ];
-
-      // Ref Update
-      thetaBodyCamRef.current = new_theta_cam;
-
-      const T_cam = mr.FKinSpace(M_cam, Slist_cam, new_theta_cam);
-      const [R_cam, p_cam] = mr.TransToRp(T_cam);
-      
-      positionEECamRef.current = p_cam;
-      REECamRef.current = R_cam;
-      const euler_ee_cam = worlr2three(mr.RotMatToEuler(R_cam, Euler_order))
-
-      setThetaBodyCam(new_theta_cam);
-      setErrorCodeCam(0);
-      setPositionEECam(p_cam);
-      setREECam(R_cam);
-      setEulerEECam(euler_ee_cam);
-
-    // --- 关节限位 ---
-    // const limited_theta_cam = new_theta_cam.map((angle, i) => {
-    //   if (joint_limits_cam[i]) {
-    //     return Math.max(
-    //       joint_limits_cam[i][0],
-    //       Math.min(joint_limits_cam[i][1], angle)
-    //     );
-    //   }
-    //   return angle;
-    // });
-
-    // --- 更新状态 ---
-    // thetaBodyCamRef.current = limited_theta_cam;
-    // setThetaBodyCam(limited_theta_cam);
-
-  }, [
-    controller_object_cam.position.x,
-    controller_object_cam.position.y,
-    controller_object_cam.position.z,
-    controller_object_cam.quaternion.x,
-    controller_object_cam.quaternion.y,
-    controller_object_cam.quaternion.z,
-    controller_object_cam.quaternion.w,
-    rendered,
-    vrModeRef.current,
-    showMenu
-  ]);
 
   /*======================= VR Right Robot Arm Control ====================================*/
   /*** Right Arm Unified Control Loop (Use Quaternion Diff to get rotation axis in space) ***/
@@ -626,16 +511,6 @@ export default function DynamicHome(props) {
         position_ee[2] + pos_diff_world[2]
       ];
 
-      // let newT;
-      // if (VR_Control_Mode === 'inSpace') {
-      //   const axis_world = [-axis[2], -axis[0], axis[1]]; 
-      //   const R_rel = ScrewAxisToRMatrix(axis_world, theta); 
-      //   newT = mr.RpToTrans(numeric.dot(R_rel, R_ee), newP);
-      // } else {
-      //   const R_rel = ScrewAxisToRMatrix(axis, theta); 
-      //   newT = mr.RpToTrans(numeric.dot(R_ee, R_rel), newP);
-      // }
-
       const axis_world = [-axis[2], -axis[0], axis[1]]; 
       const R_rel = ScrewAxisToRMatrix(axis_world, theta); 
       const newT = mr.RpToTrans(numeric.dot(R_rel, R_ee), newP);
@@ -665,6 +540,11 @@ export default function DynamicHome(props) {
       setPositionEE(p_right);
       setREE(R_right);
       setEuler(euler_ee);
+      
+      if (wholeBodyControl && waistControlOwner === 'right') {
+        thetaBodyCamRef.current = [new_theta_body[0], 0, 0];
+        setThetaBodyCam([new_theta_body[0], 0, 0]);
+      }
 
     } else {
       // --- Reset as trigger off ---
@@ -687,10 +567,22 @@ export default function DynamicHome(props) {
 
   // React for Render
   React.useEffect(() => {
-    thetaBodyRef.current = theta_body;
-    positionEERef.current = position_ee;
-    REERef.current = R_ee;
-  }, [theta_body, position_ee, R_ee]);
+    if (!wholeBodyControl) {
+      thetaBodyRef.current = theta_body;
+      positionEERef.current = position_ee;
+      REERef.current = R_ee;
+    } else {
+      thetaBodyRef.current = [theta_body_cam[0], ...theta_body.slice(1)];
+      const T_right = mr.FKinSpace(M_right, Slist_right, thetaBodyRef.current);
+      const [R_right, p_right] = mr.TransToRp(T_right);
+      positionEERef.current = p_right;
+      REERef.current = R_right;
+      const euler_ee = worlr2three(mr.RotMatToEuler(R_right, Euler_order))
+      setPositionEE(p_right);
+      setREE(R_right);
+      setEuler(euler_ee);
+    }
+  }, [theta_body, position_ee, R_ee, theta_body_cam]);
 
   /*======================= VR Left Arm Control ====================================*/
   const lastVRPosRef_left = React.useRef(null);
@@ -741,16 +633,6 @@ export default function DynamicHome(props) {
       const R_rel = ScrewAxisToRMatrix(axis_world, theta);
       const newT = mr.RpToTrans(numeric.dot(R_rel, R_ee_left), newP);
 
-      // let newT;
-      // if (VR_Control_Mode === 'inSpace') {
-      //   const axis_world = [-axis[2], -axis[0], axis[1]];
-      //   const R_rel = ScrewAxisToRMatrix(axis_world, theta);
-      //   newT = mr.RpToTrans(numeric.dot(R_rel, R_ee_left), newP);
-      // } else {
-      //   const R_rel = ScrewAxisToRMatrix(axis, theta);
-      //   newT = mr.RpToTrans(numeric.dot(R_ee_left, R_rel), newP);
-      // }
-
       // --- D. IK ---
       const { new_theta_body, error_code } = IK_joint_velocity_limit(
         newT, 
@@ -780,6 +662,11 @@ export default function DynamicHome(props) {
       setREELeft(R_left);
       setEulerEELeft(euler_ee_left);
 
+      if (wholeBodyControl && waistControlOwner === 'left') {
+        thetaBodyCamRef.current = [new_theta_body[0], 0, 0];
+        setThetaBodyCam([new_theta_body[0], 0, 0]);
+      }
+
     } else {
       // --- Trigger Off Reset ---
       if (lastVRPosRef_left.current || showMenu) {
@@ -802,10 +689,74 @@ export default function DynamicHome(props) {
 
   // Refresh for Left Arm
   React.useEffect(() => {
-    thetaBodyLeftRef.current = theta_body_left;
-    positionEELeftRef.current = position_ee_left;
-    REELeftRef.current = R_ee_left;
-  }, [theta_body_left, position_ee_left, R_ee_left]);
+    if (!wholeBodyControl) {
+      thetaBodyLeftRef.current = theta_body_left;
+      positionEELeftRef.current = position_ee_left;
+      REELeftRef.current = R_ee_left;
+    } else {
+      thetaBodyLeftRef.current = [theta_body_cam[0], ...theta_body_left.slice(1)];
+      const T_left = mr.FKinSpace(M_left, Slist_left, thetaBodyLeftRef.current);
+      const [R_left, p_left] = mr.TransToRp(T_left);
+      positionEELeftRef.current = p_left;
+      REELeftRef.current = R_left;
+      const euler_ee_left = worlr2three(mr.RotMatToEuler(R_left, Euler_order))
+      setPositionEELeft(p_left);
+      setREELeft(R_left);
+      setEulerEELeft(euler_ee_left);
+    } 
+  }, [theta_body_left, position_ee_left, R_ee_left, theta_body_cam]);
+
+
+  /* ---------------------- Waist State ------------------------------------*/
+  const [waistControlOwner, setWaistControlOwner] = React.useState('none'); // 'none', 'left', 'right'
+  React.useEffect(() => {
+    if (wholeBodyControl) {
+      if (trigger_on && !trigger_on_left && !showMenu) {
+        setWaistControlOwner('right');
+        Slist_right[2][0] = 1;
+        setSlistRight(Slist_right);
+        Slist_left[2][0] = 1;
+        setSlistLeft(Slist_left);
+      } else if (!trigger_on && trigger_on_left && !showMenu) {
+        setWaistControlOwner('left');
+        Slist_left[2][0] = 1;
+        setSlistLeft(Slist_left);
+        Slist_right[2][0] = 1;
+        setSlistRight(Slist_right);
+      } else if (trigger_on && trigger_on_left && !showMenu){
+        setWaistControlOwner('none');
+        Slist_right[2][0] = 0;
+        Slist_left[2][0] = 0;
+        setSlistRight(Slist_right);
+        setSlistLeft(Slist_left);
+      }
+    } else {
+      setWaistControlOwner('none');
+      thetaBodyCamRef.current = [0, 0, 0];
+      setThetaBodyCam([0, 0, 0]);
+
+      thetaBodyLeftRef.current = [0, ...theta_body_left.slice(1)];
+      const T_left = mr.FKinSpace(M_left, Slist_left, thetaBodyLeftRef.current);
+      const [R_left, p_left] = mr.TransToRp(T_left);
+      positionEELeftRef.current = p_left;
+      REELeftRef.current = R_left;
+      const euler_ee_left = worlr2three(mr.RotMatToEuler(R_left, Euler_order))
+      setPositionEELeft(p_left);
+      setREELeft(R_left);
+      setEulerEELeft(euler_ee_left);
+
+      thetaBodyRef.current = [0, ...theta_body.slice(1)];
+      const T_right = mr.FKinSpace(M_right, Slist_right, thetaBodyRef.current);
+      const [R_right, p_right] = mr.TransToRp(T_right);
+      positionEERef.current = p_right;
+      REERef.current = R_right;
+      const euler_ee = worlr2three(mr.RotMatToEuler(R_right, Euler_order))
+      setPositionEE(p_right);
+      setREE(R_right);
+      setEuler(euler_ee);
+
+    }
+  }, [wholeBodyControl, trigger_on, trigger_on_left, showMenu]);
 
 
   /* ---------------------- Hand Control ------------------------------------*/
