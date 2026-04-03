@@ -33,11 +33,8 @@ export default function RobotScene(props) {
     euler_ee_cam,
 
     // Others
-    // modelOpacity, 
-    // webcamStream1, 
-    // webcamStream2,
-    // dsp_message,
     showMenu,
+    showVideo,
   } = props;
 
   const getStateCodeColor = (code) => {
@@ -67,14 +64,18 @@ export default function RobotScene(props) {
   
   // Webcam Stream
   React.useEffect(() => {
-    if (props.webcamStream1) {
+    if (props.webcamStream1 && props.showVideo) {
       const videoEl = document.getElementById('stereoVideo');
       if (videoEl && videoEl.srcObject !== props.webcamStream1) {
         videoEl.srcObject = props.webcamStream1;
-        videoEl.play();
+        // videoEl.play();
+        videoEl.play().catch(error => {
+          // 即使有保护，也最好捕获一下 play() 可能的异常
+          console.warn("Video play interrupted, likely due to component unmount:", error);
+        });
       }
     }
-  }, [props.webcamStream1]);
+  }, [props.webcamStream1, props.showVideo]);
 
   // React.useEffect(() => {
   //   if (props.webcamStream2) {
@@ -136,25 +137,25 @@ export default function RobotScene(props) {
             <a-entity id="button1" position="-0.3 0.4 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Control Mode \n inSpace" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="HMD Control \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
             
             {/* Button 2 */}
             <a-entity id="button2" position="0.3 0.4 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Control Mode \n inBody" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="HMD Control \n On" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
             
             {/* Button 3 */}
             <a-entity id="button3" position="-0.3 0.2 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Dual Arm Control \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="Show Video \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
 
             {/* Button 4 */}
             <a-entity id="button4" position="0.3 0.2 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Dual Arm Control \n On" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="Show Video \n On" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
 
             {/* Button 5 */}
             <a-entity id="button5" position="-0.3 0.0 0.01" class="raycastable menu-button"
@@ -234,7 +235,8 @@ export default function RobotScene(props) {
         <a-assets>
           <video id="stereoVideo" autoPlay playsInline crossOrigin="anonymous" muted></video>
         </a-assets>
-
+        
+        {showVideo && (
         <a-entity
           stereo-split="
             eye: left; 
@@ -248,11 +250,12 @@ export default function RobotScene(props) {
             thetaStart: 30;
             thetaLength: 130;
           "
-          position="-0.35 0.5 12"
+          position="-0.30 0.5 12"
           scale="-1 1 1"
           rotation="0 180 0"
-        ></a-entity>
+        ></a-entity>)}
 
+        {showVideo && (
         <a-entity
           stereo-split="
             eye: right; 
@@ -266,10 +269,10 @@ export default function RobotScene(props) {
             thetaStart: 30;
             thetaLength: 130;
           "
-          position="0.35 0.5 12"
+          position="0.30 0.5 12"
           scale="-1 1 1"
           rotation="0 180 0"
-        ></a-entity>
+        ></a-entity>)}
         
         
         {/* Light */}

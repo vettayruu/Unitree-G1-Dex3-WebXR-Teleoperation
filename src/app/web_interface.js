@@ -1,7 +1,7 @@
 "use client";
 import * as React from 'react'
 import "./web_interface.css";
-import { idtopic } from '../lib/MetaworkMQTT'
+import { idtopic, mqttBrokerURL } from '../lib/MetaworkMQTT'
 import { soraConfig } from '../lib/WebRTC_Sora';
 
 function rad2deg(rad) {
@@ -45,17 +45,17 @@ export default function WebInterface(props) {
 
   return (
     <>
+      <div className="mqtt-broker">
+        MQTT Broker URL: <span>{mqttBrokerURL}</span>
+      </div>
+
       <div className="user-uuid">
         USER ID: <span>{idtopic}</span>
       </div>
 
       <div className="webrtc-channel">
         WebRTC Signaling Url: <span>{soraConfig.signalingUrl}</span><br/>
-        Recv Channel 1 (Stereo Left): <span>{soraConfig.recv_channel_1}</span><br/>
-        Recv Channel 2 (Stereo Right): <span>{soraConfig.recv_channel_2}</span><br/>
-        Recv Channel 3 (Sub Cam): <span>{soraConfig.recv_channel_3}</span><br/>
-        Send Channel 1 (VR Left): <span>{soraConfig.send_channel_1}</span><br/>
-        Send Channel 2 (VR Right): <span>{soraConfig.send_channel_2}</span><br/>
+        Recv Channel 1 (G1 VRCam): <span>{soraConfig.G1_VRCAM_CHANNEL}</span><br/>
       </div>
 
 

@@ -1,3 +1,5 @@
+import { t } from "numeric";
+
 let registered = false;
 export default function registerAframeComponents(options) {
   if (registered) return;
@@ -44,8 +46,9 @@ export default function registerAframeComponents(options) {
 
     // Menu
     setShowMenu,
-    setControlMode,
-    setLeftArmMode,
+    setHmdControl,
+    setShowVideo,
+    // setControlMode,
     setIndicator,
     setShareControl,
     setWholeBodyControl,
@@ -538,69 +541,7 @@ export default function registerAframeComponents(options) {
     }
   });
 
-  // AFRAME.registerComponent('stereo-split', {
-  //   schema: {
-  //     eye: { type: 'string', default: 'left' }, // 'left', 'right', or 'both'
-  //     videoId: { type: 'string', default: '' },  // ID of the <video> element
-  //     width: { type: 'number', default: 1 },
-  //     height: { type: 'number', default: 1 },
-  //   },
-  //   init() {
-  //     const videoEl = document.getElementById(this.data.videoId);
-  //     if (!videoEl || videoEl.tagName !== 'VIDEO') {
-  //       console.warn('Video element not found or invalid:', this.data.videoId);
-  //       return;
-  //     }
-
-  //     this.videoEl = videoEl;
-  //     this.videoEl.setAttribute('crossorigin', 'anonymous');
-  //     this.videoEl.setAttribute('playsinline', 'true');
-  //     this.videoEl.play();
-
-  //     const texture = new THREE.VideoTexture(this.videoEl);
-  //     texture.colorSpace = THREE.SRGBColorSpace;
-
-  //     // 关键：根据 eye 设置纹理的 repeat 和 offset
-  //     if (this.data.eye === 'left') {
-  //       texture.repeat.set(0.5, 1);
-  //       texture.offset.set(0, 0);
-  //     } else if (this.data.eye === 'right') {
-  //       texture.repeat.set(0.5, 1);
-  //       texture.offset.set(0.5, 0);
-  //     }
-
-  //     this.el.setAttribute('material', {
-  //       shader: 'flat',
-  //       src: texture,
-  //       side: 'double'
-  //     });
-
-  //     this.el.setAttribute('geometry', {
-  //       primitive: 'plane',
-  //       width: this.data.width,
-  //       height: this.data.height,
-  //     });
-
-  //     this.update();
-  //   },
-  //   update() {
-  //     const mesh = this.el.getObject3D('mesh');
-  //     if (!mesh) return;
-
-  //     switch (this.data.eye) {
-  //       case 'left':
-  //         mesh.layers.set(1); // A-Frame 左眼图层
-  //         break;
-  //       case 'right':
-  //         mesh.layers.set(2); // A-Frame 右眼图层
-  //         break;
-  //       default:
-  //         mesh.layers.set(0); // 双眼可见
-  //     }
-  //   }
-  // });
-
-    AFRAME.registerComponent('stereo-split', {
+  AFRAME.registerComponent('stereo-split', {
     schema: {
       // --- 核心参数 ---
       eye: { type: 'string', default: 'left' },
@@ -768,70 +709,6 @@ export default function registerAframeComponents(options) {
   //     }
   //   }
   // });
-
-  // For FishEye Camera
-  AFRAME.registerComponent('stereo-spherevideo', {
-    schema: {
-      eye: { type: 'string', default: 'left' },
-      videoId: { type: 'string', default: '' },
-      radius: { type: 'number', default: 10 } // 建议 10m 左右，减少调焦压力
-    },
-
-    init: function () {
-      const videoEl = document.getElementById(this.data.videoId);
-      if (!videoEl) {
-        console.warn('Video element not found:', this.data.videoId);
-        return;
-      }
-
-      this.videoEl = videoEl;
-
-      // 针对鱼眼/沉浸式模式调整几何体
-      // thetaLength 180 代表从头顶覆盖到脚下
-      // phiLength 180 代表覆盖前方 180 度视野
-      this.el.setAttribute('geometry', {
-        primitive: 'sphere',
-        radius: this.data.radius,
-        segmentsWidth: 64,
-        segmentsHeight: 64, // 增加垂直分段以平滑鱼眼畸变
-        phiStart: 0,        // 从中心开始
-        phiLength: 180,     // 覆盖半球
-        thetaStart: 0,
-        thetaLength: 180
-      });
-
-      // 创建 Texture
-      const texture = new THREE.VideoTexture(this.videoEl);
-      texture.colorSpace = THREE.SRGBColorSpace; // 确保色彩正确
-
-      this.el.setAttribute('material', {
-        shader: 'flat',
-        src: texture,
-        side: 'front' // 'front' or 'back'
-      });
-
-      // 初始设置图层
-      this.updateLayer();
-    },
-
-    update: function () {
-      this.updateLayer();
-    },
-
-    updateLayer: function () {
-      const mesh = this.el.getObject3D('mesh');
-      if (!mesh) return;
-
-      // A-Frame 默认相机左眼 Layer 1, 右眼 Layer 2
-      if (this.data.eye === 'left') {
-        mesh.layers.set(1);
-      } else if (this.data.eye === 'right') {
-        mesh.layers.set(2);
-      } else {
-        mesh.layers.set(0);
-      }
-    }
-  });
   
   /* Menu */
   AFRAME.registerComponent('highlight', {
@@ -933,13 +810,13 @@ export default function registerAframeComponents(options) {
         buttonEls[i].addEventListener('click', (evt) => {
           const btnId = evt.currentTarget.id;
           if (btnId === "button1") {
-            setControlMode("inSpace");
+            setHmdControl(false);
           } else if (btnId === "button2") {
-            setControlMode("inBody");
+            setHmdControl(true);
           } else if (btnId === "button3") {
-            setLeftArmMode("free");
+            setShowVideo(false);
           } else if (btnId === "button4") {
-            setLeftArmMode("assist");
+            setShowVideo(true);
           } else if (btnId === "button5") {
             setIndicator("true");
           } else if (btnId === "button6") {
@@ -1056,7 +933,7 @@ export default function registerAframeComponents(options) {
       isGestureActive: false,       // 当前手势是否激活
       gestureStartTime: 0,          // 手势开始时间
       lastToggleTime: 0,            // 上次切换菜单的时间
-      HOLD_DURATION: 500,           // 需要保持手势的时间（毫秒）
+      HOLD_DURATION: 800,           // 需要保持手势的时间（毫秒）
       COOLDOWN_DURATION: 1000,      // 冷却时间，防止误触发
     };
   },
@@ -1147,10 +1024,10 @@ export default function registerAframeComponents(options) {
 
       if (dThumbIndex < 0.02) {
         thumbIndexTipRatio = 1;
-      } else if (dThumbIndex > 0.08) {
+      } else if (dThumbIndex > 0.09) {
         thumbIndexTipRatio = 0;
       } else {
-        thumbIndexTipRatio = 1 - (dThumbIndex - 0.02) / (0.08 - 0.02);
+        thumbIndexTipRatio = 1 - (dThumbIndex - 0.02) / (0.09 - 0.02);
       }
 
       if (dIndexTipMeta < 0.07) {
@@ -1161,20 +1038,20 @@ export default function registerAframeComponents(options) {
         indexMetaRatio = 1 - (dIndexTipMeta - 0.07) / (0.14 - 0.07);
       }
 
-      if (dThumbMiddle < 0.025) {
+      if (dThumbMiddle < 0.02) {
         thumbMiddleRatio = 1;
-      } else if (dThumbMiddle > 0.012) {
+      } else if (dThumbMiddle > 0.095) {
         thumbMiddleRatio = 0;
       } else {
-        thumbMiddleRatio = 1 - (dThumbMiddle - 0.025) / (0.012 - 0.025);
+        thumbMiddleRatio = 1 - (dThumbMiddle - 0.02) / (0.095 - 0.02);
       }
       
       if (dMiddleTipMeta < 0.07) {
         middleMetaRatio = 1;
-      } else if (dMiddleTipMeta > 0.14) {
+      } else if (dMiddleTipMeta > 0.15) {
         middleMetaRatio = 0;
       } else {
-        middleMetaRatio = 1 - (dMiddleTipMeta - 0.07) / (0.14 - 0.07);
+        middleMetaRatio = 1 - (dMiddleTipMeta - 0.07) / (0.15 - 0.07);
       }
 
       if (dThumbIndexInter < 0.025) {
@@ -1182,7 +1059,7 @@ export default function registerAframeComponents(options) {
       } else if (dThumbIndexInter > 0.10) {
         thumbIndexInterRatio = 0;
       } else {
-        thumbIndexInterRatio = 1 - (dThumbIndexInter - 0.02) / (0.10 - 0.025);
+        thumbIndexInterRatio = 1 - (dThumbIndexInter - 0.025) / (0.10 - 0.025);
       }
 
       // Hand Trigger
@@ -1200,7 +1077,7 @@ export default function registerAframeComponents(options) {
       const state = this.menuGestureState;
 
       // 检测手势是否满足触发条件
-      const isGestureDetected = dThumbPinky < 0.03; // 3.0cm 触发距离
+      const isGestureDetected = dThumbPinky < 0.030; // 触发距离,m
 
       if (isGestureDetected) {
         if (!state.isGestureActive) {

@@ -159,11 +159,13 @@ export default function DynamicHome(props) {
   // Right Arm
   const [M_right, setMRight] = React.useState([]);
   const [Slist_right, setSlistRight] = React.useState([]);
+  const Slist_right_FK = React.useRef([Slist_right]); 
   const [Blist_right, setBlistRight] = React.useState([]);
 
   // Left Arm
   const [M_left, setMLeft] = React.useState([]);
   const [Slist_left, setSlistLeft] = React.useState([]);
+  const Slist_left_FK = React.useRef([Slist_left]); 
   const [Blist_left, setBlistLeft] = React.useState([]);
 
   // Torso/Cam Arm
@@ -243,7 +245,8 @@ export default function DynamicHome(props) {
 
   // Menu
   const [showMenu, setShowMenu] = React.useState(true);
-  const [left_arm_mode, setLeftArmMode] = React.useState('free'); // 'free' or 'assist', not used currently
+  const [hmdControl, setHmdControl] = React.useState(false);
+  const [showVideo, setShowVideo] = React.useState(false);
   const [VR_Control_Mode, setControlMode] = React.useState('inSpace'); // 'inSpace' or 'inBody', not used currently
   const [indicator, setIndicator] = React.useState('false');
   const [shareControl, setShareControl] = React.useState(false);
@@ -270,6 +273,16 @@ export default function DynamicHome(props) {
 
     }
   }, [rendered, wholeBodyControl]);
+
+  React.useEffect(() => {
+    if (robotParams.right !== null && robotParams.left !== null) {
+      Slist_right_FK.current = Slist_right.map(arr => arr.slice());
+      Slist_left_FK.current = Slist_left.map(arr => arr.slice());
+      Slist_right_FK.current[2][0] = 1;
+      Slist_left_FK.current[2][0] = 1;
+    }
+  }, [Slist_right, Slist_left]);
+
 
  // MQTT
   const [selectedMode, setSelectedMode] = React.useState('control'); 
@@ -399,71 +412,42 @@ export default function DynamicHome(props) {
 
 
   /* ======================== Waist Control (use hmd)) ================================*/
-  // const lastVRPosRef_cam = React.useRef(null);
-  // const lastQuatRef_cam = React.useRef(null);
-  // const thetaBodyCamRef = React.useRef(theta_body_cam);
-  // const positionEECamRef = React.useRef(position_ee_cam);
-  // const REECamRef = React.useRef(R_ee_cam);
+  const lastVRPosRef_cam = React.useRef(null);
+  const lastQuatRef_cam = React.useRef(null);
+  const thetaBodyCamRef = React.useRef(theta_body_cam);
+  const positionEECamRef = React.useRef(position_ee_cam);
+  const REECamRef = React.useRef(R_ee_cam);
 
-  // React.useEffect(() => {
-  //   if (!rendered || !vrModeRef.current || showMenu) return;
-  //   if (!thetaBodyCamRef.current || !positionEECamRef.current || !REECamRef.current) return;
+  const [waistControlOwner, setWaistControlOwner] = React.useState('none'); // 'none', 'left', 'right'
 
-  //   const { position: p_raw, quaternion: q_raw } = controller_object_cam;
-  //   console.log("Cam Controller Raw Position:", p_raw);
-  //   console.log("Cam Controller Raw Quaternion:", q_raw);
+  // React.useLayoutEffect(() => {
+  //   if (!rendered || !vrModeRef.current || showMenu || !hmdControl ) return;
 
-  //   if (!lastVRPosRef_cam.current) {
-  //       lastVRPosRef_cam.current = [p_raw.x, p_raw.y, p_raw.z];
-  //       lastQuatRef_cam.current = q_raw.clone(); 
-  //       return; 
-  //     }
+  //   const q_raw = controller_object_cam.quaternion;
 
-  //     // --- A. Delta Position ---
-  //     const pos_diff_world = three2world([
-  //       p_raw.x - lastVRPosRef_cam.current[0],
-  //       p_raw.y - lastVRPosRef_cam.current[1],
-  //       p_raw.z - lastVRPosRef_cam.current[2]
-  //     ]);
+  //   // --- 初始化参考姿态 ---
+  //   if (!lastQuatRef_cam.current) {
+  //     lastQuatRef_cam.current = q_raw.clone();
+  //     return;
+  //   }
 
-  //     lastVRPosRef_cam.current[0] = p_raw.x;
-  //     lastVRPosRef_cam.current[1] = p_raw.y;
-  //     lastVRPosRef_cam.current[2] = p_raw.z;
+  //   // --- 计算相对四元数 ---
+  //   const q_rel = new THREE.Quaternion()
+  //     .copy(lastQuatRef_cam.current)
+  //     .invert()
+  //     .premultiply(q_raw);
 
-  //     // --- B. Axis-Angle ---
-  //     const { axis, theta } = getAxisAngleFromQuatDiff(q_raw, lastQuatRef_cam.current);
-  //     console.log("Cam Controller Rotation Axis:", axis);
-  //     console.log("Cam Controller Rotation Angle (rad):", theta);
+  //   // --- 提取欧拉角（YXZ 顺序适合人体腰部）---
+  //   const euler = new THREE.Euler().setFromQuaternion(q_rel, 'YXZ');
 
-  //     lastQuatRef_cam.current.copy(q_raw);
+  //   // --- 直接映射到关节角度 ---
+  //   // 假设 theta_body_cam = [waist_yaw, waist_pitch, waist_roll]
+  //   const new_theta_cam = [
+  //     euler.y,  // Yaw (左右转头)
+  //     0,  // Pitch (俯仰)
+  //     0   // Roll (可选，一般不需要)
+  //   ];
 
-  //     // --- C. Target Pose ---
-  //     const newP = [
-  //       position_ee_left[0] + pos_diff_world[0],
-  //       position_ee_left[1] + pos_diff_world[1],
-  //       position_ee_left[2] + pos_diff_world[2]
-  //     ];
-
-  //     const axis_world = [-axis[2], -axis[0], axis[1]];
-  //     console.log("Cam Controller Rotation Axis in World Frame:", axis_world);
-
-  //     const R_rel = ScrewAxisToRMatrix(axis_world, theta);
-  //     console.log("Cam Controller Relative Rotation Matrix:", R_rel);
-  //     console.log("Current End-Effector Rotation Matrix:", R_ee_cam);
-
-  //     const newT = mr.RpToTrans(numeric.dot(R_rel, R_ee_cam), newP);
-  //     console.log("newT:", newT);
-
-  //     let new_theta_cam, success
-  //     [new_theta_cam, success] = mr.IKRetarget(
-  //       Slist_cam, 
-  //       M_cam, 
-  //       newT, 
-  //       thetaBodyCamRef.current,
-  //       1e-3, 1e-3
-  //     );    
-
-  //     // console.log("New Theta Cam:", new_theta_cam);
   //     // Ref Update
   //     thetaBodyCamRef.current = new_theta_cam;
 
@@ -472,11 +456,10 @@ export default function DynamicHome(props) {
       
   //     positionEECamRef.current = p_cam;
   //     REECamRef.current = R_cam;
-
   //     const euler_ee_cam = worlr2three(mr.RotMatToEuler(R_cam, Euler_order))
 
   //     setThetaBodyCam(new_theta_cam);
-  //     setErrorCodeCam(success ? 0 : 1);
+  //     setErrorCodeCam(0);
   //     setPositionEECam(p_cam);
   //     setREECam(R_cam);
   //     setEulerEECam(euler_ee_cam);
@@ -489,48 +472,25 @@ export default function DynamicHome(props) {
   //   controller_object_cam.quaternion.y,
   //   controller_object_cam.quaternion.z,
   //   controller_object_cam.quaternion.w,
-  //   rendered, 
-  //   vrModeRef.current
+  //   rendered,
+  //   vrModeRef.current,
+  //   showMenu
   // ]);
 
-  // React.useEffect(() => {
-  //   thetaBodyCamRef.current = theta_body_cam;
-  //   positionEECamRef.current = position_ee_cam;
-  //   REECamRef.current = R_ee_cam;
-  // }, [theta_body_cam, position_ee_cam, R_ee_cam]);
-    
-  const lastVRPosRef_cam = React.useRef(null);
-  const lastQuatRef_cam = React.useRef(null);
-  const thetaBodyCamRef = React.useRef(theta_body_cam);
-  const positionEECamRef = React.useRef(position_ee_cam);
-  const REECamRef = React.useRef(R_ee_cam);
-
   React.useLayoutEffect(() => {
-    if (!rendered || !vrModeRef.current || showMenu || !wholeBodyControl ) return;
+    if (!rendered || !vrModeRef.current || showMenu || !hmdControl ) return;
 
     const q_raw = controller_object_cam.quaternion;
 
-    // --- 初始化参考姿态 ---
-    if (!lastQuatRef_cam.current) {
-      lastQuatRef_cam.current = q_raw.clone();
-      return;
-    }
-
-    // --- 计算相对四元数 ---
-    const q_rel = new THREE.Quaternion()
-      .copy(lastQuatRef_cam.current)
-      .invert()
-      .premultiply(q_raw);
-
     // --- 提取欧拉角（YXZ 顺序适合人体腰部）---
-    const euler = new THREE.Euler().setFromQuaternion(q_rel, 'YXZ');
+    const euler = new THREE.Euler().setFromQuaternion(q_raw, 'YXZ');
 
     // --- 直接映射到关节角度 ---
     // 假设 theta_body_cam = [waist_yaw, waist_pitch, waist_roll]
     const new_theta_cam = [
       euler.y,  // Yaw (左右转头)
-      -euler.z * 0.8,  // Pitch (俯仰)
-      -euler.x   // Roll (可选，一般不需要)
+      0,  // Pitch (俯仰)
+      0   // Roll (可选，一般不需要)
     ];
 
       // Ref Update
@@ -548,21 +508,6 @@ export default function DynamicHome(props) {
       setPositionEECam(p_cam);
       setREECam(R_cam);
       setEulerEECam(euler_ee_cam);
-
-    // --- 关节限位 ---
-    // const limited_theta_cam = new_theta_cam.map((angle, i) => {
-    //   if (joint_limits_cam[i]) {
-    //     return Math.max(
-    //       joint_limits_cam[i][0],
-    //       Math.min(joint_limits_cam[i][1], angle)
-    //     );
-    //   }
-    //   return angle;
-    // });
-
-    // --- 更新状态 ---
-    // thetaBodyCamRef.current = limited_theta_cam;
-    // setThetaBodyCam(limited_theta_cam);
 
   }, [
     controller_object_cam.position.x,
@@ -626,16 +571,6 @@ export default function DynamicHome(props) {
         position_ee[2] + pos_diff_world[2]
       ];
 
-      // let newT;
-      // if (VR_Control_Mode === 'inSpace') {
-      //   const axis_world = [-axis[2], -axis[0], axis[1]]; 
-      //   const R_rel = ScrewAxisToRMatrix(axis_world, theta); 
-      //   newT = mr.RpToTrans(numeric.dot(R_rel, R_ee), newP);
-      // } else {
-      //   const R_rel = ScrewAxisToRMatrix(axis, theta); 
-      //   newT = mr.RpToTrans(numeric.dot(R_ee, R_rel), newP);
-      // }
-
       const axis_world = [-axis[2], -axis[0], axis[1]]; 
       const R_rel = ScrewAxisToRMatrix(axis_world, theta); 
       const newT = mr.RpToTrans(numeric.dot(R_rel, R_ee), newP);
@@ -665,6 +600,11 @@ export default function DynamicHome(props) {
       setPositionEE(p_right);
       setREE(R_right);
       setEuler(euler_ee);
+      
+      if (wholeBodyControl && waistControlOwner === 'right') {
+        thetaBodyCamRef.current = [new_theta_body[0], 0, 0];
+        setThetaBodyCam([new_theta_body[0], 0, 0]);
+      }
 
     } else {
       // --- Reset as trigger off ---
@@ -682,15 +622,29 @@ export default function DynamicHome(props) {
     controller_object.quaternion.z,
     controller_object.quaternion.w,
     trigger_on,
-    VR_Control_Mode
+    VR_Control_Mode,
+    waistControlOwner,
   ]);
 
   // React for Render
   React.useEffect(() => {
-    thetaBodyRef.current = theta_body;
-    positionEERef.current = position_ee;
-    REERef.current = R_ee;
-  }, [theta_body, position_ee, R_ee]);
+    if (!wholeBodyControl) {
+      thetaBodyRef.current = theta_body;
+      positionEERef.current = position_ee;
+      REERef.current = R_ee;
+    } 
+    else {
+      thetaBodyRef.current = [theta_body_cam[0], ...theta_body.slice(1)];
+      const T_right = mr.FKinSpace(M_right, Slist_right, thetaBodyRef.current);
+      const [R_right, p_right] = mr.TransToRp(T_right);
+      positionEERef.current = p_right;
+      REERef.current = R_right;
+      const euler_ee = worlr2three(mr.RotMatToEuler(R_right, Euler_order))
+      setPositionEE(p_right);
+      setREE(R_right);
+      setEuler(euler_ee);
+    }
+  }, [theta_body, position_ee, R_ee, theta_body_cam]);
 
   /*======================= VR Left Arm Control ====================================*/
   const lastVRPosRef_left = React.useRef(null);
@@ -741,16 +695,6 @@ export default function DynamicHome(props) {
       const R_rel = ScrewAxisToRMatrix(axis_world, theta);
       const newT = mr.RpToTrans(numeric.dot(R_rel, R_ee_left), newP);
 
-      // let newT;
-      // if (VR_Control_Mode === 'inSpace') {
-      //   const axis_world = [-axis[2], -axis[0], axis[1]];
-      //   const R_rel = ScrewAxisToRMatrix(axis_world, theta);
-      //   newT = mr.RpToTrans(numeric.dot(R_rel, R_ee_left), newP);
-      // } else {
-      //   const R_rel = ScrewAxisToRMatrix(axis, theta);
-      //   newT = mr.RpToTrans(numeric.dot(R_ee_left, R_rel), newP);
-      // }
-
       // --- D. IK ---
       const { new_theta_body, error_code } = IK_joint_velocity_limit(
         newT, 
@@ -780,6 +724,11 @@ export default function DynamicHome(props) {
       setREELeft(R_left);
       setEulerEELeft(euler_ee_left);
 
+      if (wholeBodyControl && waistControlOwner === 'left') {
+        thetaBodyCamRef.current = [new_theta_body[0], 0, 0];
+        setThetaBodyCam([new_theta_body[0], 0, 0]);
+      }
+
     } else {
       // --- Trigger Off Reset ---
       if (lastVRPosRef_left.current || showMenu) {
@@ -797,15 +746,86 @@ export default function DynamicHome(props) {
     controller_object_left.quaternion.w,
     trigger_on_left,
     VR_Control_Mode,
+    waistControlOwner,
     rendered
   ]);
 
   // Refresh for Left Arm
   React.useEffect(() => {
-    thetaBodyLeftRef.current = theta_body_left;
-    positionEELeftRef.current = position_ee_left;
-    REELeftRef.current = R_ee_left;
-  }, [theta_body_left, position_ee_left, R_ee_left]);
+    if (!wholeBodyControl) {
+      thetaBodyLeftRef.current = theta_body_left;
+      positionEELeftRef.current = position_ee_left;
+      REELeftRef.current = R_ee_left;
+    } 
+    else {
+      thetaBodyLeftRef.current = [theta_body_cam[0], ...theta_body_left.slice(1)];
+      const T_left = mr.FKinSpace(M_left, Slist_left, thetaBodyLeftRef.current);
+      const [R_left, p_left] = mr.TransToRp(T_left);
+      positionEELeftRef.current = p_left;
+      REELeftRef.current = R_left;
+      const euler_ee_left = worlr2three(mr.RotMatToEuler(R_left, Euler_order))
+      setPositionEELeft(p_left);
+      setREELeft(R_left);
+      setEulerEELeft(euler_ee_left);
+    } 
+  }, [theta_body_left, position_ee_left, R_ee_left, theta_body_cam]);
+
+  //   React.useEffect(() => {
+  //     thetaBodyLeftRef.current = theta_body_left;
+  //     positionEELeftRef.current = position_ee_left;
+  //     REELeftRef.current = R_ee_left;
+  // }, [theta_body_left, position_ee_left, R_ee_left, theta_body_cam]);
+
+
+  /* ---------------------- Waist State ------------------------------------*/
+  React.useEffect(() => {
+    if (!hmdControl && wholeBodyControl) {
+      if (trigger_on && !trigger_on_left && !showMenu) {
+        setWaistControlOwner('right');
+        Slist_right[2][0] = 1;
+        setSlistRight(Slist_right);
+        Slist_left[2][0] = 1;
+        setSlistLeft(Slist_left);
+      } else if (!trigger_on && trigger_on_left && !showMenu) {
+        setWaistControlOwner('left');
+        Slist_left[2][0] = 1;
+        setSlistLeft(Slist_left);
+        Slist_right[2][0] = 1;
+        setSlistRight(Slist_right);
+      } else if (trigger_on && trigger_on_left && !showMenu){
+        setWaistControlOwner('none');
+        Slist_right[2][0] = 0;
+        Slist_left[2][0] = 0;
+        setSlistRight(Slist_right);
+        setSlistLeft(Slist_left);
+      }
+    } else if (!hmdControl && !wholeBodyControl) {
+      setWaistControlOwner('none');
+      thetaBodyCamRef.current = [0, 0, 0];
+      setThetaBodyCam([0, 0, 0]);
+
+      thetaBodyLeftRef.current = [0, ...theta_body_left.slice(1)];
+      const T_left = mr.FKinSpace(M_left, Slist_left, thetaBodyLeftRef.current);
+      const [R_left, p_left] = mr.TransToRp(T_left);
+      positionEELeftRef.current = p_left;
+      REELeftRef.current = R_left;
+      const euler_ee_left = worlr2three(mr.RotMatToEuler(R_left, Euler_order))
+      setPositionEELeft(p_left);
+      setREELeft(R_left);
+      setEulerEELeft(euler_ee_left);
+
+      thetaBodyRef.current = [0, ...theta_body.slice(1)];
+      const T_right = mr.FKinSpace(M_right, Slist_right, thetaBodyRef.current);
+      const [R_right, p_right] = mr.TransToRp(T_right);
+      positionEERef.current = p_right;
+      REERef.current = R_right;
+      const euler_ee = worlr2three(mr.RotMatToEuler(R_right, Euler_order))
+      setPositionEE(p_right);
+      setREE(R_right);
+      setEuler(euler_ee);
+
+    }
+  }, [wholeBodyControl, trigger_on, trigger_on_left, showMenu]);
 
 
   /* ---------------------- Hand Control ------------------------------------*/
@@ -827,6 +847,9 @@ export default function DynamicHome(props) {
   const thetaToolRightRef = React.useRef(theta_tool);
   const thetaToolLeftRef = React.useRef(theta_tool_left);
 
+  const pinchThreshold = 0.78; 
+  const releaseThreshold = 0.75; 
+
   React.useLayoutEffect(() => {
     if (!rendered || !vrModeRef.current || showMenu || shareControl) return;
 
@@ -834,37 +857,36 @@ export default function DynamicHome(props) {
     let newMiddleRight = [0, 0];
     let newIndexRight = [0, 0];
 
-    const pinchThreshold = 0.78; 
-    const releaseThreshold = 0.75; 
-
     if (handGestureModeRight === 'free') {
         const isIndexPinching = thumb_index_right > pinchThreshold;
         const isMiddlePinching = thumb_middle_right > pinchThreshold;
 
         if (isIndexPinching && thumb_index_right > thumb_middle_right) {
             setHandGestureModeRight('thumb-index');
-        } else if (isMiddlePinching) {
+        } else if (isMiddlePinching && thumb_index_right < thumb_middle_right) {
             setHandGestureModeRight('thumb-middle');
+        } else {
+            setHandGestureModeRight('free');
         }
     }
 
     switch (handGestureModeRight) {
         case 'thumb-index':
-            newThumbRight = [-thumb_index_right * 30, -thumb_index_right * 17, -thumb_index_right * 46];
-            newIndexRight = [thumb_index_right * 62, thumb_index_right * 55];
+            newThumbRight = [-thumb_index_right * 35, -thumb_index_right * 30, -thumb_index_right * 30];
+            newIndexRight = [thumb_index_right * 75, thumb_index_right * 35];
             newMiddleRight = [middle_meta_right * 75, middle_meta_right * 75];
             if (thumb_index_right < releaseThreshold) setHandGestureModeRight('free');
             break;
         case 'thumb-middle':
-            newThumbRight = [thumb_middle_right * 30, -thumb_middle_right * 17, -thumb_middle_right * 46];
-            newMiddleRight = [thumb_middle_right * 62, thumb_middle_right * 55];
+            newThumbRight = [thumb_middle_right * 35, -thumb_middle_right * 30, -thumb_middle_right * 30];
             newIndexRight = [index_meta_right * 75, index_meta_right * 75];
+            newMiddleRight = [thumb_middle_right * 75, thumb_middle_right * 35];
             if (thumb_middle_right < releaseThreshold) setHandGestureModeRight('free');
             break;
         default: // 'free'
-            newThumbRight = [0, -thumb_index_inter_right * 45, -thumb_index_inter_right * 75];
-            newIndexRight = [index_meta_right * 75, index_meta_right * 75];
-            newMiddleRight = [middle_meta_right * 75, middle_meta_right * 75];
+            newThumbRight = [0, -thumb_index_inter_right * 30, -thumb_index_inter_right * 90];
+            newIndexRight = [index_meta_right * 90, index_meta_right * 90];
+            newMiddleRight = [middle_meta_right * 90, middle_meta_right * 90];
             break;
     }
 
@@ -890,37 +912,36 @@ export default function DynamicHome(props) {
       let newMiddleLeft = [0, 0];
       let newIndexLeft = [0, 0];
 
-      const pinchThreshold = 0.78; 
-      const releaseThreshold = 0.75; 
-
       if (handGestureModeLeft === 'free') {
           const isIndexPinching = thumb_index_left > pinchThreshold;
           const isMiddlePinching = thumb_middle_left > pinchThreshold;
 
           if (isIndexPinching && thumb_index_left > thumb_middle_left) {
               setHandGestureModeLeft('thumb-index');
-          } else if (isMiddlePinching) {
+          } else if (isMiddlePinching && thumb_index_left < thumb_middle_left) {
               setHandGestureModeLeft('thumb-middle');
+          } else {
+              setHandGestureModeLeft('free');
           }
       }
 
       switch (handGestureModeLeft) {
           case 'thumb-index':
-              newThumbLeft = [-thumb_index_left * 30, thumb_index_left * 17, thumb_index_left * 46];
-              newIndexLeft = [-thumb_index_left * 62, -thumb_index_left * 55];
+              newThumbLeft = [-thumb_index_left * 35, thumb_index_left * 30, thumb_index_left * 30];
+              newIndexLeft = [-thumb_index_left * 75, -thumb_index_left * 35];
               newMiddleLeft = [-middle_meta_left * 75, -middle_meta_left * 75];
               if (thumb_index_left < releaseThreshold) setHandGestureModeLeft('free');
               break;
           case 'thumb-middle':
-              newThumbLeft = [thumb_middle_left * 30, thumb_middle_left * 17, thumb_middle_left * 46];
-              newMiddleLeft = [-thumb_middle_left * 62, -thumb_middle_left * 55];
+              newThumbLeft = [thumb_middle_left * 35, thumb_middle_left * 30, thumb_middle_left * 30];
+              newMiddleLeft = [-thumb_middle_left * 75, -thumb_middle_left * 35];
               newIndexLeft = [-index_meta_left * 75, -index_meta_left * 75];
               if (thumb_middle_left < releaseThreshold) setHandGestureModeLeft('free');
               break;
           default: // 'free'
-              newThumbLeft = [0, thumb_index_inter_left * 45, thumb_index_inter_left * 75];
-              newIndexLeft = [-index_meta_left * 75, -index_meta_left * 75];
-              newMiddleLeft = [-middle_meta_left * 75, -middle_meta_left * 75];
+              newThumbLeft = [0, thumb_index_inter_left * 30, thumb_index_inter_left * 90];
+              newIndexLeft = [-index_meta_left * 90, -index_meta_left * 90];
+              newMiddleLeft = [-middle_meta_left * 90, -middle_meta_left * 90];
               break;
       }
 
@@ -1079,8 +1100,9 @@ export default function DynamicHome(props) {
       
       // Menu
       setShowMenu,
-      setLeftArmMode,
-      setControlMode,
+      setHmdControl,
+      setShowVideo,
+      // setControlMode,
       setIndicator,
       setShareControl,
       setWholeBodyControl,
@@ -1183,11 +1205,13 @@ export default function DynamicHome(props) {
       setThetaToolLeft(mr.rad2deg(robot_state.left.hand))
       setThetaBody(robot_state.right.arm)
       setThetaTool(mr.rad2deg(robot_state.right.hand))
+      setThetaBodyCam(robot_state.waist.joints)
 
       console.log("Left Arm State Updated:", robot_state.left.arm);
       console.log("Left Hand State Updated:", robot_state.left.hand);
       console.log("Right Arm State Updated:", robot_state.right.arm);
       console.log("Right Hand State Updated:", robot_state.right.hand);
+      console.log("Waist State Updated:", robot_state.waist.joints);
 
       const T_left = mr.FKinSpace(M_left, Slist_left, robot_state.left.arm);
       const [R_left, p_left] = mr.TransToRp(T_left);
@@ -1389,6 +1413,9 @@ export default function DynamicHome(props) {
           right: {
             arm: thetaBodyRef.current,
             hand: mr.deg2rad(thetaToolRightRef.current),
+          },
+          waist: {
+            joints: thetaBodyCamRef.current,
           }
         };
 
@@ -1464,6 +1491,7 @@ export default function DynamicHome(props) {
         webcamStream2={webcamStream2}
         webcamStream3={webcamStream3}
         showMenu={showMenu}
+        showVideo={showVideo}
       />
     </>
   );
