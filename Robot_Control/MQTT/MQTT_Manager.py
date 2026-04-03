@@ -23,7 +23,7 @@ class MetaworkMQTT:
 
         # For Local MQTT Test
         self.client = mqtt.Client(transport="websockets")
-        self.client.tls_set(cert_reqs=0)
+        # self.client.tls_set(cert_reqs=0)
 
         self.client.connect(host, port, 60)
 
@@ -150,8 +150,8 @@ if __name__ == "__main__":
     # host = "127.0.0.1"
     # port = 1883
 
-    host = '192.168.197.36'
-    port = 8333
+    host = '192.168.123.51'
+    port = 9001
     mq = MetaworkMQTT(host, port)
 
     while True:

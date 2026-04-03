@@ -5,6 +5,7 @@ import numpy as np
 from paho.mqtt import client as mqtt
 import multiprocessing.shared_memory as sm
 
+import argparse
 import os
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
@@ -17,8 +18,8 @@ MQTT_DEVICE_TOPIC = os.getenv("MQTT_DEVICE_TOPIC", "dev")
 MQTT_CTRL_TOPIC = os.getenv("MQTT_CTRL_TOPIC", "control")
 MQTT_ROBOT_STATE_TOPIC = os.getenv("MQTT_ROBOT_STATE_TOPIC", "robot")
 
-MQTT_LOCAL_SERVER = "192.168.197.36"
-MQTT_LOCAL_PORT = 8333
+MQTT_LOCAL_SERVER = "192.168.123.51"
+MQTT_LOCAL_PORT = 9001
 MQTT_UCLAB_SERVER = "sora2.uclab.jp"
 MQTT_UCLAB_PORT = 1883
 
@@ -35,10 +36,11 @@ class MQTT_Client():
         self.left_hand_joints_ctrl = np.zeros(8)
         self.right_arm_joints_ctrl = np.zeros(8)
         self.right_hand_joints_ctrl = np.zeros(8)
+        self.waist_joints_ctrl = np.zeros(8)
 
         self.shm_handles = {}
         self.shm_arrays = {}
-        self.shm_name_list = ['Left_Arm', 'Left_Hand', 'Right_Arm', 'Right_Hand']
+        self.shm_name_list = ['Left_Arm', 'Left_Hand', 'Right_Arm', 'Right_Hand', 'Waist']
 
     def on_connect(self, client, userdata, flags, reason_code, properties):
         if reason_code == 0:
@@ -104,11 +106,13 @@ class MQTT_Client():
                 self.left_hand_joints_ctrl[0:7] = ctrl_msg['left']['hand']
                 self.right_arm_joints_ctrl[0:8] = ctrl_msg['right']['arm']
                 self.right_hand_joints_ctrl[0:7] = ctrl_msg['right']['hand']
+                self.waist_joints_ctrl[0:3] = ctrl_msg['waist']['joints']
 
                 self.update_shm_ctrl("Left_Arm", self.left_arm_joints_ctrl)
                 self.update_shm_ctrl("Left_Hand", self.left_hand_joints_ctrl)
                 self.update_shm_ctrl("Right_Arm", self.right_arm_joints_ctrl)
                 self.update_shm_ctrl("Right_Hand", self.right_hand_joints_ctrl)
+                self.update_shm_ctrl("Waist", self.waist_joints_ctrl)
 
         except Exception as e:
             print(f"⚠️ Data Receive Error: {msg.topic}, {e}")
@@ -119,7 +123,7 @@ class MQTT_Client():
                 callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
                 transport="websockets"
             )
-            self.client.tls_set(cert_reqs=0)
+            # self.client.tls_set(cert_reqs=0)
             self.client.on_connect = self.on_connect
             self.client.on_disconnect = self.on_disconnect
             self.client.on_message = self.on_message
@@ -184,7 +188,10 @@ class MQTT_Client():
                 "right": {
                     "arm": self.shm_arrays['Right_Arm'][8:16].tolist(),
                     "hand": self.shm_arrays['Right_Hand'][8:15].tolist(),
-                }
+                },
+                "waist": {
+                    "joints": self.shm_arrays['Waist'][8:11].tolist(),
+                },
             }
 
             # Quality of Service set as qos=0
@@ -216,7 +223,22 @@ class MQTT_Client():
 
 
 if __name__ == '__main__':
-    mode = "uclab" # "local" or "uclab"
+    # 1. 设置命令行参数解析
+    parser = argparse.ArgumentParser(description="Run MQTT Client in different modes.")
+    parser.add_argument(
+        '--mode',
+        type=str,
+        default='local',
+        choices=['local', 'uclab'],
+        help="Choose the running mode: 'local' or 'uclab' (default: local)"
+    )
+
+    # 2. 解析参数
+    args = parser.parse_args()
+    mode = args.mode
+
+    print(f"--- Starting in {mode.upper()} Mode ---")
+
     client = MQTT_Client(mode)
     client.create_shared_memories()
     client.connect_mqtt()
@@ -230,16 +252,10 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print("\nStopping...")
     finally:
-        # Unregister
+        # 清理工作
         client.robot_unregister()
-
-        # Disconnect
         if client.client.is_connected():
             client.client.disconnect()
-
-        # Loop stop
         client.client.loop_stop()
-
-        # Close shard memory
         client.close_all_shm()
         print("Client Closed Successfully.")
