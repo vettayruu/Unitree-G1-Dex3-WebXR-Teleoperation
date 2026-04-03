@@ -1,5 +1,14 @@
 # G1 Low-Level Control Manual
 
+## Start Sora WebRTC on local server PC
+```bash
+cd ./sora/sora-2024.1.3
+bin/sora foreground
+```
+
+Note: Power on Wifi6 device before the PC power on
+
+
 ## Connect G1 with Wifi6
 
 ```bash
@@ -40,12 +49,6 @@ python robot_hand_cmd.py
 ```bash
 cd ./sora_related/momo-2023.1.0_ubuntu_20.04_armv8_jetson_xavier
 ./doit_sora2.sh
-```
-
-Note: To start the Sora WebRTC on the local server PC
-```bash
-cd ./sora/sora-2024.1.3
-bin/sora foreground
 ```
 
 ## References
