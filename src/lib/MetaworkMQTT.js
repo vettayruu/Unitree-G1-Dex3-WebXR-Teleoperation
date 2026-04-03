@@ -2,6 +2,7 @@
 import mqtt from 'mqtt'
 import package_info from '../../package.json' // load version
 import {userUUID} from './cookie_id';
+import { t } from 'numeric';
 
 // export const codeType = package_info.name; // software name
 export const codeType = package_info.customInfo.type; 
@@ -12,12 +13,18 @@ console.log("Robot Type:", codeType);
 export var mqttclient = null;
 export var idtopic = userUUID;
 
-const MQTT_BROKER_URL = "wss://sora2.uclab.jp/mqws"; // For Nagoya-U UCLab Development
-// const MQTT_BROKER_URL = "wss://192.168.197.36:8333"; // For Local Development, change to your broker address
+// const MQTT_BROKER_URL = "wss://sora2.uclab.jp/mqws"; // For Nagoya-U UCLab Development
+const MQTT_BROKER_URL = "wss://192.168.123.51:2118"; // For Local Development, change to your broker address
+// const MQTT_BROKER_URL = "wss://192.168.123.45/mqtt"; // For Local Development, change to your broker address
+export var mqttBrokerURL = MQTT_BROKER_URL;
 
 export const connectMQTT = (callback) => {
     if (mqttclient == null) {
-        const client = new mqtt.connect(MQTT_BROKER_URL, {protocolVersion: 5}); 
+        const client = new mqtt.connect(MQTT_BROKER_URL, {
+            protocolVersion: 5,
+
+        });
+
         client.on("connect", () => {
             console.log("MQTT Connected", client);
 

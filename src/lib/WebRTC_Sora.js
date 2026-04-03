@@ -4,25 +4,58 @@ import Sora from "sora-js-sdk";
 // WebRTC setup (change to your signaling URL and channel IDs)
 const signalingUrl = 'wss://sora2.uclab.jp/signaling'; 
  
-const recv_channel_1 = 'sora_liust_left';
-const recv_channel_2 = 'sora_liust_right';
-const recv_channel_3 = 'sora_liust_sub';
+// const recv_channel_1 = 'sora_liust_left';
+// const recv_channel_2 = 'sora_liust_right';
+// const recv_channel_3 = 'sora_liust_sub';
 
-const send_channel_1 = 'sora_liust_vr_left';
-const send_channel_2 = 'sora_liust_vr_right';
+// const send_channel_1 = 'sora_liust_vr_left';
+// const send_channel_2 = 'sora_liust_vr_right';
+// const G1_VRCAM_CHANNEL = 'sora_liust_stereo';
+const G1_VRCAM_CHANNEL = 'g1-vr180';
+const recv_channel_1 = G1_VRCAM_CHANNEL;
 
 export const soraConfig = {
   signalingUrl: 'wss://sora2.uclab.jp/signaling',
-  recv_channel_1: 'sora_liust_left',
-  recv_channel_2: 'sora_liust_right',
-  recv_channel_3: 'sora_liust_sub',
-  send_channel_1: 'sora_liust_vr_left',
-  send_channel_2: 'sora_liust_vr_right'
+  G1_VRCAM_CHANNEL: G1_VRCAM_CHANNEL
+  // recv_channel_1: 'sora_liust_left',
+  // recv_channel_2: 'sora_liust_right',
+  // recv_channel_3: 'sora_liust_sub',
+  // send_channel_1: 'sora_liust_vr_left',
+  // send_channel_2: 'sora_liust_vr_right'
 };
 
 const sora = Sora.connection(signalingUrl);
 
-// Receive video streams
+export function WebRTC_G1_VRCam({ onVideoStream1 }) {
+  React.useEffect(() => {
+    const options = {
+      role: 'recvonly',
+      multistream: false,
+      video: { codecType: 'H264', resolution: 'HD', bitrate: 5000 },
+      audio: false,
+    };
+
+    // Webcam 1 (Stereo Left)
+    const recvonly_webcam1 = sora.recvonly(recv_channel_1, options);
+    recvonly_webcam1.on('track', event => {
+      if (event.track.kind === 'video') {
+        const mediaStream = new MediaStream();
+        mediaStream.addTrack(event.track);
+        if (onVideoStream1) onVideoStream1(mediaStream);
+      }
+    });
+    recvonly_webcam1.connect();
+
+    // Cleanup function
+    return () => {
+      recvonly_webcam1.disconnect();
+    };
+  }, [onVideoStream1]);
+
+  return null; 
+}
+
+// Receive video streams， for ZEDmini and Realsense
 export function WebRTC_Video_Recv({ onVideoStream1, onVideoStream2, onVideoStream3 }) {
   React.useEffect(() => {
     const options = {
