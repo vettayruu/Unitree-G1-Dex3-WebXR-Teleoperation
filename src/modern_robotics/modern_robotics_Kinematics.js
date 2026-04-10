@@ -208,11 +208,11 @@ RobotKinematics.register_robot("unitree_g1_arm_right_body", function build_unitr
     const P7 = [0.19978, -0.14847, -0.19654+0.29178]
 
     const jointLimits = [
-    { min: deg2rad(-120), max: deg2rad(120) },   // theta_0, wrist
+    { min: deg2rad(-45), max: deg2rad(45) },   // theta_0, wrist
     { min: deg2rad(-150), max: deg2rad(60) },   // theta_1
     { min: deg2rad(-100), max: deg2rad(5) },   // theta_2
     { min: deg2rad(-90), max: deg2rad(90) },   // theta_3 defalt: { min: deg2rad(-150), max: deg2rad(150) }
-    { min: deg2rad(-60), max: deg2rad(90) },   // theta_4
+    { min: deg2rad(-60), max: deg2rad(85) },   // theta_4
     { min: deg2rad(-113), max: deg2rad(113) },   // theta_5
     { min: deg2rad(-92.5), max: deg2rad(92.5) },   // theta_6
     { min: deg2rad(-92.5), max: deg2rad(92.5) },   // theta_7
@@ -265,11 +265,11 @@ RobotKinematics.register_robot("unitree_g1_arm_left_body", function build_unitre
     const L_ee = 0.10
 
     const jointLimits = [
-    { min: deg2rad(-120), max: deg2rad(120) },   // theta_0, wrist
+    { min: deg2rad(-45), max: deg2rad(45) },   // theta_0, wrist
     { min: deg2rad(-150), max: deg2rad(60) },   // theta_1
     { min: deg2rad(-5), max: deg2rad(100) },   // theta_2
     { min: deg2rad(-90), max: deg2rad(90) },   // theta_3
-    { min: deg2rad(-60), max: deg2rad(90) },   // theta_4
+    { min: deg2rad(-60), max: deg2rad(85) },   // theta_4
     { min: deg2rad(-113), max: deg2rad(113) },   // theta_5
     { min: deg2rad(-92.5), max: deg2rad(92.5) },   // theta_6
     { min: deg2rad(-92.5), max: deg2rad(92.5) },   // theta_7
