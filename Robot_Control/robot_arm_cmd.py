@@ -32,20 +32,37 @@ G1_NUM_MOTOR = 29
 #     2.5, 2.3, 2.0, 2.2, 0.50, 0.60, 0.60,  # arm right
 # ]
 
+# Trusco demo 2026/04/02
+# Kp = [
+#     80, 0.5, 0.5, 0.5, 0.1, 0.1,  # leg left
+#     80, 0.5, 0.5, 0.5, 0.1, 0.1,  # leg right
+#     80, 0.5, 0.5,  # waist
+#     80, 80, 80, 80, 35, 35, 35,  # arm left
+#     80, 80, 80, 80, 35, 35, 35,  # arm right
+# ]
+#
+# Kd = [
+#     3.5, 0.1, 0.1, 0.1, 0.01, 0.01,  # leg left
+#     3.5, 0.1, 0.1, 0.1, 0.01, 0.01,  # leg right
+#     3.5, 1, 1,  # waist
+#     2.0, 2.0, 1.5, 1.5, 0.50, 0.50, 0.50,  # arm left
+#     2.0, 2.0, 1.5, 1.5, 0.50, 0.50, 0.50,  # arm right
+# ]
+
 Kp = [
-    80, 0.5, 0.5, 0.5, 0.1, 0.1,  # leg left
-    80, 0.5, 0.5, 0.5, 0.1, 0.1,  # leg right
-    80, 0.5, 0.5,  # waist
-    80, 80, 80, 85, 30, 35, 35,  # arm left
-    80, 80, 80, 85, 30, 35, 35,  # arm right
+    80, 0.5, 10.0, 0.5, 0.1, 0.1,  # leg left
+    80, 0.5, 10.0, 0.5, 0.1, 0.1,  # leg right
+    100, 0.5, 0.5,  # waist
+    65, 50, 35, 40, 10.0, 18, 15,  # arm left
+    65, 50, 35, 40, 10.0, 18, 15,  # arm right
 ]
 
 Kd = [
-    3.5, 0.1, 0.1, 0.1, 0.01, 0.01,  # leg left
-    3.5, 0.1, 0.1, 0.1, 0.01, 0.01,  # leg right
-    3.5, 1, 1,  # waist
-    2.5, 2.3, 2.0, 2.2, 0.50, 0.60, 0.60,  # arm left
-    2.5, 2.3, 2.0, 2.2, 0.50, 0.60, 0.60,  # arm right
+    3.5, 0.1, 3.5, 0.1, 0.01, 0.01,  # leg left
+    3.5, 0.1, 3.5, 0.1, 0.01, 0.01,  # leg right
+    5.0, 1, 1,  # waist
+    3.0, 1.50, 0.40, 0.25, 0.30, 0.40, 0.30,  # arm left
+    3.0, 1.50, 0.40, 0.25, 0.30, 0.40, 0.30,  # arm right
 ]
 
 
@@ -95,7 +112,7 @@ class Custom:
     def __init__(self):
         # FPS
         self.write_dt_ = 0.002  # 500Hz (command write fps)
-        self.control_dt_ = 0.006  # 200Hz (control fps)
+        self.control_dt_ = 0.005  # 200Hz (control fps)
 
         self.time_ = 0.0
         self.duration_ = 5.0
@@ -110,7 +127,7 @@ class Custom:
         self.shm_waist = shared_memory.SharedMemory(name='Waist')
 
         # Control Parameter
-        self.alpha = 0.040
+        self.alpha = 0.0375
 
     def Init(self):
         self.msc = MotionSwitcherClient()
@@ -174,7 +191,7 @@ class Custom:
             # self.low_cmd.motor_cmd[6].q = np.deg2rad(-5.0)
             # self.low_cmd.motor_cmd[0].kp = 80
             # self.low_cmd.motor_cmd[6].kp = 80
-            hip_target = np.deg2rad(-8.0) # 前倾为负，后仰为正
+            hip_target = np.deg2rad(5.0) # 前倾为负，后仰为正
             self.apply_smooth(0, hip_target)
             self.apply_smooth(6, hip_target)
 
