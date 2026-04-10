@@ -35,6 +35,7 @@ export default function RobotScene(props) {
     // Others
     showMenu,
     showVideo,
+    showModel,
   } = props;
 
   const getStateCodeColor = (code) => {
@@ -70,7 +71,6 @@ export default function RobotScene(props) {
         videoEl.srcObject = props.webcamStream1;
         // videoEl.play();
         videoEl.play().catch(error => {
-          // 即使有保护，也最好捕获一下 play() 可能的异常
           console.warn("Video play interrupted, likely due to component unmount:", error);
         });
       }
@@ -97,6 +97,27 @@ export default function RobotScene(props) {
   //   }
   // }, [props.webcamStream3]);
 
+  const [vrcam_position, setVrcamPosition] = React.useState('0 0 0');
+  const [vrcam_rotation, setVrcamRotation] = React.useState('0 0 0');
+  React.useEffect(() => {
+    if (showVideo) {
+      setVrcamPosition("0 -0.035 -0.0")
+      setVrcamRotation("42.5 0 0")
+    } else {
+      setVrcamPosition("0 -0.15 -0.3")
+      setVrcamRotation("0 0 0")
+    }
+  }, [showVideo]);
+
+  // React.useEffect(() => {
+  //   if (showVideo) {
+  //     setVrcamPosition("0 -0.465 -0.26")
+  //     setVrcamRotation("42.5 0 0")
+  //   } else {
+  //     setVrcamPosition("0 -0.35 -0.5")
+  //     setVrcamRotation("0 0 0")
+  //   }
+  // }, [showVideo]);
 
 
   if (!rendered) {
@@ -113,6 +134,161 @@ export default function RobotScene(props) {
         scene 
         xr-mode-ui="XRMode: xr"
       >
+        {/* Robot Model*/}
+        <Assets robot_assets={robot_assets} viewer={props.viewer} monitor={props.monitor}/>
+
+        {/* Remote Cam*/}
+        <a-assets>
+          <video id="stereoVideo" autoPlay playsInline crossOrigin="anonymous" muted></video>
+        </a-assets>
+
+        <a-entity position={vrcam_position} rotation={vrcam_rotation}>
+              {showModel && (
+                <Select_Robot 
+                  {...robotProps} 
+                  // modelOpacity={props.modelOpacity}
+                  position_left={leftArmPosition}
+                  position_right={rightArmPosition}
+                  joint_limits_right={joint_limits_right}
+                  joint_limits_left={joint_limits_left}
+                  indicator_visibility={props.indicator}
+                />
+              )}
+
+              <a-sphere 
+                position={`${position_ee[0]} ${position_ee[1]} ${position_ee[2]}`} 
+                scale="0.012 0.012 0.012" 
+                color={stateCodeColor}
+                visible={true}></a-sphere>
+              <a-entity
+                position={`${position_ee[0]} ${position_ee[1]} ${position_ee[2]}`}
+                // ZYX
+                rotation={`${euler_ee_deg[0]} ${-euler_ee_deg[2]} ${-euler_ee_deg[1]} `}
+              >
+                <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0700" radius="0.0015" color="red" /> 
+                <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
+                <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0500" radius="0.0015" color="blue" />
+              </a-entity>
+
+              <a-sphere 
+                position={`${position_ee_left[0]} ${position_ee_left[1]} ${position_ee_left[2]}`} 
+                scale="0.012 0.012 0.012" 
+                color={stateCodeColorLeft}
+                visible={true}></a-sphere>
+              <a-entity
+                position={`${position_ee_left[0]} ${position_ee_left[1]} ${position_ee_left[2]}`}
+                // ZYX
+                rotation={`${euler_ee_deg_left[0]} ${-euler_ee_deg_left[2]} ${-euler_ee_deg_left[1]} `}
+                >
+                <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0700" radius="0.0015" color="red" /> 
+                <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
+                <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0500" radius="0.0015" color="blue" />
+              </a-entity>
+
+              <a-sphere 
+                position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`} 
+                scale="0.012 0.012 0.012" 
+                color={stateCodeColorCam}
+                visible={true}></a-sphere>
+              <a-entity
+                position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`}
+                // ZYX
+                rotation={`${euler_ee_deg_cam[0]} ${-euler_ee_deg_cam[2]} ${-euler_ee_deg_cam[1]} `}
+              >
+                <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0500" radius="0.0015" color="red" /> 
+                <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
+                <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0700" radius="0.0015" color="blue" />
+              </a-entity>
+
+            </a-entity>
+
+        {/* Light */}
+        <a-entity light="type: directional; color: #FFF; intensity: 0.5" position="1 1 1"></a-entity>
+        <a-entity light="type: directional; color: #FFF; intensity: 0.5" position="-1 1 1"></a-entity>
+        <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="-1 1 -1"></a-entity>
+        <a-entity light="type: directional; color: #FFF; intensity: 0.5" position="1 1 -1"></a-entity>
+        <a-entity light="type: directional; color: #EFE; intensity: 0.5" position="0 -1 0"></a-entity>
+
+        <a-entity id="rig" position={`${view_cam_pose[0]} ${view_cam_pose[1]} ${view_cam_pose[2]}`} rotation={`${view_cam_pose[3]} ${view_cam_pose[4]} ${view_cam_pose[5]}`}>
+
+          {/* Camera */}
+          <a-camera id="camera" cursor="rayOrigin: mouse;" position="0 0 0">
+
+            {/* <a-entity vr-controller-hmd></a-entity>
+
+            <a-entity id="hand-offset-left" position="-0.10 -0.62 -0.05">
+              <a-entity hand-tracking-controls="hand: left" vr-hand-as-controller="hand: left">
+              </a-entity>
+            </a-entity>
+
+            <a-entity id="hand-offset-right" position="0.10 -0.62 -0.05">
+              <a-entity hand-tracking-controls="hand: right" vr-hand-as-controller="hand: right">
+              </a-entity>
+            </a-entity> */}
+{/*                 
+            <a-entity position={vrcam_position} rotation={vrcam_rotation}>
+              {showModel && (
+                <Select_Robot 
+                  {...robotProps} 
+                  // modelOpacity={props.modelOpacity}
+                  position_left={leftArmPosition}
+                  position_right={rightArmPosition}
+                  joint_limits_right={joint_limits_right}
+                  joint_limits_left={joint_limits_left}
+                  indicator_visibility={props.indicator}
+                />
+              )}
+
+              <a-sphere 
+                position={`${position_ee[0]} ${position_ee[1]} ${position_ee[2]}`} 
+                scale="0.012 0.012 0.012" 
+                color={stateCodeColor}
+                visible={true}></a-sphere>
+              <a-entity
+                position={`${position_ee[0]} ${position_ee[1]} ${position_ee[2]}`}
+                // ZYX
+                rotation={`${euler_ee_deg[0]} ${-euler_ee_deg[2]} ${-euler_ee_deg[1]} `}
+              >
+                <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0700" radius="0.0015" color="red" /> 
+                <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
+                <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0500" radius="0.0015" color="blue" />
+              </a-entity>
+
+              <a-sphere 
+                position={`${position_ee_left[0]} ${position_ee_left[1]} ${position_ee_left[2]}`} 
+                scale="0.012 0.012 0.012" 
+                color={stateCodeColorLeft}
+                visible={true}></a-sphere>
+              <a-entity
+                position={`${position_ee_left[0]} ${position_ee_left[1]} ${position_ee_left[2]}`}
+                // ZYX
+                rotation={`${euler_ee_deg_left[0]} ${-euler_ee_deg_left[2]} ${-euler_ee_deg_left[1]} `}
+                >
+                <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0700" radius="0.0015" color="red" /> 
+                <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
+                <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0500" radius="0.0015" color="blue" />
+              </a-entity>
+
+              <a-sphere 
+                position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`} 
+                scale="0.012 0.012 0.012" 
+                color={stateCodeColorCam}
+                visible={true}></a-sphere>
+              <a-entity
+                position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`}
+                // ZYX
+                rotation={`${euler_ee_deg_cam[0]} ${-euler_ee_deg_cam[2]} ${-euler_ee_deg_cam[1]} `}
+              >
+                <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0500" radius="0.0015" color="red" /> 
+                <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
+                <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0700" radius="0.0015" color="blue" />
+              </a-entity>
+
+            </a-entity> */}
+
+          </a-camera>
+        </a-entity>
+
         {showMenu && (<a-entity
           id="background"
           position="0 0 0"
@@ -205,36 +381,17 @@ export default function RobotScene(props) {
 
         <a-entity id="hand-offset-left" position="0.00 -0.65 0.31">
           <a-entity hand-tracking-controls="hand: left" vr-hand-as-controller="hand: left">
-            {/* <a-entity finger-distance-visualizer="hand: left; jointA: middleTip; jointB: middleMeta; color: #55ff00"></a-entity> */}
           </a-entity>
         </a-entity>
 
         <a-entity id="hand-offset-right" position="0.00 -0.65 0.31">
           <a-entity hand-tracking-controls="hand: right" vr-hand-as-controller="hand: right">
-            {/* <a-entity finger-distance-visualizer="hand: right; jointA: middleTip; jointB: middleMeta; color: #55ff00"></a-entity> */}
           </a-entity>
         </a-entity>
 
         <a-entity vr-controller-hmd></a-entity>
-        
 
-        {/* Robot Model*/}
-        <Assets robot_assets={robot_assets} viewer={props.viewer} monitor={props.monitor}/>
-        
-        <Select_Robot 
-          {...robotProps} 
-          // modelOpacity={props.modelOpacity}
-          position_left={leftArmPosition}
-          position_right={rightArmPosition}
-          joint_limits_right={joint_limits_right}
-          joint_limits_left={joint_limits_left}
-          indicator_visibility={props.indicator}
-        />
 
-        {/* Remote Cam*/}
-        <a-assets>
-          <video id="stereoVideo" autoPlay playsInline crossOrigin="anonymous" muted></video>
-        </a-assets>
         
         {showVideo && (
         <a-entity
@@ -250,7 +407,7 @@ export default function RobotScene(props) {
             thetaStart: 30;
             thetaLength: 130;
           "
-          position="-0.30 0.5 12"
+          position="-0.30 10.0 10.0"
           scale="-1 1 1"
           rotation="0 180 0"
         ></a-entity>)}
@@ -269,101 +426,10 @@ export default function RobotScene(props) {
             thetaStart: 30;
             thetaLength: 130;
           "
-          position="0.30 0.5 12"
+          position="0.30 10.0 10.0"
           scale="-1 1 1"
           rotation="0 180 0"
         ></a-entity>)}
-        
-        
-        {/* Light */}
-        <a-entity light="type: directional; color: #FFF; intensity: 0.5" position="1 1 1"></a-entity>
-        <a-entity light="type: directional; color: #FFF; intensity: 0.5" position="-1 1 1"></a-entity>
-        <a-entity light="type: directional; color: #EEE; intensity: 0.5" position="-1 1 -1"></a-entity>
-        <a-entity light="type: directional; color: #FFF; intensity: 0.5" position="1 1 -1"></a-entity>
-        <a-entity light="type: directional; color: #EFE; intensity: 0.5" position="0 -1 0"></a-entity>
-        <a-entity id="rig" position={`${view_cam_pose[0]} ${view_cam_pose[1]} ${view_cam_pose[2]}`} rotation={`${view_cam_pose[3]} ${view_cam_pose[4]} ${view_cam_pose[5]}`}>
-
-          {/* Camera */}
-          <a-camera id="camera" cursor="rayOrigin: mouse;" position="0 0 0">
-            {/* <a-entity jtext={`text: ${dsp_message}; color: black; background:rgb(31, 219, 255); border: #000000`} position="0 0.7 -1.4"></a-entity>
-            <a-curvedimage
-              id="left-curved"
-              height="9.0"
-              radius="5.7"
-              theta-length="155"
-              position="-0.2 0 0"
-              rotation="0 -115 0"
-              scale="-1 1 1"
-              stereo-curvedvideo="eye: left; videoId: leftVideo"
-            ></a-curvedimage>
-
-            <a-curvedimage
-              id="right-curved"
-              height="9.0"
-              radius="5.7"
-              theta-length="155"
-              position="-0.2 0 0"
-              rotation="0 -121 0"
-              scale="-1 1 1"
-              stereo-curvedvideo="eye: right; videoId: rightVideo"
-            ></a-curvedimage> */}
-          </a-camera>
-        </a-entity>
-
-        {/* End Effector Right*/}
-        <a-sphere 
-          position={`${position_ee[0]} ${position_ee[1]} ${position_ee[2]}`} 
-          scale="0.012 0.012 0.012" 
-          color={stateCodeColor}
-          visible={true}></a-sphere>
-        <a-entity
-          position={`${position_ee[0]} ${position_ee[1]} ${position_ee[2]}`}
-          // ZYX
-          rotation={`${euler_ee_deg[0]} ${-euler_ee_deg[2]} ${-euler_ee_deg[1]} `}
-        >
-          <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0700" radius="0.0015" color="red" /> 
-          <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
-          <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0500" radius="0.0015" color="blue" />
-        </a-entity>
-
-        {/* End Effector Left */}
-        <a-sphere 
-          position={`${position_ee_left[0]} ${position_ee_left[1]} ${position_ee_left[2]}`} 
-          scale="0.012 0.012 0.012" 
-          color={stateCodeColorLeft}
-          visible={true}></a-sphere>
-        <a-entity
-          position={`${position_ee_left[0]} ${position_ee_left[1]} ${position_ee_left[2]}`}
-          // ZYX
-          rotation={`${euler_ee_deg_left[0]} ${-euler_ee_deg_left[2]} ${-euler_ee_deg_left[1]} `}
-          >
-          <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0700" radius="0.0015" color="red" /> 
-          <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
-          <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0500" radius="0.0015" color="blue" />
-        </a-entity>
-
-        {/* End Effector Cam */}
-        <a-sphere 
-          position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`} 
-          scale="0.012 0.012 0.012" 
-          color={stateCodeColorCam}
-          visible={true}></a-sphere>
-        <a-entity
-          position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`}
-          // ZYX
-          rotation={`${euler_ee_deg_cam[0]} ${-euler_ee_deg_cam[2]} ${-euler_ee_deg_cam[1]} `}
-        >
-          <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0500" radius="0.0015" color="red" /> 
-          <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
-          <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0700" radius="0.0015" color="blue" />
-        </a-entity>
-        
-        {/* Show FPS */}
-        {/* <a-entity id="fpsDisplay"
-          position="0 0 0.1"
-          text="value: -- fps; color: white; align: center"
-          fps-counter="for90fps: false">
-        </a-entity> */}
 
       </a-scene>
 

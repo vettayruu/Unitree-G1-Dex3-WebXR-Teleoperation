@@ -250,6 +250,8 @@ export default function DynamicHome(props) {
   const [VR_Control_Mode, setControlMode] = React.useState('inSpace'); // 'inSpace' or 'inBody', not used currently
   const [indicator, setIndicator] = React.useState('false');
   const [shareControl, setShareControl] = React.useState(false);
+  const [showModel, setShowModel] = React.useState(true);
+
 
   const [wholeBodyControl, setWholeBodyControl] = React.useState(false); // not used currently, reserved for future whole-body control extension
   React.useEffect(() => {
@@ -1103,7 +1105,7 @@ export default function DynamicHome(props) {
       setHmdControl,
       setShowVideo,
       // setControlMode,
-      setIndicator,
+      setShowModel,
       setShareControl,
       setWholeBodyControl,
     });
@@ -1380,7 +1382,7 @@ export default function DynamicHome(props) {
     shareControlRef.current = shareControl;
   }, [shareControl]);
 
-  const MQTT_PUBLISH_INTERVAL = 1000 / 30; // MQTT Publish FPS (30Hz)
+  const MQTT_PUBLISH_INTERVAL = 1000 / 50; // MQTT Publish FPS (50Hz)
 
   const onXRFrameMQTT = React.useCallback((time, frame) => {
     if (!vrModeRef.current) return;
@@ -1492,6 +1494,7 @@ export default function DynamicHome(props) {
         webcamStream3={webcamStream3}
         showMenu={showMenu}
         showVideo={showVideo}
+        showModel={showModel}
       />
     </>
   );
