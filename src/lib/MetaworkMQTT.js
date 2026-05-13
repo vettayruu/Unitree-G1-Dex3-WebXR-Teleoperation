@@ -14,8 +14,9 @@ export var mqttclient = null;
 export var idtopic = userUUID;
 
 // const MQTT_BROKER_URL = "wss://sora2.uclab.jp/mqws"; // For Nagoya-U UCLab Development
-const MQTT_BROKER_URL = "wss://192.168.123.51:2118"; // For Local Development, change to your broker address
-// const MQTT_BROKER_URL = "wss://192.168.123.45/mqtt"; // For Local Development, change to your broker address
+// const MQTT_BROKER_URL = "wss://192.168.123.51:2118"; // For Local Development, change to your broker address
+const MQTT_BROKER_URL = "wss://liust.local/mqtt";
+// const MQTT_BROKER_URL = "wss://192.168.197.18/mqtt"; // For Local Development, change to your broker address
 export var mqttBrokerURL = MQTT_BROKER_URL;
 
 export const connectMQTT = (callback) => {
