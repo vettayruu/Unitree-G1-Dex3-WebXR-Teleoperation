@@ -49,7 +49,7 @@ export default function registerAframeComponents(options) {
     setHmdControl,
     setShowVideo,
     // setControlMode,
-    setIndicator,
+    setShowModel,
     setShareControl,
     setWholeBodyControl,
 
@@ -712,95 +712,95 @@ export default function registerAframeComponents(options) {
   
   /* Menu */
   AFRAME.registerComponent('highlight', {
-  init: function () {
-    var buttonEls = this.buttonEls = this.el.querySelectorAll('.menu-button');
-    var backgroundEl = document.querySelector('#background');
-    this.groups = [
-      ['button1', 'button2'],
-      ['button3', 'button4'],
-      ['button5', 'button6'],
-      ['button7', 'button8'],
-      ['button9', 'button10']
-    ];
-    window.menuActiveBtnIds = window.menuActiveBtnIds || ['button1', 'button3', 'button6', 'button8', 'button10'];
-    const activeBtnIds = window.menuActiveBtnIds;
-    this.activeBtns = [null, null, null, null, null];
+    init: function () {
+      var buttonEls = this.buttonEls = this.el.querySelectorAll('.menu-button');
+      var backgroundEl = document.querySelector('#background');
+      this.groups = [
+        ['button1', 'button2'],
+        ['button3', 'button4'],
+        ['button5', 'button6'],
+        ['button7', 'button8'],
+        ['button9', 'button10']
+      ];
+      window.menuActiveBtnIds = window.menuActiveBtnIds || ['button1', 'button3', 'button5', 'button8', 'button10'];
+      const activeBtnIds = window.menuActiveBtnIds;
+      this.activeBtns = [null, null, null, null, null];
 
-    this.onClick = this.onClick.bind(this);
-    this.onMouseEnter = this.onMouseEnter.bind(this);
-    this.onMouseLeave = this.onMouseLeave.bind(this);
-    this.reset = this.reset.bind(this);
+      this.onClick = this.onClick.bind(this);
+      this.onMouseEnter = this.onMouseEnter.bind(this);
+      this.onMouseLeave = this.onMouseLeave.bind(this);
+      this.reset = this.reset.bind(this);
 
-    for (let groupIdx = 0; groupIdx < this.groups.length; ++groupIdx) {
-      const btnId = activeBtnIds[groupIdx];
-      const el = document.getElementById(btnId);
-      if (el) {
-        el.setAttribute('material', 'color', '#00ff00');
-        this.activeBtns[groupIdx] = el;
+      for (let groupIdx = 0; groupIdx < this.groups.length; ++groupIdx) {
+        const btnId = activeBtnIds[groupIdx];
+        const el = document.getElementById(btnId);
+        if (el) {
+          el.setAttribute('material', 'color', '#00ff00');
+          this.activeBtns[groupIdx] = el;
+        }
       }
-    }
-    for (var i = 0; i < buttonEls.length; ++i) {
-      if (!activeBtnIds.includes(buttonEls[i].id)) {
-        buttonEls[i].setAttribute('material', 'color', 'white');
+      for (var i = 0; i < buttonEls.length; ++i) {
+        if (!activeBtnIds.includes(buttonEls[i].id)) {
+          buttonEls[i].setAttribute('material', 'color', 'white');
+        }
+        buttonEls[i].addEventListener('mouseenter', this.onMouseEnter);
+        buttonEls[i].addEventListener('mouseleave', this.onMouseLeave);
+        buttonEls[i].addEventListener('click', this.onClick);
       }
-      buttonEls[i].addEventListener('mouseenter', this.onMouseEnter);
-      buttonEls[i].addEventListener('mouseleave', this.onMouseLeave);
-      buttonEls[i].addEventListener('click', this.onClick);
-    }
-    backgroundEl.addEventListener('click', this.reset);
-  },
+      backgroundEl.addEventListener('click', this.reset);
+    },
 
-  getGroupIndex: function (btnId) {
-    for (let i = 0; i < this.groups.length; ++i) {
-      if (this.groups[i].includes(btnId)) return i;
-    }
-    return -1;
-  },
+    getGroupIndex: function (btnId) {
+      for (let i = 0; i < this.groups.length; ++i) {
+        if (this.groups[i].includes(btnId)) return i;
+      }
+      return -1;
+    },
 
-  onClick: function (evt) {
-    const btnId = evt.target.id;
-    const groupIdx = this.getGroupIndex(btnId);
-    if (groupIdx === -1) return;
-    for (const id of this.groups[groupIdx]) {
-      const el = document.getElementById(id);
-      if (el) el.setAttribute('material', 'color', 'white');
-    }
-    evt.target.setAttribute('material', 'color', '#00ff00');
-    this.activeBtns[groupIdx] = evt.target;
-    window.menuActiveBtnIds[groupIdx] = btnId;
-    this.el.addState('clicked');
-  },
-
-  onMouseEnter: function (evt) {
-    const btnId = evt.target.id;
-    const groupIdx = this.getGroupIndex(btnId);
-    if (groupIdx === -1) return;
-    if (evt.target !== this.activeBtns[groupIdx]) {
-      evt.target.setAttribute('material', 'color', '#046de7');
-    }
-  },
-
-  onMouseLeave: function (evt) {
-    const btnId = evt.target.id;
-    const groupIdx = this.getGroupIndex(btnId);
-    if (groupIdx === -1) return;
-    if (evt.target !== this.activeBtns[groupIdx]) {
-      evt.target.setAttribute('material', 'color', 'white');
-    }
-  },
-
-  reset: function () {
-    // 不重置 window.menuActiveBtnIds，只重置显示
-    for (let i = 0; i < this.groups.length; ++i) {
-      for (const id of this.groups[i]) {
+    onClick: function (evt) {
+      const btnId = evt.target.id;
+      const groupIdx = this.getGroupIndex(btnId);
+      if (groupIdx === -1) return;
+      for (const id of this.groups[groupIdx]) {
         const el = document.getElementById(id);
         if (el) el.setAttribute('material', 'color', 'white');
       }
-      this.activeBtns[i] = null;
+      evt.target.setAttribute('material', 'color', '#00ff00');
+      this.activeBtns[groupIdx] = evt.target;
+      window.menuActiveBtnIds[groupIdx] = btnId;
+      this.el.addState('clicked');
+    },
+
+    onMouseEnter: function (evt) {
+      const btnId = evt.target.id;
+      const groupIdx = this.getGroupIndex(btnId);
+      if (groupIdx === -1) return;
+      if (evt.target !== this.activeBtns[groupIdx]) {
+        evt.target.setAttribute('material', 'color', '#046de7');
+      }
+    },
+
+    onMouseLeave: function (evt) {
+      const btnId = evt.target.id;
+      const groupIdx = this.getGroupIndex(btnId);
+      if (groupIdx === -1) return;
+      if (evt.target !== this.activeBtns[groupIdx]) {
+        evt.target.setAttribute('material', 'color', 'white');
+      }
+    },
+
+    reset: function () {
+      // 不重置 window.menuActiveBtnIds，只重置显示
+      for (let i = 0; i < this.groups.length; ++i) {
+        for (const id of this.groups[i]) {
+          const el = document.getElementById(id);
+          if (el) el.setAttribute('material', 'color', 'white');
+        }
+        this.activeBtns[i] = null;
+      }
+      this.el.removeState('clicked');
     }
-    this.el.removeState('clicked');
-  }
-});
+  });
 
   AFRAME.registerComponent('button-action', {
     init: function () {
@@ -818,9 +818,9 @@ export default function registerAframeComponents(options) {
           } else if (btnId === "button4") {
             setShowVideo(true);
           } else if (btnId === "button5") {
-            setIndicator("true");
+            setShowModel(true);
           } else if (btnId === "button6") {
-            setIndicator("false");
+            setShowModel(false);
           } else if (btnId === "button7") {
             setShareControl(true);
           } else if (btnId === "button8") {
@@ -1022,12 +1022,12 @@ export default function registerAframeComponents(options) {
       let middleMetaRatio = 0;
       let thumbIndexInterRatio = 0;
 
-      if (dThumbIndex < 0.02) {
+      if (dThumbIndex < 0.018) {
         thumbIndexTipRatio = 1;
       } else if (dThumbIndex > 0.09) {
         thumbIndexTipRatio = 0;
       } else {
-        thumbIndexTipRatio = 1 - (dThumbIndex - 0.02) / (0.09 - 0.02);
+        thumbIndexTipRatio = 1 - (dThumbIndex - 0.018) / (0.09 - 0.018);
       }
 
       if (dIndexTipMeta < 0.07) {

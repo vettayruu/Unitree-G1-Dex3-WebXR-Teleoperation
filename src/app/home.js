@@ -1,4 +1,32 @@
 "use client";
+
+(function() {
+    if (typeof window === 'undefined') return;
+
+    const NativeBinding = window.XRWebGLBinding;
+    if (!NativeBinding) return;
+
+    window.XRWebGLBinding = function(session, gl) {
+        if (!session || !(session instanceof XRSession)) {
+
+            return new Proxy({}, {
+                get: (target, prop) => {
+                    return () => { 
+                        console.debug(`WebXR call '${prop}' ignored.`); 
+                    };
+                }
+            });
+        }
+
+        try {
+            return new NativeBinding(session, gl);
+        } catch (e) {
+            console.error("Critical error in Native XRWebGLBinding:", e);
+            return {};
+        }
+    };
+})();
+
 import 'aframe'
 let THREE;
 if (typeof window !== 'undefined' && window.AFRAME) {
@@ -116,10 +144,34 @@ function ScrewAxisToRMatrix(axis, theta) {
     // R = I*cos(theta) + [axis]_x*sin(theta) + axis*axis^T*(1-cos(theta))
     return [
         [nx * nx * v + c,      nx * ny * v - nz * s,  nx * nz * v + ny * s],
-        [nx * ny * v + nz * s, ny * ny * v + c,      ny * nz * v - nx * s],
-        [nx * nz * v - ny * s, ny * nz * v + nx * s, nz * nz * v + c     ]
+        [nx * ny * v + nz * s, ny * ny * v + c,       ny * nz * v - nx * s],
+        [nx * nz * v - ny * s, ny * nz * v + nx * s,  nz * nz * v + c     ]
     ];
 }
+
+async function sendMessageToServer(messageData) {
+  try {
+    const response = await fetch('https://liust.local/api/send-message', { // 新的发送端点
+      method: 'POST', // 指定方法为 POST
+      headers: {
+        'Content-Type': 'application/json', // 告诉服务器我们发送的是 JSON
+      },
+      body: JSON.stringify(messageData), // 将 JavaScript 对象转换为 JSON 字符串
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json(); // 解析服务器返回的确认消息
+    console.log('Server response:', result);
+    return result;
+
+  } catch (error) {
+    console.error('Error sending message to server:', error);
+  }
+}
+
 
 /* ============================= Main Component ==========================================*/
 export default function DynamicHome(props) {
@@ -499,16 +551,16 @@ export default function DynamicHome(props) {
       thetaBodyCamRef.current = new_theta_cam;
 
       const T_cam = mr.FKinSpace(M_cam, Slist_cam, new_theta_cam);
-      const [R_cam, p_cam] = mr.TransToRp(T_cam);
+      const [R_waist, p_cam] = mr.TransToRp(T_cam);
       
       positionEECamRef.current = p_cam;
-      REECamRef.current = R_cam;
-      const euler_ee_cam = worlr2three(mr.RotMatToEuler(R_cam, Euler_order))
+      REECamRef.current = R_waist;
+      const euler_ee_cam = worlr2three(mr.RotMatToEuler(R_waist, Euler_order))
 
       setThetaBodyCam(new_theta_cam);
       setErrorCodeCam(0);
       setPositionEECam(p_cam);
-      setREECam(R_cam);
+      setREECam(R_waist);
       setEulerEECam(euler_ee_cam);
 
   }, [
@@ -535,6 +587,20 @@ export default function DynamicHome(props) {
   const REERef = React.useRef(R_ee);
   const EulerEERef = React.useRef(euler_ee);
 
+  const [cameraYaw, setCameraYaw] = React.useState(0); // Camera Yaw Angle in Radians
+  React.useEffect(() => {
+    if (showVideo)
+      setCameraYaw(42.5 * Math.PI / 180);
+    else
+      setCameraYaw(0);
+  }, [showVideo]);
+
+  const R_cam = [
+    [Math.cos(cameraYaw), 0, Math.sin(cameraYaw)],
+    [0, 1, 0],
+    [-Math.sin(cameraYaw), 0, Math.cos(cameraYaw)]
+  ]
+
   React.useLayoutEffect(() => {
     if (!rendered || !vrModeRef.current ) return;
     if (!thetaBodyRef.current || !positionEERef.current || !REERef.current) return;
@@ -560,6 +626,8 @@ export default function DynamicHome(props) {
       lastVRPosRef.current[1] = p_raw.y;
       lastVRPosRef.current[2] = p_raw.z;
 
+      const pos_diff_cam = numeric.dot(R_cam, pos_diff_world); // Convert to camera frame if needed
+
       // --- B. Get rotation axis and angle from quaterion difference ---
       const { axis, theta } = getAxisAngleFromQuatDiff(q_raw, lastQuatRef.current);
       
@@ -568,13 +636,15 @@ export default function DynamicHome(props) {
 
       // --- C. Calculate Target SE3 ---
       const newP = [
-        position_ee[0] + pos_diff_world[0],
-        position_ee[1] + pos_diff_world[1],
-        position_ee[2] + pos_diff_world[2]
+        position_ee[0] + pos_diff_cam[0],
+        position_ee[1] + pos_diff_cam[1],
+        position_ee[2] + pos_diff_cam[2]
       ];
 
       const axis_world = [-axis[2], -axis[0], axis[1]]; 
-      const R_rel = ScrewAxisToRMatrix(axis_world, theta); 
+      const axis_cam = numeric.dot(R_cam, axis_world); // Convert rotation axis to camera frame if needed
+
+      const R_rel = ScrewAxisToRMatrix(axis_cam, theta); 
       const newT = mr.RpToTrans(numeric.dot(R_rel, R_ee), newP);
 
       // --- D. IK ---
@@ -681,6 +751,8 @@ export default function DynamicHome(props) {
       lastVRPosRef_left.current[1] = p_raw.y;
       lastVRPosRef_left.current[2] = p_raw.z;
 
+      const pos_diff_cam = numeric.dot(R_cam, pos_diff_world); // Convert to camera frame if needed
+
       // --- B. Axis-Angle ---
       const { axis, theta } = getAxisAngleFromQuatDiff(q_raw, lastQuatRef_left.current);
 
@@ -688,13 +760,15 @@ export default function DynamicHome(props) {
 
       // --- C. Target Pose ---
       const newP = [
-        position_ee_left[0] + pos_diff_world[0],
-        position_ee_left[1] + pos_diff_world[1],
-        position_ee_left[2] + pos_diff_world[2]
+        position_ee_left[0] + pos_diff_cam[0],
+        position_ee_left[1] + pos_diff_cam[1],
+        position_ee_left[2] + pos_diff_cam[2]
       ];
 
       const axis_world = [-axis[2], -axis[0], axis[1]];
-      const R_rel = ScrewAxisToRMatrix(axis_world, theta);
+      const axis_cam = numeric.dot(R_cam, axis_world); // Convert rotation axis to camera frame if needed
+
+      const R_rel = ScrewAxisToRMatrix(axis_cam, theta);
       const newT = mr.RpToTrans(numeric.dot(R_rel, R_ee_left), newP);
 
       // --- D. IK ---
@@ -859,18 +933,18 @@ export default function DynamicHome(props) {
     let newMiddleRight = [0, 0];
     let newIndexRight = [0, 0];
 
-    if (handGestureModeRight === 'free') {
-        const isIndexPinching = thumb_index_right > pinchThreshold;
-        const isMiddlePinching = thumb_middle_right > pinchThreshold;
+    // if (handGestureModeRight === 'free') {
+    //     const isIndexPinching = thumb_index_right > pinchThreshold;
+    //     const isMiddlePinching = thumb_middle_right > pinchThreshold;
 
-        if (isIndexPinching && thumb_index_right > thumb_middle_right) {
-            setHandGestureModeRight('thumb-index');
-        } else if (isMiddlePinching && thumb_index_right < thumb_middle_right) {
-            setHandGestureModeRight('thumb-middle');
-        } else {
-            setHandGestureModeRight('free');
-        }
-    }
+    //     if (isIndexPinching && thumb_index_right > thumb_middle_right) {
+    //         setHandGestureModeRight('thumb-index');
+    //     } else if (isMiddlePinching && thumb_index_right < thumb_middle_right) {
+    //         setHandGestureModeRight('thumb-middle');
+    //     } else {
+    //         setHandGestureModeRight('free');
+    //     }
+    // }
 
     switch (handGestureModeRight) {
         case 'thumb-index':
@@ -886,9 +960,14 @@ export default function DynamicHome(props) {
             if (thumb_middle_right < releaseThreshold) setHandGestureModeRight('free');
             break;
         default: // 'free'
-            newThumbRight = [0, -thumb_index_inter_right * 30, -thumb_index_inter_right * 90];
-            newIndexRight = [index_meta_right * 90, index_meta_right * 90];
-            newMiddleRight = [middle_meta_right * 90, middle_meta_right * 90];
+            // newThumbRight = [0, -thumb_index_inter_right * 30, -thumb_index_inter_right * 40];
+            // newIndexRight = [index_meta_right * 85, index_meta_right * 40];
+            // newMiddleRight = [middle_meta_right * 85, middle_meta_right * 40];
+
+            newThumbRight = [0, -thumb_index_right * 30, -thumb_index_right * 30];
+            newIndexRight = [thumb_index_right * 85, thumb_index_right * 30];
+            newMiddleRight = [thumb_index_right * 85, thumb_index_right * 30];
+
             break;
     }
 
@@ -914,18 +993,18 @@ export default function DynamicHome(props) {
       let newMiddleLeft = [0, 0];
       let newIndexLeft = [0, 0];
 
-      if (handGestureModeLeft === 'free') {
-          const isIndexPinching = thumb_index_left > pinchThreshold;
-          const isMiddlePinching = thumb_middle_left > pinchThreshold;
+      // if (handGestureModeLeft === 'free') {
+      //     const isIndexPinching = thumb_index_left > pinchThreshold;
+      //     const isMiddlePinching = thumb_middle_left > pinchThreshold;
 
-          if (isIndexPinching && thumb_index_left > thumb_middle_left) {
-              setHandGestureModeLeft('thumb-index');
-          } else if (isMiddlePinching && thumb_index_left < thumb_middle_left) {
-              setHandGestureModeLeft('thumb-middle');
-          } else {
-              setHandGestureModeLeft('free');
-          }
-      }
+      //     if (isIndexPinching && thumb_index_left > thumb_middle_left) {
+      //         setHandGestureModeLeft('thumb-index');
+      //     } else if (isMiddlePinching && thumb_index_left < thumb_middle_left) {
+      //         setHandGestureModeLeft('thumb-middle');
+      //     } else {
+      //         setHandGestureModeLeft('free');
+      //     }
+      // }
 
       switch (handGestureModeLeft) {
           case 'thumb-index':
@@ -941,9 +1020,14 @@ export default function DynamicHome(props) {
               if (thumb_middle_left < releaseThreshold) setHandGestureModeLeft('free');
               break;
           default: // 'free'
-              newThumbLeft = [0, thumb_index_inter_left * 30, thumb_index_inter_left * 90];
-              newIndexLeft = [-index_meta_left * 90, -index_meta_left * 90];
-              newMiddleLeft = [-middle_meta_left * 90, -middle_meta_left * 90];
+              // newThumbLeft = [0, thumb_index_inter_left * 30, thumb_index_inter_left * 90];
+              // newIndexLeft = [-index_meta_left * 90, -index_meta_left * 90];
+              // newMiddleLeft = [-middle_meta_left * 90, -middle_meta_left * 90];
+
+              newThumbLeft = [0, thumb_index_left * 30, thumb_index_left * 30];
+              newIndexLeft = [-thumb_index_left * 85, -thumb_index_left * 30];
+              newMiddleLeft = [-thumb_index_left * 85, -thumb_index_left * 30];
+
               break;
       }
 
@@ -1336,6 +1420,73 @@ export default function DynamicHome(props) {
   //   thetaToolLeftMQTT.current
   // ]);
 
+  /* ================================== Message from SAP BTP ===================================== */
+  // React.useEffect(() => {
+  //   // 设置一个定时器，每 1000 毫秒（1秒）执行一次
+  //   const intervalId = setInterval(() => {
+  //     // 使用 fetch API 向你的 Flask 服务器发送 GET 请求
+  //     fetch('http://localhost:8080/get-messages')
+  //       .then(response => {
+  //         // 检查响应是否成功
+  //         if (!response.ok) {
+  //           throw new Error('Network response was not ok');
+  //         }
+  //         return response.json(); // 解析 JSON 数据
+  //       })
+  //       .then(messages => {
+  //         // 如果服务器返回了消息
+  //         if (messages && messages.length > 0) {
+  //           console.log('Received messages:', messages);
+            
+  //           // 在这里处理收到的每条消息
+  //           messages.forEach(message => {
+  //             // 例如，更新你的 React State
+  //             // setSomeState(message);
+  //           });
+  //         }
+  //       })
+  //       .catch(error => {
+  //         // 在这里处理错误，例如服务器没开，网络问题等
+  //         // console.error('轮询错误:', error);
+  //       });
+  //   }, 1000); // 轮询间隔：1000毫秒
+
+  //   // 组件卸载时，清除定时器，防止内存泄漏
+  //   return () => {
+  //     clearInterval(intervalId);
+  //   };
+
+  // }, []); // 空依赖数组表示这个 effect 只在组件挂载和卸载时运行一次
+  // React.useEffect(() => {
+  //     const intervalId = setInterval(() => {
+  //       // ⚠️ 修改这里：指向 Nginx 所在的域名
+  //       // 浏览器会自动补全协议和当前域名，最终变为 https://liust.local/api/get-messages
+  //       // fetch('https://192.168.197.18/api/get-messages') 
+  //       fetch('https://liust.local/api/get-messages') 
+  //         .then(response => {
+  //           if (!response.ok) throw new Error('Network response was not ok');
+  //           return response.json();
+  //         })
+  //         .then(messages => {
+  //           if (messages && messages.length > 0) {
+  //             console.log('Received messages:', messages);
+  //             // 处理逻辑...
+  //           }
+  //         })
+  //         .catch(error => {
+  //           // 调试时可以取消注释，查看具体错误
+  //           // console.error('轮询错误:', error);
+  //         });
+  //     }, 1000);
+
+  //     return () => clearInterval(intervalId);
+  // }, []);
+
+  // React.useEffect(() => {
+  //   const messageToSend = { user: 'WebApp', action: 'connected', timestamp: Date.now() };
+  //   sendMessageToServer(messageToSend);
+  // }, []); // 空依赖数组确保只在挂载时运行一次
+
 
   /* ================================== Robot State Update =====================================*/
   // const robotProps = React.useMemo(() => ({
@@ -1382,7 +1533,7 @@ export default function DynamicHome(props) {
     shareControlRef.current = shareControl;
   }, [shareControl]);
 
-  const MQTT_PUBLISH_INTERVAL = 1000 / 50; // MQTT Publish FPS (50Hz)
+  const MQTT_PUBLISH_INTERVAL = 1000 / 50; // MQTT Publish FPS (25Hz)
 
   const onXRFrameMQTT = React.useCallback((time, frame) => {
     if (!vrModeRef.current) return;

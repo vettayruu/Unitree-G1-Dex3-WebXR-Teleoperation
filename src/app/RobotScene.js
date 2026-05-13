@@ -109,15 +109,7 @@ export default function RobotScene(props) {
     }
   }, [showVideo]);
 
-  // React.useEffect(() => {
-  //   if (showVideo) {
-  //     setVrcamPosition("0 -0.465 -0.26")
-  //     setVrcamRotation("42.5 0 0")
-  //   } else {
-  //     setVrcamPosition("0 -0.35 -0.5")
-  //     setVrcamRotation("0 0 0")
-  //   }
-  // }, [showVideo]);
+  const [activeTab, setActiveTab] = React.useState('task'); // 'task' 或 'setting'
 
 
   if (!rendered) {
@@ -299,99 +291,242 @@ export default function RobotScene(props) {
         </a-entity>)}
 
         {showMenu && (
-          <a-entity id="menu" position="0 0.8 -1.2" highlight button-action>
+          <a-entity id="setting" position="1.0 0.8 -1.2" rotation="0 -37 0" highlight button-action>
             {/* Background Plane */}
             <a-plane
               width="1.2"
-              height="1.6"
+              height="1.35"
               color="#222"
               opacity="1.0"
-              position="0 0 0"
-              class="raycastable"
-            ></a-plane><a-text value="Menu" align="center" color="#fff" width="2.0" position="0 0.65 0.01"></a-text>
+              position="0 0.05 0"
+              // class="raycastable"
+            ></a-plane><a-text value="Robot Settings" align="center" color="#fff" width="2.0" position="0 0.60 0.01" font="/fonts/Roboto-msdf.json"></a-text>
             {/* Button 1 */}
             <a-entity id="button1" position="-0.3 0.4 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="HMD Control \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="HMD Control \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
             
             {/* Button 2 */}
             <a-entity id="button2" position="0.3 0.4 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="HMD Control \n On" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="HMD Control \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
             
             {/* Button 3 */}
             <a-entity id="button3" position="-0.3 0.2 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Show Video \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="Show Video \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
 
             {/* Button 4 */}
             <a-entity id="button4" position="0.3 0.2 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Show Video \n On" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="Show Video \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
 
             {/* Button 5 */}
             <a-entity id="button5" position="-0.3 0.0 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Indicator \n On" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="Indicator \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
 
             {/* Button 6 */}
             <a-entity id="button6" position="0.3 0.0 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Indicator \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="Indicator \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
 
             {/* Button 7 */}
             <a-entity id="button7" position="-0.3 -0.2 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Visual Assist \n On" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="Visual Assist \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
 
             {/* Button 8 */}
             <a-entity id="button8" position="0.3 -0.2 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Visual Assist \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="Visual Assist \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
 
             {/* Button 9 */}
             <a-entity id="button9" position="-0.3 -0.4 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Whole Body Control \n On" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="Whole Body Control \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
 
             {/* Button 10 */}
             <a-entity id="button10" position="0.3 -0.4 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Whole Body Control \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01"></a-text></a-entity>
+            ><a-text value="Whole Body Control \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
 
           </a-entity>
         )}
 
-        {showMenu && (<a-entity id="leftHand" laser-controls="hand: left" raycaster="objects: .raycastable"></a-entity>)}
-        {showMenu && (<a-entity id="rightHand" laser-controls="hand: right" raycaster="objects: .raycastable" line="color: #118A7E"></a-entity>)}
+        {showMenu && (
+          <a-entity id="task" position="-1.0 0.8 -1.2" rotation="0 37 0" highlight button-action>
+            {/* Background Plane */}
+            <a-plane
+              width="1.5"
+              height="2.2"
+              color="#222"
+              opacity="1.0"
+              position="0 -0.35 0"
+              // class="raycastable"
+            ></a-plane>
+            <a-text value="SAP EWM Order" align="center" color="#fff" width="2.0" position="0 0.60 0.01" font="/fonts/Roboto-msdf.json"></a-text>
+
+            {/* Putaway Status Signal */}
+            <a-text value="Putaway Status Signal" align="right" color="#fff" width="1.25" position="-0.12 0.48 0.01" font="/fonts/Roboto-msdf.json"></a-text>
+            
+            <a-entity id="signal_1" position="-0.46 0.35 0.01" 
+              geometry={`primitive: plane; width: ${botton_width}; height: 0.12`}
+              material="color: orange; opacity: 0.95"
+            ><a-text value="Awaiting" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            
+            <a-entity id="signal_2" position="0.010 0.35 0.01" 
+              geometry={`primitive: plane; width: ${botton_width}; height: 0.12`}
+              material="color: blue; opacity: 0.95"
+            ><a-text value="Processing" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            
+            <a-entity id="signal_3" position="0.480 0.35 0.01" 
+              geometry={`primitive: plane; width: ${botton_width}; height: 0.12`}
+              material="color: green; opacity: 0.95"
+            ><a-text value="Completed" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+
+            {/* Putaway Button */}
+            <a-text value="Putaway Button" align="right" color="#fff" width="1.25" position="-0.28 0.22 0.01" font="/fonts/Roboto-msdf.json"></a-text>
+            
+            <a-entity id="btp_start" position="-0.46 0.10 0.01" class="raycastable menu-button"
+              geometry={`primitive: plane; width: ${botton_width}; height: 0.15`}
+              material="color: white; opacity: 0.95"
+            ><a-text value="Start" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+
+            <a-entity id="btp_confirm" position="0.010 0.10 0.01" class="raycastable menu-button"
+              geometry={`primitive: plane; width: ${botton_width}; height: 0.15`}
+              material="color: white; opacity: 0.95"
+            ><a-text value="WT Confirm" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+
+            <a-entity id="btp_continue" position="0.480 0.10 0.01" class="raycastable menu-button"
+              geometry={`primitive: plane; width: ${botton_width}; height: 0.15`}
+              material="color: white; opacity: 0.95"
+            ><a-text value="Continue" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+
+            <a-entity id="btp_complete" position="0.010 -0.10 0.01" class="raycastable menu-button"
+              geometry={`primitive: plane; width: ${botton_width}; height: 0.15`}
+              material="color: white; opacity: 0.95"
+            ><a-text value="Complete" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+
+            {/* Message */}
+            <a-text value="Message" align="right" color="#fff" width="1.25" position="-0.44 -0.25 0.01" font="/fonts/Roboto-msdf.json"></a-text>
+            <a-entity id="btp_message" position="-0.0 -0.42 0.01" class="raycastable menu-button"
+              geometry={`primitive: plane; width: 1.25; height: 0.20`}
+              material="color: white; opacity: 0.95"
+            ><a-text value="Message from BTP" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+
+            {/* Data Section */}
+            <a-text value="Data Section" align="right" color="#fff" width="1.25" position="-0.36 -0.63 0.01" font="/fonts/Roboto-msdf.json"></a-text>
+            <a-entity id="data-section" position="0 -0.98 0.02">
+              <a-text 
+                value="Data from EWM" 
+                align="center" 
+                color="#4CC3D9" 
+                width="1.5" 
+                position="0 0.25 0" 
+                font="/fonts/Roboto-msdf.json"
+              ></a-text>
+
+              {/* 表头背景 */}
+              <a-plane width="1.0" height="0.08" color="#222" position="0 0.15 0"></a-plane>
+              <a-text value="Parameter" position="-0.42 0.15 0.01" width="1.1" color="#aaa"></a-text>
+              <a-text value="Status / Value" position="0.05 0.15 0.01" width="1.1" color="#aaa"></a-text>
+
+              {/* 动态数据列表 */}
+              {[
+                { name: "Joint_1 Angle", value: "32.5 deg", status: "ok" },
+                { name: "Control Latency", value: "12 ms", status: "warn" },
+                { name: "MQTT Conn", value: "Connected", status: "ok" },
+                { name: "DMP Learning", value: "Active", status: "ok" },
+                { name: "SAP EWM Link", value: "Standby", status: "idle" }
+              ].map((item, index) => (
+                <a-entity key={item.name} position={`0 ${0.06 - index * 0.09} 0`}>
+                  {/* 斑马纹底色 */}
+                  <a-plane 
+                    width="1.0" 
+                    height="0.08" 
+                    color={index % 2 === 0 ? "#333" : "#2a2a2a"} 
+                    opacity="0.8"
+                  ></a-plane>
+
+                  {/* 参数名 */}
+                  <a-text value={item.name} position="-0.42 0 0.01" width="1"></a-text>
+
+                  {/* 参数值 - 根据状态改变颜色 */}
+                  <a-text 
+                    value={item.value} 
+                    position="0.05 0 0.01" 
+                    width="1" 
+                    color={item.status === 'warn' ? "#FFCC00" : "#00FF00"}
+                  ></a-text>
+
+                  {/* 侧边指示小灯 (刚才讨论过的圆形) */}
+                  <a-entity 
+                    geometry="primitive: circle; radius: 0.015" 
+                    material={`color: ${item.status === 'ok' ? '#00FF00' : '#FFCC00'}; shader: flat`}
+                    position="0.45 0 0.01"
+                  ></a-entity>
+                </a-entity>
+              ))}
+            </a-entity>
+
+          </a-entity>
+        )}
+
+        
+
+        {/* {showMenu && (
+          <a-entity 
+            id="leftHand" 
+            laser-controls="hand: left; model: false" 
+            raycaster="objects: .raycastable"
+            gltf-model="url(/models/quest-touch-plus-left.glb)"
+          ></a-entity>
+        )} */}
+
+        {showMenu && (
+          <a-entity 
+            oculus-touch-controls="hand: right"
+            laser-controls="hand: right; model: false" 
+            raycaster="objects: .raycastable"
+            gltf-model="url(/models/quest-touch-plus-right.glb)"
+          ></a-entity>
+        )}
 
         {/* -------------- VR Controller -------------*/}
-        {/* <a-entity oculus-touch-controls="hand: right" vr-controller-right visible="true"></a-entity>
-        <a-entity oculus-touch-controls="hand: left" vr-controller-left visible="true"></a-entity> */}
+        {/* <a-entity oculus-touch-controls="hand: right" vr-controller-right visible="true"></a-entity> */}
+        {/* <a-entity oculus-touch-controls="hand: left" vr-controller-left visible="true"></a-entity> */}
 
-        <a-entity id="hand-offset-left" position="0.00 -0.65 0.31">
-          <a-entity hand-tracking-controls="hand: left" vr-hand-as-controller="hand: left">
+        <a-entity id="hand-offset-left" position="0.00 -0.685 0.31">
+          <a-entity 
+            hand-tracking-controls="hand: left; modelStyle: mesh; model: false; " 
+            gltf-model="url(/models/left.glb)"
+            vr-hand-as-controller="hand: left"
+            >
           </a-entity>
         </a-entity>
 
-        <a-entity id="hand-offset-right" position="0.00 -0.65 0.31">
-          <a-entity hand-tracking-controls="hand: right" vr-hand-as-controller="hand: right">
+        <a-entity id="hand-offset-right" position="-0.005 -0.685 0.301">
+          <a-entity 
+            hand-tracking-controls="hand: right; modelStyle: mesh; model: false" 
+            gltf-model="url(/models/right.glb)"
+            aabb-collider="objects: .menu-button"
+            vr-hand-as-controller="hand: right"
+            >
           </a-entity>
         </a-entity>
 
         <a-entity vr-controller-hmd></a-entity>
-
-
         
         {showVideo && (
         <a-entity
