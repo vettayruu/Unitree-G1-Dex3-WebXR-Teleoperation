@@ -36,6 +36,10 @@ export default function RobotScene(props) {
     showMenu,
     showVideo,
     showModel,
+
+    // SAP BTP
+    btp_action,
+
   } = props;
 
   const getStateCodeColor = (code) => {
@@ -62,6 +66,8 @@ export default function RobotScene(props) {
   const euler_ee_deg_cam = euler_ee_cam.map(rad2deg);
 
   const botton_width = "0.45";
+
+  const font_path = "/fonts/Roboto-msdf.json"; 
   
   // Webcam Stream
   React.useEffect(() => {
@@ -108,9 +114,6 @@ export default function RobotScene(props) {
       setVrcamRotation("0 0 0")
     }
   }, [showVideo]);
-
-  const [activeTab, setActiveTab] = React.useState('task'); // 'task' 或 'setting'
-
 
   if (!rendered) {
     return (
@@ -206,78 +209,57 @@ export default function RobotScene(props) {
           {/* Camera */}
           <a-camera id="camera" cursor="rayOrigin: mouse;" position="0 0 0">
 
-            {/* <a-entity vr-controller-hmd></a-entity>
+            <a-entity 
+              position="-0.5 -0.20 -1.2" 
+              rotation="-10 30 -12" 
+              scale="0.6 0.6 0.6"
+              highlight 
+              button-action
+            >
+              <a-plane
+                width="1.0"
+                height="0.6"
+                color="#111"
+                opacity="0.5" 
+                position="0 0 0"
+              ></a-plane>
 
-            <a-entity id="hand-offset-left" position="-0.10 -0.62 -0.05">
-              <a-entity hand-tracking-controls="hand: left" vr-hand-as-controller="hand: left">
-              </a-entity>
+              <a-text 
+                value="Data from EWM" 
+                align="center" 
+                color="#4CC3D9" 
+                width="1.8" 
+                position="0 0.22 0.01" 
+                font ={font_path}
+              ></a-text>
+
+              {[
+                { name: "Warehouse", value: btp_action.EWMWarehouse || "---", status: "ok" },
+                { name: "Order", value: btp_action.WarehouseOrder || "---", status: "ok" },
+                { name: "Product", value: btp_action.Product || "---", status: "ok" },
+                { name: "Destination", value: btp_action.DestinationStorageBin || "---", status: "ok" },
+              ].map((item, index) => (
+                <a-entity key={item.name} position={`0 ${0.08 - index * 0.1} 0.01`}>
+                  
+                  <a-plane 
+                    width="0.95" 
+                    height="0.09" 
+                    color={index % 2 === 0 ? "#333" : "#222"} 
+                    opacity="0.3" 
+                  ></a-plane>
+
+                  <a-text value={item.name} position="-0.42 0 0.01" width="1.2" font="/fonts/Roboto-msdf.json"></a-text>
+
+                  <a-text 
+                    value={item.value} 
+                    position="0.05 0 0.01" 
+                    width="1.2" 
+                    color={item.status === 'warn' ? "#FFCC00" : "#00FF00"}
+                    font="/fonts/Roboto-msdf.json"
+                  ></a-text>
+                </a-entity>
+              ))}
             </a-entity>
-
-            <a-entity id="hand-offset-right" position="0.10 -0.62 -0.05">
-              <a-entity hand-tracking-controls="hand: right" vr-hand-as-controller="hand: right">
-              </a-entity>
-            </a-entity> */}
-{/*                 
-            <a-entity position={vrcam_position} rotation={vrcam_rotation}>
-              {showModel && (
-                <Select_Robot 
-                  {...robotProps} 
-                  // modelOpacity={props.modelOpacity}
-                  position_left={leftArmPosition}
-                  position_right={rightArmPosition}
-                  joint_limits_right={joint_limits_right}
-                  joint_limits_left={joint_limits_left}
-                  indicator_visibility={props.indicator}
-                />
-              )}
-
-              <a-sphere 
-                position={`${position_ee[0]} ${position_ee[1]} ${position_ee[2]}`} 
-                scale="0.012 0.012 0.012" 
-                color={stateCodeColor}
-                visible={true}></a-sphere>
-              <a-entity
-                position={`${position_ee[0]} ${position_ee[1]} ${position_ee[2]}`}
-                // ZYX
-                rotation={`${euler_ee_deg[0]} ${-euler_ee_deg[2]} ${-euler_ee_deg[1]} `}
-              >
-                <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0700" radius="0.0015" color="red" /> 
-                <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
-                <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0500" radius="0.0015" color="blue" />
-              </a-entity>
-
-              <a-sphere 
-                position={`${position_ee_left[0]} ${position_ee_left[1]} ${position_ee_left[2]}`} 
-                scale="0.012 0.012 0.012" 
-                color={stateCodeColorLeft}
-                visible={true}></a-sphere>
-              <a-entity
-                position={`${position_ee_left[0]} ${position_ee_left[1]} ${position_ee_left[2]}`}
-                // ZYX
-                rotation={`${euler_ee_deg_left[0]} ${-euler_ee_deg_left[2]} ${-euler_ee_deg_left[1]} `}
-                >
-                <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0700" radius="0.0015" color="red" /> 
-                <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
-                <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0500" radius="0.0015" color="blue" />
-              </a-entity>
-
-              <a-sphere 
-                position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`} 
-                scale="0.012 0.012 0.012" 
-                color={stateCodeColorCam}
-                visible={true}></a-sphere>
-              <a-entity
-                position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`}
-                // ZYX
-                rotation={`${euler_ee_deg_cam[0]} ${-euler_ee_deg_cam[2]} ${-euler_ee_deg_cam[1]} `}
-              >
-                <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0500" radius="0.0015" color="red" /> 
-                <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
-                <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0700" radius="0.0015" color="blue" />
-              </a-entity>
-
-            </a-entity> */}
-
           </a-camera>
         </a-entity>
 
@@ -423,7 +405,7 @@ export default function RobotScene(props) {
             <a-entity id="btp_message" position="-0.0 -0.42 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: 1.25; height: 0.20`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Message from BTP" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value={btp_action.Message || "No message"} align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
 
             {/* Data Section */}
             <a-text value="Data Section" align="right" color="#fff" width="1.25" position="-0.36 -0.63 0.01" font="/fonts/Roboto-msdf.json"></a-text>
@@ -440,15 +422,15 @@ export default function RobotScene(props) {
               {/* 表头背景 */}
               <a-plane width="1.0" height="0.08" color="#222" position="0 0.15 0"></a-plane>
               <a-text value="Parameter" position="-0.42 0.15 0.01" width="1.1" color="#aaa"></a-text>
-              <a-text value="Status / Value" position="0.05 0.15 0.01" width="1.1" color="#aaa"></a-text>
-
+              <a-text value="Value" position="0.05 0.15 0.01" width="1.1" color="#aaa"></a-text>
+              {/* <a-text value="Status" position="0.4 0.15 0.01" width="1.1" color="#aaa"></a-text> */}
+              
               {/* 动态数据列表 */}
               {[
-                { name: "Joint_1 Angle", value: "32.5 deg", status: "ok" },
-                { name: "Control Latency", value: "12 ms", status: "warn" },
-                { name: "MQTT Conn", value: "Connected", status: "ok" },
-                { name: "DMP Learning", value: "Active", status: "ok" },
-                { name: "SAP EWM Link", value: "Standby", status: "idle" }
+                { name: "Warehouse", value: btp_action.EWMWarehouse || "---", status: "ok" },
+                { name: "Order", value: btp_action.WarehouseOrder || "---", status: "ok" },
+                { name: "Product", value: btp_action.Product || "---", status: "ok" },
+                { name: "Destination", value: btp_action.DestinationStorageBin || "---", status: "ok" },
               ].map((item, index) => (
                 <a-entity key={item.name} position={`0 ${0.06 - index * 0.09} 0`}>
                   {/* 斑马纹底色 */}
@@ -460,7 +442,7 @@ export default function RobotScene(props) {
                   ></a-plane>
 
                   {/* 参数名 */}
-                  <a-text value={item.name} position="-0.42 0 0.01" width="1"></a-text>
+                  <a-text value={item.name} position="-0.42 0 0.01" width="1" font={font_path}></a-text>
 
                   {/* 参数值 - 根据状态改变颜色 */}
                   <a-text 
@@ -468,14 +450,15 @@ export default function RobotScene(props) {
                     position="0.05 0 0.01" 
                     width="1" 
                     color={item.status === 'warn' ? "#FFCC00" : "#00FF00"}
+                    font={font_path}
                   ></a-text>
 
-                  {/* 侧边指示小灯 (刚才讨论过的圆形) */}
-                  <a-entity 
+                  {/* 侧边指示小灯 */}
+                  {/* <a-entity 
                     geometry="primitive: circle; radius: 0.015" 
                     material={`color: ${item.status === 'ok' ? '#00FF00' : '#FFCC00'}; shader: flat`}
                     position="0.45 0 0.01"
-                  ></a-entity>
+                  ></a-entity> */}
                 </a-entity>
               ))}
             </a-entity>

@@ -42,12 +42,16 @@ import registerAframeComponents from './registerAframeComponents';
 import MQTT_Setup from './MQTT_Setup';
 import { mqttclient, idtopic, publishMQTT, subscribeMQTT, codeType } from '../lib/MetaworkMQTT'
 import { IK_joint_velocity_limit, IK_joint_velocity, IK_finger, Retarget } from '../modern_robotics/spatialKinematics.js';
+import { io } from 'socket.io-client';
 
 
 // On Windows, run the following command to allow script execution at first:
 // Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 
 /* ============================= Static Global Variables ==========================================*/
+const currentIP = typeof window !== 'undefined' ? window.location.hostname : '';
+console.log("Current IP:", currentIP);
+
 const mr = require('../modern_robotics/modern_robotics_core.js');
 const RobotKinematics = require('../modern_robotics/modern_robotics_Kinematics.js');
 
@@ -178,7 +182,7 @@ export default function DynamicHome(props) {
   const [rendered, set_rendered] = React.useState(false)
   const dtRef = React.useRef(0.01667);
 
-  const robotNameList = ["UnitreeG1-remote-vr"]
+  const robotNameList = ["Unitree-G1-Dex3"]
   const [robotName, set_robotName] = React.useState(robotNameList[0])
 
   // Load Robot Parameters
@@ -338,15 +342,11 @@ export default function DynamicHome(props) {
   }, [Slist_right, Slist_left]);
 
 
- // MQTT
   const [selectedMode, setSelectedMode] = React.useState('control'); 
   const [robotID, setRobotID] = React.useState(null);
 
   // View Camera Pose
   const [view_cam_pose, setViewCamPose] = React.useState([0.24, 0.20, -0.67, 0, 150, 0]);
-
-  // Message Display
-  const [dsp_message, set_dsp_message] = React.useState("")
 
   // WebRTC Recv
   const [webcamStream1, setWebcamStream1] = React.useState(null);
@@ -420,7 +420,7 @@ export default function DynamicHome(props) {
     }
   }, [robotParams.right]);
 
-  /* ---------------------- Left Arm Initialize ------------------------------------*/
+  /* ---------------------- Left Arm Initialize ------------------------------------ */
   const [leftArmInitialized, setLeftArmInitialized] = React.useState(false);
   const [position_ee_left, setPositionEELeft] = React.useState([0.19978+0.0415, 0.14847, -0.19654+0.29178]);
   const [euler_ee_left, setEulerEELeft] = React.useState([0,0,0]);
@@ -1322,171 +1322,41 @@ export default function DynamicHome(props) {
 
   }, [robot_state, robotID, robotRequested]);
 
+  // Message Display
+  const [btp_action, setBTPAction] = React.useState({})
+  React.useEffect(() => {
+    // 1. 初始化连接 (指向你的 Nginx 地址或 Flask 直接地址)
+    // 如果用了 Nginx 转发，路径通常会自动映射到 /socket.io
+    // 'https://liust.local/ws'
+    const wsurl = currentIP + '/ws';
+    // const wsurl = 'https://liust.local/ws';
+    const socket = io(wsurl, {
+      transports: ['websocket'], // 强制使用 websocket 协议
+      upgrade: true
+    });
 
-  /* ============================== WebRTC ==========================================*/
-  
-  // Get stream from media devices (For testing purpose)
-  // React.useEffect(() => {
-  //   navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-  //     .then(stream => {
-  //       setVrLeftStream(stream);
-  //       setVrRightStream(stream); 
-  //     });
-  // }, []);
+    // 2. 监听连接成功的事件
+    socket.on('connect', () => {
+      console.log('✅ 已成功连接到机器人 WebSocket 服务');
+    });
 
-  /* ------------------------ Get Stream from WebXR ------------------------*/
-  // React.useEffect(() => {
-  //   if (!vrModeRef.current && !rendered) {
-  //     console.warn('⚠️ Not in VR mode');
-  //     return;
-  //   }
+    // 3. 监听服务器推送的消息 (对应 Python 中的 socketio.emit('robot_command', ...))
+    socket.on('btp_action', (action) => {
+      console.log('📩 收到实时指令:', action);
+      setBTPAction(action);
+    });
+    
 
-  //   const scene = document.querySelector('a-scene');
-  //   if (!scene) {
-  //     console.warn('⚠️ a-scene not found');
-  //     return;
-  //   }
+    // 4. 监听连接断开
+    socket.on('disconnect', () => {
+      console.log('❌ WebSocket 连接已断开');
+    });
 
-  //   const getCanvasStream = () => {
-  //     const sceneEl = document.querySelector('a-scene');
-  //     const canvas = sceneEl.renderer.domElement;
-  //     const stream = canvas.captureStream(30);  // 30 FPS
-  //     return stream;
-  //   };
-
-  //   // Listen VR enter event
-  //   const handleEnterVR = async () => {
-  //     console.log('🥽 Entering VR, capturing streams...');
-  //     const stream = getCanvasStream();
-  //     setVrLeftStream(stream);
-  //     setVrRightStream(stream);
-  //   };
-
-  //   const handleExitVR = () => {
-  //     console.log('🚪 Exiting VR, stopping streams...');
-      
-  //     // Stop all tracks
-  //     if (vrLeftStream) {
-  //       vrLeftStream.getTracks().forEach(track => track.stop());
-  //       setVrLeftStream(null);
-  //     }
-  //     if (vrRightStream) {
-  //       vrRightStream.getTracks().forEach(track => track.stop());
-  //       setVrRightStream(null);
-  //     }
-  //   };
-
-  //   scene.addEventListener('enter-vr', handleEnterVR);
-  //   scene.addEventListener('exit-vr', handleExitVR);
-
-  //   return () => {
-  //     scene.removeEventListener('enter-vr', handleEnterVR);
-  //     scene.removeEventListener('exit-vr', handleExitVR);
-  //   };
-  // }, [vrModeRef.current, rendered]);
-
-  // React.useEffect(() => {
-  //   if (!vrLeftStream && !vrRightStream) return;
-
-  //   if (!shareControl && !showMenu) {
-  //     const payload = {
-  //       timestamp: Date.now(),
-  //       joint: thetaBodyMQTT.current,
-  //       tool: thetaToolMQTT.current,
-  //       joint_left: thetaBodyLeftMQTT.current,
-  //       tool_left: thetaToolLeftMQTT.current,
-  //     };
-  //     setControlData(payload);
-  //   }
-
-  //   // const interval = setInterval(() => {
-  //   //   const payload = {
-  //   //     timestamp: Date.now(),
-  //   //     joint: thetaBodyMQTT.current,
-  //   //     tool: thetaToolMQTT.current,
-  //   //     joint_left: thetaBodyLeftMQTT.current,
-  //   //     tool_left: thetaToolLeftMQTT.current,
-  //   //   };
-  //   //   setControlData(payload);
-  //   // }, 45); // 25Hz
-
-  //   // return () => clearInterval(interval);
-  // }, [
-  //   // vrLeftStream, 
-  //   // vrRightStream,
-  //   thetaBodyMQTT.current,
-  //   thetaToolMQTT.current,
-  //   thetaBodyLeftMQTT.current,
-  //   thetaToolLeftMQTT.current
-  // ]);
-
-  /* ================================== Message from SAP BTP ===================================== */
-  // React.useEffect(() => {
-  //   // 设置一个定时器，每 1000 毫秒（1秒）执行一次
-  //   const intervalId = setInterval(() => {
-  //     // 使用 fetch API 向你的 Flask 服务器发送 GET 请求
-  //     fetch('http://localhost:8080/get-messages')
-  //       .then(response => {
-  //         // 检查响应是否成功
-  //         if (!response.ok) {
-  //           throw new Error('Network response was not ok');
-  //         }
-  //         return response.json(); // 解析 JSON 数据
-  //       })
-  //       .then(messages => {
-  //         // 如果服务器返回了消息
-  //         if (messages && messages.length > 0) {
-  //           console.log('Received messages:', messages);
-            
-  //           // 在这里处理收到的每条消息
-  //           messages.forEach(message => {
-  //             // 例如，更新你的 React State
-  //             // setSomeState(message);
-  //           });
-  //         }
-  //       })
-  //       .catch(error => {
-  //         // 在这里处理错误，例如服务器没开，网络问题等
-  //         // console.error('轮询错误:', error);
-  //       });
-  //   }, 1000); // 轮询间隔：1000毫秒
-
-  //   // 组件卸载时，清除定时器，防止内存泄漏
-  //   return () => {
-  //     clearInterval(intervalId);
-  //   };
-
-  // }, []); // 空依赖数组表示这个 effect 只在组件挂载和卸载时运行一次
-  // React.useEffect(() => {
-  //     const intervalId = setInterval(() => {
-  //       // ⚠️ 修改这里：指向 Nginx 所在的域名
-  //       // 浏览器会自动补全协议和当前域名，最终变为 https://liust.local/api/get-messages
-  //       // fetch('https://192.168.197.18/api/get-messages') 
-  //       fetch('https://liust.local/api/get-messages') 
-  //         .then(response => {
-  //           if (!response.ok) throw new Error('Network response was not ok');
-  //           return response.json();
-  //         })
-  //         .then(messages => {
-  //           if (messages && messages.length > 0) {
-  //             console.log('Received messages:', messages);
-  //             // 处理逻辑...
-  //           }
-  //         })
-  //         .catch(error => {
-  //           // 调试时可以取消注释，查看具体错误
-  //           // console.error('轮询错误:', error);
-  //         });
-  //     }, 1000);
-
-  //     return () => clearInterval(intervalId);
-  // }, []);
-
-  // React.useEffect(() => {
-  //   const messageToSend = { user: 'WebApp', action: 'connected', timestamp: Date.now() };
-  //   sendMessageToServer(messageToSend);
-  // }, []); // 空依赖数组确保只在挂载时运行一次
-
+    // 5. 组件卸载时自动断开连接，防止内存泄漏和重复连接
+    return () => {
+      socket.disconnect();
+    };
+  }, []); // 空依赖数组确保只在组件挂载时执行一次
 
   /* ================================== Robot State Update =====================================*/
   // const robotProps = React.useMemo(() => ({
@@ -1615,7 +1485,7 @@ export default function DynamicHome(props) {
 
         robotProps={robotProps}
         interfacePropos={interfacePropos}
-        dsp_message={dsp_message}
+        btp_action={btp_action}
         view_cam_pose={view_cam_pose}
         viewer={props.viewer}
         monitor={props.monitor}
@@ -1634,11 +1504,12 @@ export default function DynamicHome(props) {
         leftArmPosition={leftArmPosition}
         joint_limits_left={joint_limits_left}
 
-        // CAM Arm
+        // Waist
         state_codes_cam={error_code_cam}
         position_ee_cam={worlr2three(positionEECamRef.current)}
         euler_ee_cam={euler_ee_cam}
 
+        // Menu
         indicator={indicator}
         webcamStream1={webcamStream1}
         webcamStream2={webcamStream2}
