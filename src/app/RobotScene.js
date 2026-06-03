@@ -115,13 +115,65 @@ export default function RobotScene(props) {
     }
   }, [showVideo]);
 
+  const [scannerInfo, setScannerInfo] = React.useState({
+    Product: 'PRD5678',
+    Destination: 'DEST4321',
+  });
+
+  const [ewmInfo, setEWMStatus] = React.useState(
+    {
+      Warehouse: null,
+      Order: null,
+      Product: null,
+      Destination: null,
+    }
+  );
+  const statusColors = {
+    ok: '#00FF00',
+    warn: '#FFCC00',
+    error: '#FF0000',
+    text: '#FFFFFF',
+    null: '#888888' 
+  };
+
+  React.useEffect(() => {
+    if (btp_action.WarehouseTask) {
+      setEWMStatus(prev => ({ ...prev, Warehouse: "ok" }));
+    }
+
+    if (btp_action.Product) {
+      setEWMStatus(prev => ({ ...prev, Product: "ok" }));
+    }
+
+    // if (btp_action.WarehouseOrder) {
+    //   setEWMStatus(prev => ({ ...prev, Order: "ok" }));
+    // }
+
+    // if (!btp_action.Product) {
+    //   setEWMStatus(prev => ({ ...prev, Product: null })); 
+    // } else if (btp_action.Product === scannerInfo.Product) {
+    //   setEWMStatus(prev => ({ ...prev, Product: "ok" }));
+    // } else {
+    //   setEWMStatus(prev => ({ ...prev, Product: "error" }));
+    // }
+
+    // if (!btp_action.DestinationStorageBin) {
+    //   setEWMStatus(prev => ({ ...prev, Destination: null }));
+    // } else if (btp_action.DestinationStorageBin === scannerInfo.Destination) {
+    //   setEWMStatus(prev => ({ ...prev, Destination: "ok" }));
+    // } else {
+    //   setEWMStatus(prev => ({ ...prev, Destination: "error" }));
+    // }
+
+  }, [btp_action]);
+
   if (!rendered) {
     return (
       <a-scene xr-mode-ui="XRMode: xr">
         <Assets robot_assets={robot_assets} viewer={props.viewer}/>
       </a-scene>
     );
-    }
+  }
 
   return (
     <>
@@ -225,7 +277,7 @@ export default function RobotScene(props) {
               ></a-plane>
 
               <a-text 
-                value="Data from EWM" 
+                value="EWM Information" 
                 align="center" 
                 color="#4CC3D9" 
                 width="1.8" 
@@ -234,10 +286,10 @@ export default function RobotScene(props) {
               ></a-text>
 
               {[
-                { name: "Warehouse", value: btp_action.EWMWarehouse || "---", status: "ok" },
-                { name: "Order", value: btp_action.WarehouseOrder || "---", status: "ok" },
-                { name: "Product", value: btp_action.Product || "---", status: "ok" },
-                { name: "Destination", value: btp_action.DestinationStorageBin || "---", status: "ok" },
+                { name: "Warehouse", value: btp_action.WarehouseTask || "---", status: ewmInfo.Warehouse || "null" },
+                // { name: "Order", value: btp_action.WarehouseOrder || "---", status: ewmInfo.Order || "null" },
+                { name: "Product", value: btp_action.Product || "---", status: ewmInfo.Product || "null" },
+                // { name: "Destination", value: btp_action.DestinationStorageBin || "---", status: ewmInfo.Destination || "null" },
               ].map((item, index) => (
                 <a-entity key={item.name} position={`0 ${0.08 - index * 0.1} 0.01`}>
                   
@@ -248,18 +300,91 @@ export default function RobotScene(props) {
                     opacity="0.3" 
                   ></a-plane>
 
-                  <a-text value={item.name} position="-0.42 0 0.01" width="1.2" font="/fonts/Roboto-msdf.json"></a-text>
+                  <a-text value={item.name} position="-0.42 0 0.01" width="1.2" font={font_path}></a-text>
 
+                  {/* Value */}
                   <a-text 
                     value={item.value} 
-                    position="0.05 0 0.01" 
+                    position="0.0 0 0.01" 
                     width="1.2" 
-                    color={item.status === 'warn' ? "#FFCC00" : "#00FF00"}
-                    font="/fonts/Roboto-msdf.json"
+                    color={statusColors[item.status] || statusColors.null}
+                    font={font_path}
                   ></a-text>
+
+                  {/* Status Indicator */}
+                  <a-entity 
+                    geometry="primitive: circle; radius: 0.015" 
+                    material={`color: ${statusColors[item.status]}; shader: flat`}
+                    position="0.36 0 0.01"
+                  ></a-entity>
+
                 </a-entity>
               ))}
             </a-entity>
+            
+            {/* Scanner Info */}
+            <a-entity 
+              position="-0.54 -0.56 -1.1" 
+              rotation="-10 30 -12" 
+              scale="0.6 0.6 0.6"
+              highlight 
+              button-action
+            >
+              <a-plane
+                width="1.0"
+                height="0.6"
+                color="#111"
+                opacity="0.5" 
+                position="0 0 0"
+              ></a-plane>
+
+              <a-text 
+                value="Scanner Information" 
+                align="center" 
+                color="#4CC3D9" 
+                width="1.8" 
+                position="0 0.22 0.01" 
+                font ={font_path}
+              ></a-text>
+
+              {[
+                // { name: "Warehouse", value: btp_action.EWMWarehouse || "---", status: ewmInfo.Warehouse || "null" },
+                // { name: "Order", value: btp_action.WarehouseOrder || "---", status: ewmInfo.Order || "null" },
+                { name: "Product", value: scannerInfo.Product || "---", status: ewmInfo.Product || "null" },
+                { name: "Destination", value: scannerInfo.Destination || "---", status: ewmInfo.Destination || "null" },
+              ].map((item, index) => (
+                <a-entity key={item.name} position={`0 ${0.08 - index * 0.1} 0.01`}>
+                  
+                  <a-plane 
+                    width="0.95" 
+                    height="0.09" 
+                    color={index % 2 === 0 ? "#333" : "#222"} 
+                    opacity="0.3" 
+                  ></a-plane>
+
+                  <a-text value={item.name} position="-0.42 0 0.01" width="1.2" font={font_path}></a-text>
+
+                  <a-text 
+                    value={item.value} 
+                    position="0.0 0 0.01" 
+                    width="1.2" 
+                    color={statusColors[item.status] || statusColors.null}
+                    font={font_path}
+                  ></a-text>
+
+                  <a-entity 
+                    geometry="primitive: circle; radius: 0.015" 
+                    material={`color: ${statusColors[item.status]}; shader: flat`}
+                    position="0.36 0 0.01"
+                  ></a-entity>
+
+                </a-entity>
+                  )
+                )
+              }
+
+            </a-entity>
+
           </a-camera>
         </a-entity>
 
@@ -282,70 +407,71 @@ export default function RobotScene(props) {
               opacity="1.0"
               position="0 0.05 0"
               // class="raycastable"
-            ></a-plane><a-text value="Robot Settings" align="center" color="#fff" width="2.0" position="0 0.60 0.01" font="/fonts/Roboto-msdf.json"></a-text>
+            ></a-plane><a-text value="Robot Settings" align="center" color="#fff" width="2.0" position="0 0.60 0.01" font={font_path}></a-text>
             {/* Button 1 */}
             <a-entity id="button1" position="-0.3 0.4 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="HMD Control \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="HMD Control \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
             
             {/* Button 2 */}
             <a-entity id="button2" position="0.3 0.4 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="HMD Control \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="HMD Control \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
             
             {/* Button 3 */}
             <a-entity id="button3" position="-0.3 0.2 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Show Video \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Show Video \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
             {/* Button 4 */}
             <a-entity id="button4" position="0.3 0.2 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Show Video \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Show Video \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
             {/* Button 5 */}
             <a-entity id="button5" position="-0.3 0.0 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Indicator \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Indicator \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
             {/* Button 6 */}
             <a-entity id="button6" position="0.3 0.0 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Indicator \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Indicator \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
             {/* Button 7 */}
             <a-entity id="button7" position="-0.3 -0.2 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Visual Assist \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Visual Assist \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
             {/* Button 8 */}
             <a-entity id="button8" position="0.3 -0.2 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Visual Assist \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Visual Assist \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
             {/* Button 9 */}
             <a-entity id="button9" position="-0.3 -0.4 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Whole Body Control \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Whole Body Control \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
             {/* Button 10 */}
             <a-entity id="button10" position="0.3 -0.4 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Whole Body Control \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Whole Body Control \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
           </a-entity>
         )}
 
+        {/* SAP Menu */}
         {showMenu && (
           <a-entity id="task" position="-1.0 0.8 -1.2" rotation="0 37 0" highlight button-action>
             {/* Background Plane */}
@@ -357,83 +483,83 @@ export default function RobotScene(props) {
               position="0 -0.35 0"
               // class="raycastable"
             ></a-plane>
-            <a-text value="SAP EWM Order" align="center" color="#fff" width="2.0" position="0 0.60 0.01" font="/fonts/Roboto-msdf.json"></a-text>
+            <a-text value="SAP EWM Task Menu" align="center" color="#fff" width="2.0" position="0 0.60 0.01" font={font_path}></a-text>
 
             {/* Putaway Status Signal */}
-            <a-text value="Putaway Status Signal" align="right" color="#fff" width="1.25" position="-0.12 0.48 0.01" font="/fonts/Roboto-msdf.json"></a-text>
+            {/* <a-text value="Putaway Status Signal" align="right" color="#fff" width="1.25" position="-0.12 0.48 0.01" font={font_path}></a-text>
             
             <a-entity id="signal_1" position="-0.46 0.35 0.01" 
               geometry={`primitive: plane; width: ${botton_width}; height: 0.12`}
               material="color: orange; opacity: 0.95"
-            ><a-text value="Awaiting" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Awaiting" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
             
             <a-entity id="signal_2" position="0.010 0.35 0.01" 
               geometry={`primitive: plane; width: ${botton_width}; height: 0.12`}
               material="color: blue; opacity: 0.95"
-            ><a-text value="Processing" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Processing" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
             
             <a-entity id="signal_3" position="0.480 0.35 0.01" 
               geometry={`primitive: plane; width: ${botton_width}; height: 0.12`}
               material="color: green; opacity: 0.95"
-            ><a-text value="Completed" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Completed" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity> */}
 
             {/* Putaway Button */}
-            <a-text value="Putaway Button" align="right" color="#fff" width="1.25" position="-0.28 0.22 0.01" font="/fonts/Roboto-msdf.json"></a-text>
+            <a-text value="Data Recording" align="right" color="#fff" width="1.25" position="-0.30 0.22 0.01" font={font_path}></a-text>
             
-            <a-entity id="btp_start" position="-0.46 0.10 0.01" class="raycastable menu-button"
+            <a-entity id="sap-data-start" position="-0.46 0.10 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.15`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Start" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Start" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
-            <a-entity id="btp_confirm" position="0.010 0.10 0.01" class="raycastable menu-button"
+            <a-entity id="sap-data-stop" position="0.010 0.10 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.15`}
               material="color: white; opacity: 0.95"
-            ><a-text value="WT Confirm" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Finish" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
-            <a-entity id="btp_continue" position="0.480 0.10 0.01" class="raycastable menu-button"
+            <a-entity id="sap-data-upload" position="0.480 0.10 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.15`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Continue" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Upload" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
-            <a-entity id="btp_complete" position="0.010 -0.10 0.01" class="raycastable menu-button"
+            {/* <a-entity id="btp_complete" position="0.010 -0.10 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.15`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Complete" align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value="Complete" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity> */}
 
             {/* Message */}
-            <a-text value="Message" align="right" color="#fff" width="1.25" position="-0.44 -0.25 0.01" font="/fonts/Roboto-msdf.json"></a-text>
+            <a-text value="Message" align="right" color="#fff" width="1.25" position="-0.44 -0.25 0.01" font={font_path}></a-text>
             <a-entity id="btp_message" position="-0.0 -0.42 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: 1.25; height: 0.20`}
               material="color: white; opacity: 0.95"
-            ><a-text value={btp_action.Message || "No message"} align="center" color="#fff" width="1.0" position="0 0 0.01" font="/fonts/Roboto-msdf.json"></a-text></a-entity>
+            ><a-text value={btp_action.Message || "No message"} align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
             {/* Data Section */}
-            <a-text value="Data Section" align="right" color="#fff" width="1.25" position="-0.36 -0.63 0.01" font="/fonts/Roboto-msdf.json"></a-text>
+            <a-text value="EWM Info" align="right" color="#fff" width="1.25" position="-0.36 -0.63 0.01" font={font_path}></a-text>
             <a-entity id="data-section" position="0 -0.98 0.02">
               <a-text 
-                value="Data from EWM" 
+                value="EWM Information" 
                 align="center" 
                 color="#4CC3D9" 
                 width="1.5" 
                 position="0 0.25 0" 
-                font="/fonts/Roboto-msdf.json"
+                font={font_path}
               ></a-text>
 
-              {/* 表头背景 */}
+              {/* Table Header Background */}
               <a-plane width="1.0" height="0.08" color="#222" position="0 0.15 0"></a-plane>
               <a-text value="Parameter" position="-0.42 0.15 0.01" width="1.1" color="#aaa"></a-text>
-              <a-text value="Value" position="0.05 0.15 0.01" width="1.1" color="#aaa"></a-text>
-              {/* <a-text value="Status" position="0.4 0.15 0.01" width="1.1" color="#aaa"></a-text> */}
+              <a-text value="Value" position="0.00 0.15 0.01" width="1.1" color="#aaa"></a-text>
+              <a-text value="Status" position="0.35 0.15 0.01" width="1.1" color="#aaa"></a-text>
               
-              {/* 动态数据列表 */}
+              {/* Data List */}
               {[
-                { name: "Warehouse", value: btp_action.EWMWarehouse || "---", status: "ok" },
-                { name: "Order", value: btp_action.WarehouseOrder || "---", status: "ok" },
-                { name: "Product", value: btp_action.Product || "---", status: "ok" },
-                { name: "Destination", value: btp_action.DestinationStorageBin || "---", status: "ok" },
+                { name: "Warehouse", value: btp_action.EWMWarehouse || "---", status: ewmInfo.Warehouse || "null" },
+                { name: "Order", value: btp_action.WarehouseOrder || "---", status: ewmInfo.Order || "null" },
+                { name: "Product", value: btp_action.Product || "---", status: ewmInfo.Product || "null" },
+                { name: "Destination", value: btp_action.DestinationStorageBin || "---", status: ewmInfo.Destination || "null" },
               ].map((item, index) => (
                 <a-entity key={item.name} position={`0 ${0.06 - index * 0.09} 0`}>
-                  {/* 斑马纹底色 */}
+                  {/* Background */}
                   <a-plane 
                     width="1.0" 
                     height="0.08" 
@@ -441,24 +567,24 @@ export default function RobotScene(props) {
                     opacity="0.8"
                   ></a-plane>
 
-                  {/* 参数名 */}
+                  {/* Parameter */}
                   <a-text value={item.name} position="-0.42 0 0.01" width="1" font={font_path}></a-text>
 
-                  {/* 参数值 - 根据状态改变颜色 */}
+                  {/* Value */}
                   <a-text 
                     value={item.value} 
                     position="0.05 0 0.01" 
                     width="1" 
-                    color={item.status === 'warn' ? "#FFCC00" : "#00FF00"}
+                    color={statusColors[item.status] || statusColors.null}
                     font={font_path}
                   ></a-text>
 
-                  {/* 侧边指示小灯 */}
-                  {/* <a-entity 
+                  {/* Status Indicator */}
+                  <a-entity 
                     geometry="primitive: circle; radius: 0.015" 
-                    material={`color: ${item.status === 'ok' ? '#00FF00' : '#FFCC00'}; shader: flat`}
+                    material={`color: ${statusColors[item.status]}; shader: flat`}
                     position="0.45 0 0.01"
-                  ></a-entity> */}
+                  ></a-entity>
                 </a-entity>
               ))}
             </a-entity>
@@ -493,7 +619,7 @@ export default function RobotScene(props) {
         <a-entity id="hand-offset-left" position="0.00 -0.685 0.31">
           <a-entity 
             hand-tracking-controls="hand: left; modelStyle: mesh; model: false; " 
-            gltf-model="url(/models/left.glb)"
+            // gltf-model="url(/models/left.glb)"
             vr-hand-as-controller="hand: left"
             >
           </a-entity>
@@ -502,8 +628,8 @@ export default function RobotScene(props) {
         <a-entity id="hand-offset-right" position="-0.005 -0.685 0.301">
           <a-entity 
             hand-tracking-controls="hand: right; modelStyle: mesh; model: false" 
-            gltf-model="url(/models/right.glb)"
-            aabb-collider="objects: .menu-button"
+            // gltf-model="url(/models/right.glb)"
+            // aabb-collider="objects: .menu-button"
             vr-hand-as-controller="hand: right"
             >
           </a-entity>
