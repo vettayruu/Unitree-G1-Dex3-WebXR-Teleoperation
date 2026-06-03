@@ -547,9 +547,9 @@ export default function RobotScene(props) {
 
               {/* Table Header Background */}
               <a-plane width="1.0" height="0.08" color="#222" position="0 0.15 0"></a-plane>
-              <a-text value="Parameter" position="-0.42 0.15 0.01" width="1.1" color="#aaa"></a-text>
-              <a-text value="Value" position="0.00 0.15 0.01" width="1.1" color="#aaa"></a-text>
-              <a-text value="Status" position="0.35 0.15 0.01" width="1.1" color="#aaa"></a-text>
+              <a-text value="Parameter" position="-0.42 0.15 0.01" width="1.1" color="#aaa" font={font_path}></a-text>
+              <a-text value="Value" position="0.00 0.15 0.01" width="1.1" color="#aaa" font={font_path}></a-text>
+              <a-text value="Status" position="0.35 0.15 0.01" width="1.1" color="#aaa" font={font_path}></a-text>
               
               {/* Data List */}
               {[
