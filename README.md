@@ -238,12 +238,35 @@ Don't forget to change the server name and the path of SSL.
 </div>
 
 ---
+## Step 4: Connection between the Manager and Client
+
+### 1. Run the Manager
+In folder `Robot_Control/MQTT`, run
+
+```Python
+python SAP_Device_Data_Manager.py
+```
+
+```Python
+python MQTT_Client_SAP.py
+```
+
+
+
+
+---
 ## Step 4: Operate the Robot in Simulator
 
 ### 1. Run the MQTT Client
 In folder `Robot_Control/MQTT`, run
+
 ```Python
-MQTT_Client.py
+python SAP_Device_Data_Manager.py
+```
+
+and 
+```Python
+MQTT_Client_SAP.py
 ```
 
 Then, in folder `Robot_Control`, run
@@ -288,6 +311,8 @@ The operation is based on hand tracking. Gestures are desgined for robot control
   <img src="./Readme_img/G1_middle_grip.jpg" alt="sim" width="480"/>
   <p><em>Figure: Gesture grip (middle).</em></p>
 </div>
+
+
 
 
 
