@@ -63,6 +63,9 @@ export default function registerAframeComponents(options) {
     props,
     onXRFrameMQTT,
 
+    // SAP TASK MENU
+    handleTask,
+
   } = options;
   
   // set rendered state after a short delay to ensure the scene is ready
@@ -720,11 +723,13 @@ export default function registerAframeComponents(options) {
         ['button3', 'button4'],
         ['button5', 'button6'],
         ['button7', 'button8'],
-        ['button9', 'button10']
+        ['button9', 'button10'],
+        ['sap-data-start', 'sap-data-stop'],
+        ['sap-data-reset']
       ];
-      window.menuActiveBtnIds = window.menuActiveBtnIds || ['button1', 'button3', 'button5', 'button8', 'button10'];
+      window.menuActiveBtnIds = window.menuActiveBtnIds || ['button1', 'button3', 'button5', 'button8', 'button10', 'sap-data-stop', null];
       const activeBtnIds = window.menuActiveBtnIds;
-      this.activeBtns = [null, null, null, null, null];
+      this.activeBtns = [null, null, null, null, null, null];
 
       this.onClick = this.onClick.bind(this);
       this.onMouseEnter = this.onMouseEnter.bind(this);
@@ -829,6 +834,12 @@ export default function registerAframeComponents(options) {
             setWholeBodyControl(true);
           } else if (btnId === "button10") {
             setWholeBodyControl(false);
+          } else if (btnId === "sap-data-start") {
+            handleTask("start");
+          } else if (btnId === "sap-data-stop") {
+            handleTask("stop");
+          } else if (btnId === "sap-data-reset") {
+            handleTask("reset");
           }
         });
       }
@@ -933,7 +944,7 @@ export default function registerAframeComponents(options) {
       isGestureActive: false,       // 当前手势是否激活
       gestureStartTime: 0,          // 手势开始时间
       lastToggleTime: 0,            // 上次切换菜单的时间
-      HOLD_DURATION: 800,           // 需要保持手势的时间（毫秒）
+      HOLD_DURATION: 600,           // 需要保持手势的时间（毫秒）
       COOLDOWN_DURATION: 1000,      // 冷却时间，防止误触发
     };
   },
@@ -1077,7 +1088,7 @@ export default function registerAframeComponents(options) {
       const state = this.menuGestureState;
 
       // 检测手势是否满足触发条件
-      const isGestureDetected = dThumbPinky < 0.030; // 触发距离,m
+      const isGestureDetected = dThumbPinky < 0.028; // 触发距离,m
 
       if (isGestureDetected) {
         if (!state.isGestureActive) {

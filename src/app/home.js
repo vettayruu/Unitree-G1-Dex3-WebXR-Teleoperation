@@ -40,17 +40,15 @@ import { WebRTC_G1_VRCam, WebRTC_Video_Send, WebRTC_Video_Send_Data, WebRTC_Data
 import RobotScene from './RobotScene';
 import registerAframeComponents from './registerAframeComponents'; 
 import MQTT_Setup from './MQTT_Setup';
-import { mqttclient, idtopic, publishMQTT, subscribeMQTT, codeType } from '../lib/MetaworkMQTT'
+import { mqttclient, idtopic, version, publishMQTT, subscribeMQTT, codeType, currentIP } from '../lib/MetaworkMQTT'
+import { MQTT_REGISTER_TOPIC, MQTT_CTRL_TOPIC, MQTT_DEVICE_TOPIC, MQTT_REQUEST_TOPIC, MQTT_UNREQUEST_TOPIC, MQTT_ROBOT_DATA_TOPIC } from '../lib/MetaworkMQTT';
 import { IK_joint_velocity_limit, IK_joint_velocity, IK_finger, Retarget } from '../modern_robotics/spatialKinematics.js';
 import { io } from 'socket.io-client';
-
 
 // On Windows, run the following command to allow script execution at first:
 // Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 
 /* ============================= Static Global Variables ==========================================*/
-const currentIP = typeof window !== 'undefined' ? window.location.hostname : '';
-console.log("Current IP:", currentIP);
 
 const mr = require('../modern_robotics/modern_robotics_core.js');
 const RobotKinematics = require('../modern_robotics/modern_robotics_Kinematics.js');
@@ -63,13 +61,9 @@ const robot_assets = [
 const Euler_order = 'ZYX'; // Euler angle order
 
 // MQTT Topics
-const MQTT_REQUEST_TOPIC = "mgr/request";
-const MQTT_DEVICE_TOPIC = "dev/" + idtopic;
-const MQTT_CTRL_TOPIC = "control/"; 
-const MQTT_ROBOT_STATE_TOPIC = "robot/";
-// const MQTT_COMMAND_TOPIC = "command/";
-// const MQTT_SHARE_TOPIC = "share/";
-// const MQTT_VR_TOPIC = "vr/";
+// const MQTT_REQUEST_TOPIC = "sap/request";
+// const MQTT_UNREQUEST_TOPIC = "sap/unrequest";
+// const MQTT_CTRL_TOPIC = "control/"; 
 
 // IK State Codes
 const STATE_CODES = {
@@ -111,9 +105,6 @@ function three2world(v) {
     return [-v[2], -v[0], v[1]];
 }
 
-/**
- * 优化后的逻辑：从两个四元数直接提取旋转轴和角度
- */
 function getAxisAngleFromQuatDiff(q_curr, q_init) {
     // 1. 计算相对四元数 Q_rel = Q_curr * inv(Q_init)
     // THREE.js 中：q_rel = q_curr * q_init.inverse()
@@ -125,18 +116,14 @@ function getAxisAngleFromQuatDiff(q_curr, q_init) {
     
     // 3. 提取单位轴 (x, y, z) / sin(theta/2)
     const s = Math.sqrt(1 - w * w);
-    // let axis = [0, 0, 1]; // 默认轴，当 theta 趋近 0 时
     
     if (s > 1e-6) {
         const axis = [q_rel.x / s, q_rel.y / s, q_rel.z / s];
         return { axis, theta };
     } else {
-        // 当旋转角度非常小，轴的方向不确定，可以返回任意单位轴
         return { axis: [0, 0, 1], theta: 0 };
     }
-    
-    // return { axis, theta };
-}
+  }
 
 function ScrewAxisToRMatrix(axis, theta) {
     const [nx, ny, nz] = axis;
@@ -153,34 +140,14 @@ function ScrewAxisToRMatrix(axis, theta) {
     ];
 }
 
-async function sendMessageToServer(messageData) {
-  try {
-    const response = await fetch('https://liust.local/api/send-message', { // 新的发送端点
-      method: 'POST', // 指定方法为 POST
-      headers: {
-        'Content-Type': 'application/json', // 告诉服务器我们发送的是 JSON
-      },
-      body: JSON.stringify(messageData), // 将 JavaScript 对象转换为 JSON 字符串
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json(); // 解析服务器返回的确认消息
-    console.log('Server response:', result);
-    return result;
-
-  } catch (error) {
-    console.error('Error sending message to server:', error);
-  }
-}
-
 
 /* ============================= Main Component ==========================================*/
 export default function DynamicHome(props) {
   const [rendered, set_rendered] = React.useState(false)
   const dtRef = React.useRef(0.01667);
+
+  const [time_offset, setTimeOffset] = React.useState(0); // Time offset state
+  const timeOffsetRef = React.useRef(0);
 
   const robotNameList = ["Unitree-G1-Dex3"]
   const [robotName, set_robotName] = React.useState(robotNameList[0])
@@ -308,7 +275,6 @@ export default function DynamicHome(props) {
   const [shareControl, setShareControl] = React.useState(false);
   const [showModel, setShowModel] = React.useState(true);
 
-
   const [wholeBodyControl, setWholeBodyControl] = React.useState(false); // not used currently, reserved for future whole-body control extension
   React.useEffect(() => {
     if (robotParams.right !== null && robotParams.left !== null) {
@@ -398,6 +364,9 @@ export default function DynamicHome(props) {
   // Robot State
   const [robot_state, setRobotState] = React.useState(null);
 
+  // Scan Data
+  const [scan_data, setScanData] = React.useState({});
+
   /* ---------------------- Right Arm Initialize ------------------------------------*/
   const [rightArmInitialized, setRightArmInitialized] = React.useState(false);
   const [position_ee, setPositionEE] = React.useState([0.19978+0.0415, -0.14847, -0.19654+0.29178]);
@@ -466,70 +435,11 @@ export default function DynamicHome(props) {
 
 
   /* ======================== Waist Control (use hmd)) ================================*/
-  const lastVRPosRef_cam = React.useRef(null);
-  const lastQuatRef_cam = React.useRef(null);
   const thetaBodyCamRef = React.useRef(theta_body_cam);
   const positionEECamRef = React.useRef(position_ee_cam);
   const REECamRef = React.useRef(R_ee_cam);
 
   const [waistControlOwner, setWaistControlOwner] = React.useState('none'); // 'none', 'left', 'right'
-
-  // React.useLayoutEffect(() => {
-  //   if (!rendered || !vrModeRef.current || showMenu || !hmdControl ) return;
-
-  //   const q_raw = controller_object_cam.quaternion;
-
-  //   // --- 初始化参考姿态 ---
-  //   if (!lastQuatRef_cam.current) {
-  //     lastQuatRef_cam.current = q_raw.clone();
-  //     return;
-  //   }
-
-  //   // --- 计算相对四元数 ---
-  //   const q_rel = new THREE.Quaternion()
-  //     .copy(lastQuatRef_cam.current)
-  //     .invert()
-  //     .premultiply(q_raw);
-
-  //   // --- 提取欧拉角（YXZ 顺序适合人体腰部）---
-  //   const euler = new THREE.Euler().setFromQuaternion(q_rel, 'YXZ');
-
-  //   // --- 直接映射到关节角度 ---
-  //   // 假设 theta_body_cam = [waist_yaw, waist_pitch, waist_roll]
-  //   const new_theta_cam = [
-  //     euler.y,  // Yaw (左右转头)
-  //     0,  // Pitch (俯仰)
-  //     0   // Roll (可选，一般不需要)
-  //   ];
-
-  //     // Ref Update
-  //     thetaBodyCamRef.current = new_theta_cam;
-
-  //     const T_cam = mr.FKinSpace(M_cam, Slist_cam, new_theta_cam);
-  //     const [R_cam, p_cam] = mr.TransToRp(T_cam);
-      
-  //     positionEECamRef.current = p_cam;
-  //     REECamRef.current = R_cam;
-  //     const euler_ee_cam = worlr2three(mr.RotMatToEuler(R_cam, Euler_order))
-
-  //     setThetaBodyCam(new_theta_cam);
-  //     setErrorCodeCam(0);
-  //     setPositionEECam(p_cam);
-  //     setREECam(R_cam);
-  //     setEulerEECam(euler_ee_cam);
-
-  // }, [
-  //   controller_object_cam.position.x,
-  //   controller_object_cam.position.y,
-  //   controller_object_cam.position.z,
-  //   controller_object_cam.quaternion.x,
-  //   controller_object_cam.quaternion.y,
-  //   controller_object_cam.quaternion.z,
-  //   controller_object_cam.quaternion.w,
-  //   rendered,
-  //   vrModeRef.current,
-  //   showMenu
-  // ]);
 
   React.useLayoutEffect(() => {
     if (!rendered || !vrModeRef.current || showMenu || !hmdControl ) return;
@@ -933,18 +843,18 @@ export default function DynamicHome(props) {
     let newMiddleRight = [0, 0];
     let newIndexRight = [0, 0];
 
-    // if (handGestureModeRight === 'free') {
-    //     const isIndexPinching = thumb_index_right > pinchThreshold;
-    //     const isMiddlePinching = thumb_middle_right > pinchThreshold;
+    if (handGestureModeRight === 'free') {
+        const isIndexPinching = thumb_index_right > pinchThreshold;
+        const isMiddlePinching = thumb_middle_right > pinchThreshold;
 
-    //     if (isIndexPinching && thumb_index_right > thumb_middle_right) {
-    //         setHandGestureModeRight('thumb-index');
-    //     } else if (isMiddlePinching && thumb_index_right < thumb_middle_right) {
-    //         setHandGestureModeRight('thumb-middle');
-    //     } else {
-    //         setHandGestureModeRight('free');
-    //     }
-    // }
+        // if (isIndexPinching && thumb_index_right > thumb_middle_right) {
+        //     setHandGestureModeRight('thumb-index');
+        // } else if (isMiddlePinching && thumb_index_right < thumb_middle_right) {
+        //     setHandGestureModeRight('thumb-middle');
+        // } else {
+        //     setHandGestureModeRight('free');
+        // }
+    }
 
     switch (handGestureModeRight) {
         case 'thumb-index':
@@ -964,9 +874,15 @@ export default function DynamicHome(props) {
             // newIndexRight = [index_meta_right * 85, index_meta_right * 40];
             // newMiddleRight = [middle_meta_right * 85, middle_meta_right * 40];
 
-            newThumbRight = [0, -thumb_index_right * 30, -thumb_index_right * 30];
-            newIndexRight = [thumb_index_right * 85, thumb_index_right * 30];
-            newMiddleRight = [thumb_index_right * 85, thumb_index_right * 30];
+            // Box Grasping
+            // newThumbRight = [0, -thumb_index_right * 30, -thumb_index_right * 30];
+            // newIndexRight = [thumb_index_right * 85, thumb_index_right * 30];
+            // newMiddleRight = [thumb_index_right * 85, thumb_index_right * 30];
+
+            // Object Grasping
+            newThumbRight = [-thumb_index_right * 35, -thumb_index_right * 40, -thumb_index_right * 40];
+            newIndexRight = [thumb_index_right * 60, thumb_index_right * 60];
+            newMiddleRight = [middle_meta_right * 70, middle_meta_right * 85];
 
             break;
     }
@@ -1028,6 +944,11 @@ export default function DynamicHome(props) {
               newIndexLeft = [-thumb_index_left * 85, -thumb_index_left * 30];
               newMiddleLeft = [-thumb_index_left * 85, -thumb_index_left * 30];
 
+              // Object Grasping
+              newThumbLeft = [-thumb_index_left * 35, thumb_index_left * 40, thumb_index_left * 40];
+              newIndexLeft = [-thumb_index_left * 60, -thumb_index_left * 60];
+              newMiddleLeft = [-middle_meta_left * 70, -middle_meta_left * 85];
+
               break;
       }
 
@@ -1064,8 +985,8 @@ export default function DynamicHome(props) {
   }, [thumbstick_down_right]);
 
   /*========================= Collision Check ================================*/
-  const thetaHistoryRef = React.useRef([]);
-  const thetaLeftHistoryRef = React.useRef([]);
+  // const thetaHistoryRef = React.useRef([]);
+  // const thetaLeftHistoryRef = React.useRef([]);
 
   // React.useEffect(() => {
   //   if (!collision) {
@@ -1110,7 +1031,8 @@ export default function DynamicHome(props) {
       theta_body_cam, setThetaBodyCam,
       joint_limits_cam, setJointLimitsCam,
       requestRobot: () => requestRobot(mqttclient),
-      robotID,
+      unrequestRobot: () => unrequestRobot(),
+      robotID, time_offset
     };
     lastInterfacePropsRef.current = currentProps;
     return currentProps;
@@ -1130,9 +1052,295 @@ export default function DynamicHome(props) {
     joint_limits_cam, setJointLimitsCam,
     rendered,
     mqttclient,
-    robotID,
+    robotID, time_offset
   ]);
 
+  
+  /*------------------------ Get message from BTP Action by WebSocket/MQTT ---------------------------*/
+  const [btpActionMsg, setBTPActionMsg] = React.useState({});
+  const [btpMethod, setBTPMethod] = React.useState('ws'); // 'ws' or 'mqtt'
+  const socketRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (btpMethod !== 'ws') return;
+
+    const wsurl = 'https://liust.local/ws';
+    // const wsurl = 'https://santolina/ws';
+    // const wsurl = 'https://133.6.254.50/ws';
+    // const wsurl = currentIP + '/ws';
+    const socket = io(wsurl, {
+      transports: ['websocket'],
+      upgrade: true
+    });
+
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      console.log("✅ WebSocket connected!");
+      socket.emit("register_user", { userId: idtopic }); 
+
+      // Time Sync: Send client's current timestamp to server to calculate offset
+      const t0 = Date.now();
+      socket.emit("sync_time_ping", { client_t0: t0 });
+      console.log("⏱️ Time sync ping sent with client timestamp:", t0);
+    });
+
+    socket.on("sync_time_pong", (data) => {
+      const t1 = Date.now(); // Time Recvived Pong from Server
+      const t0 = data.client_t0; // Original Client Timestamp sent to Server
+      const server_time = data.server_time; // Server Timestamp when it received the ping
+
+      // Round Trip Time (RTT) = Time from Client to Server and back
+      const rtt = t1 - t0;
+      const networkDelay = Math.floor(rtt / 2);
+      const calibratedTime = server_time + networkDelay;
+      
+      // Time Offset = Calibrated Server Time - Client Local Time when Pong is received
+      timeOffsetRef.current = calibratedTime - t1;
+      setTimeOffset(timeOffsetRef.current);
+
+      console.log(`⏱️ Time sync successful! Single-way network delay: ${networkDelay}ms, Local time offset: ${timeOffsetRef.current}ms`);
+    });
+
+    socket.on('btp_action', (action) => { 
+      console.log("📩 Recv Message from BTP Action:", action);
+      setBTPActionMsg(action); 
+    });
+    
+    socket.on('disconnect', () => { console.log('❌ WebSocket to BTP is Disconnected'); });
+
+    return () => { 
+      console.log('🔌 Unloading, disconnecting WebSocket');
+      socket.disconnect(); 
+    };
+  }, [idtopic]);
+
+  // 2. 🚀 封装一个专门用于“发送反馈”的动作函数（在物理任务完成、或定时高频同步时调用）
+  // const sendRobotFeedback = () => {
+  //   if (!socketRef.current || !socketRef.current.connected) {
+  //     console.error("❌ WebSocket 未连接或尚未初始化，无法发送数据");
+  //     return;
+  //   }
+  // socketRef.current.emit('robot_feedback', currentFeedbackData);
+  // console.log("📤 已成功通过 WebSocket 发送实时反馈:", currentFeedbackData);
+  // };
+
+
+  /* ============================== MQTT ==========================================*/
+  // Robot Request
+  const [robotRequested, setRobotRequested] = React.useState(false); // Request Flag for Robot State Initialization
+
+  // Request Robot
+  const requestRobot = (mqttclient) => {
+    const requestInfo = {
+      devId: idtopic,
+      type: codeType,
+    }
+    publishMQTT(MQTT_REQUEST_TOPIC, JSON.stringify(requestInfo), 1);
+    setRobotRequested(true);
+  }
+
+  // Release Robot
+  const unrequestRobot = () => {
+    const unrequestInfo = {
+      devId: idtopic
+    }
+    publishMQTT(MQTT_UNREQUEST_TOPIC, JSON.stringify(unrequestInfo), 1);
+    publishMQTT(MQTT_DEVICE_TOPIC + robotID, JSON.stringify({ controller: "browser", devId: ""}), 1);
+    setRobotID(null);
+    setRobotRequested(false);
+  }
+
+  MQTT_Setup({
+    // MQTT Client and Topics
+    props,
+    requestRobot,
+    robotID: setRobotID,
+    btpActionMsg: setBTPActionMsg,
+
+    // Robot State
+    robot_state: setRobotState,
+    scan_data: setScanData,
+
+  });
+
+  /* ---------------------- Robot State Update (Request Robot State) and Watchdog ---------------------*/
+  const connectionWatchdogRef = React.useRef(null);
+  React.useEffect(() => {
+    if (robotID == null) return;
+
+    if (connectionWatchdogRef.current) {
+      clearTimeout(connectionWatchdogRef.current);
+    }
+
+    // Watchdog Timer: If no robot state update for 3 seconds, consider connection lost
+    connectionWatchdogRef.current = setTimeout(() => {
+      console.warn("Connection lost. No robot message update for 3 seconds. Please request again.");
+      setRobotID(null);
+      setRobotState(null); 
+    }, 3000); // 3000ms = 3s
+
+    if (robotRequested) {
+      // User Info
+      publishMQTT("sap/dev/" + robotID, JSON.stringify({ controller: "browser", devId: idtopic }), 1)
+      
+      // Update robot state as Robot Request
+      if (robot_state == null) return;
+
+      setThetaBodyLeft(robot_state.left.arm)
+      setThetaToolLeft(mr.rad2deg(robot_state.left.hand))
+      setThetaBody(robot_state.right.arm)
+      setThetaTool(mr.rad2deg(robot_state.right.hand))
+      setThetaBodyCam(robot_state.waist.joints)
+
+      console.log("Left Arm State Updated:", robot_state.left.arm);
+      console.log("Left Hand State Updated:", robot_state.left.hand);
+      console.log("Right Arm State Updated:", robot_state.right.arm);
+      console.log("Right Hand State Updated:", robot_state.right.hand);
+      console.log("Waist State Updated:", robot_state.waist.joints);
+
+      const T_left = mr.FKinSpace(M_left, Slist_left, robot_state.left.arm);
+      const [R_left, p_left] = mr.TransToRp(T_left);
+
+      const T_right = mr.FKinSpace(M_right, Slist_right, robot_state.right.arm);
+      const [R_right, p_right] = mr.TransToRp(T_right);
+
+      setPositionEELeft(p_left);
+      setREELeft(R_left);
+      setPositionEE(p_right);
+      setREE(R_right);
+
+      // Reset request flag
+      setRobotRequested(false);
+    }
+
+    return () => {
+      if (connectionWatchdogRef.current) {
+        clearTimeout(connectionWatchdogRef.current);
+      }
+    };
+
+  }, [robot_state, robotID, robotRequested]);
+
+  /* ================================== Robot State Update =====================================*/
+  // const robotProps = React.useMemo(() => ({
+  //   robotNameList, robotName, theta_body, theta_tool, theta_body_left, theta_tool_left, theta_body_cam
+  // }), [robotNameList, robotName, theta_body, theta_tool, theta_body_left, theta_tool_left, theta_body_cam]);
+
+  const robotProps = {
+    robotNameList,
+    robotName,
+    theta_body: mr.rad2deg(thetaBodyRef.current),
+    theta_tool:thetaToolRightRef.current,
+    theta_body_left: mr.rad2deg(thetaBodyLeftRef.current),
+    theta_tool_left:thetaToolLeftRef.current,
+    theta_body_cam: mr.rad2deg(thetaBodyCamRef.current),
+  };
+
+  // React.useEffect(() => {
+  //   window.robotRefs = {
+  //     theta_body:thetaBodyRef,
+  //     theta_tool:thetaToolRightRef,
+  //     theta_body_left:thetaBodyLeftRef,
+  //     theta_tool_left:thetaToolLeftRef,
+  //     theta_body_cam,
+  //   };
+  // }, []);
+
+  const handleTask = React.useCallback(async (action) => {
+       if (action === "start") {
+        publishMQTT(MQTT_ROBOT_DATA_TOPIC + idtopic, JSON.stringify({
+          time: Date.now() + timeOffsetRef.current, 
+          taskId: btpActionMsg.taskID || null,
+          userId: idtopic,
+          record: "on" 
+        }), 1);
+       } else if (action === "stop") {
+        publishMQTT(MQTT_ROBOT_DATA_TOPIC + idtopic, JSON.stringify({ 
+          time: Date.now() + timeOffsetRef.current,
+          taskId: btpActionMsg.taskID || null,
+          userId: idtopic,
+          record: "off" 
+        }), 1);
+       } else if (action === "reset") {
+        publishMQTT(MQTT_ROBOT_DATA_TOPIC + idtopic, JSON.stringify({ 
+          time: Date.now() + timeOffsetRef.current,
+          taskId: btpActionMsg.taskID || null,
+          userId: idtopic,
+          record: "reset" 
+        }), 1);
+       }
+    }, []);
+
+  /* ================================== VR Animation Loop =====================================*/
+  const receiveStateRef = React.useRef(true); // VR MQTT switch
+  const [, tick] = React.useReducer(x => x + 1, 0);
+  const [, setNow] = React.useState(Date.now());
+
+  const lastRenderTimeRef = React.useRef(0);
+  const lastUIUpdateTimeRef = React.useRef(0);
+  const lastMQTTPublishTimeRef = React.useRef(0);
+  // const sequenceNumberRef = React.useRef(0); // Check packet loss
+
+  const showMenuRef = React.useRef(showMenu);
+  const shareControlRef = React.useRef(shareControl);
+  React.useEffect(() => {
+    showMenuRef.current = showMenu;
+  }, [showMenu]);
+
+  React.useEffect(() => {
+    shareControlRef.current = shareControl;
+  }, [shareControl]);
+
+  const MQTT_PUBLISH_INTERVAL = 1000 / 50; // MQTT Publish FPS (50Hz)
+
+  const onXRFrameMQTT = React.useCallback((time, frame) => {
+    if (!vrModeRef.current) return;
+    frame.session.requestAnimationFrame(onXRFrameMQTT);
+
+    const dt = (time - lastRenderTimeRef.current) / 1000; // ms -> s
+    dtRef.current = dt;
+    
+    lastRenderTimeRef.current = time;
+    // setNow(performance.now()); 
+    tick(); // Trigger re-render
+
+    // MQTT Publish
+    if (time - lastMQTTPublishTimeRef.current >= MQTT_PUBLISH_INTERVAL) {
+      lastMQTTPublishTimeRef.current = time;
+
+      if (mqttclient && receiveStateRef.current && !showMenuRef.current && !shareControlRef.current) {
+        // MQTT Message 
+        const ctrl_msg = {
+          header: {
+            time: Date.now() + timeOffsetRef.current,
+            // devId: idtopic,
+            // taskId: btpActionMsg.taskID || null,
+          },
+          left: {
+            arm: thetaBodyLeftRef.current,
+            hand: mr.deg2rad(thetaToolLeftRef.current),
+          },
+          right: {
+            arm: thetaBodyRef.current,
+            hand: mr.deg2rad(thetaToolRightRef.current),
+          },
+          waist: {
+            joints: thetaBodyCamRef.current,
+          }
+        };
+        
+        publishMQTT(
+          MQTT_CTRL_TOPIC + idtopic, // Topic: control/user-id
+          JSON.stringify(ctrl_msg), // Message: {timestamp, devId, left: {arm, hand}, right: {arm, hand}}
+          0 // QoS
+        );
+      }
+    }
+
+  }, []);
+
+  
   /* =========================== Aframe Components ==============================*/
   React.useEffect(() => {
     registerAframeComponents({
@@ -1192,265 +1400,10 @@ export default function DynamicHome(props) {
       setShowModel,
       setShareControl,
       setWholeBodyControl,
+
+      // SAP Task Menu
+      handleTask,
     });
-  }, []);
-
-
-  /* ============================== MQTT ==========================================*/
-  // Robot Request
-  const [robotRequested, setRobotRequested] = React.useState(false); // Request Flag for Robot State Initialization
-
-  const requestRobot = (mqclient) => {
-    const requestInfo = {
-      devId: idtopic,
-      type: codeType,
-    }
-    publishMQTT(MQTT_REQUEST_TOPIC, JSON.stringify(requestInfo), 1);
-    setRobotRequested(true);
-  }
-
-  // /* ---------------------- Visual Assistance MQTT message ---------------------*/
-  // React.useEffect(() => {
-  //     let share_control_flag;
-  //     if (shareControl) {
-  //       share_control_flag = 1;
-  //     } else {
-  //       share_control_flag = 0;
-  //     }
-
-  //     let share_control_signal;
-  //     if (thumbstick_right[1] < -0.35) {
-  //       share_control_signal = 1;
-  //     } else if (thumbstick_right[1] > 0.7) {
-  //       share_control_signal = -1;
-  //     } else {
-  //       share_control_signal = 0;
-  //     }
-
-  //     if ((mqttclient != null) && receiveStateRef.current) {
-  //       publishMQTT(MQTT_SHARE_TOPIC + robotIDRef.current, JSON.stringify({
-  //         flag: share_control_flag,
-  //         share: share_control_signal,
-  //       }));
-  //       console.log("Shared Control Published:", share_control_signal);
-  //     }
-
-  // }, [thumbstick_right, shareControl]);
-  
-  /* ---------------------- Option MQTT message -------------------------------*/
-  // Send VR Controller Pose Message for Robot Control
-  // React.useEffect(() => {
-  //   const json_msg = JSON.stringify({
-  //     timestamp: Date.now(),
-  //     p_diff: vr_controller_p_diff,
-  //     R_relative: vr_controller_R_relative,
-  //   });
-  //   if ((mqttclient != null) && receiveStateRef.current && rendered && !showMenu) {
-  //     publishMQTT(MQTT_VR_TOPIC + 'right/' + robotIDRef.current, json_msg);
-  //   }
-  // }, [vr_controller_p_diff, vr_controller_R_relative]);
-
-  MQTT_Setup({
-    // MQTT Client and Topics
-    props,
-    requestRobot,
-    robotID: setRobotID,
-    MQTT_DEVICE_TOPIC, 
-    MQTT_CTRL_TOPIC, 
-    MQTT_ROBOT_STATE_TOPIC,
-
-    // Robot State
-    robot_state: setRobotState,
-
-  });
-
-  const connectionWatchdogRef = React.useRef(null);
-
-  React.useEffect(() => {
-    if (robotID == null) return;
-
-    if (connectionWatchdogRef.current) {
-      clearTimeout(connectionWatchdogRef.current);
-    }
-
-    // Watchdog Timer: If no robot state update for 3 seconds, consider connection lost
-    connectionWatchdogRef.current = setTimeout(() => {
-      console.warn("Connection lost. No robot message update for 3 seconds. Please request again.");
-      setRobotID(null);
-      setRobotState(null); 
-    }, 3000); // 3000ms = 3s
-
-    if (robotRequested) {
-      // User Info
-      publishMQTT("dev/" + robotID, JSON.stringify({ controller: "browser", devId: idtopic }), 1)
-      
-      // Update robot state as Robot Request
-      if (robot_state == null) return;
-
-      setThetaBodyLeft(robot_state.left.arm)
-      setThetaToolLeft(mr.rad2deg(robot_state.left.hand))
-      setThetaBody(robot_state.right.arm)
-      setThetaTool(mr.rad2deg(robot_state.right.hand))
-      setThetaBodyCam(robot_state.waist.joints)
-
-      console.log("Left Arm State Updated:", robot_state.left.arm);
-      console.log("Left Hand State Updated:", robot_state.left.hand);
-      console.log("Right Arm State Updated:", robot_state.right.arm);
-      console.log("Right Hand State Updated:", robot_state.right.hand);
-      console.log("Waist State Updated:", robot_state.waist.joints);
-
-      const T_left = mr.FKinSpace(M_left, Slist_left, robot_state.left.arm);
-      const [R_left, p_left] = mr.TransToRp(T_left);
-
-      const T_right = mr.FKinSpace(M_right, Slist_right, robot_state.right.arm);
-      const [R_right, p_right] = mr.TransToRp(T_right);
-
-      setPositionEELeft(p_left);
-      setREELeft(R_left);
-      setPositionEE(p_right);
-      setREE(R_right);
-
-      // Reset request flag
-      setRobotRequested(false);
-    }
-
-    return () => {
-      if (connectionWatchdogRef.current) {
-        clearTimeout(connectionWatchdogRef.current);
-      }
-    };
-
-  }, [robot_state, robotID, robotRequested]);
-
-  // Message Display
-  const [btp_action, setBTPAction] = React.useState({})
-  React.useEffect(() => {
-    // 1. 初始化连接 (指向你的 Nginx 地址或 Flask 直接地址)
-    // 如果用了 Nginx 转发，路径通常会自动映射到 /socket.io
-    // 'https://liust.local/ws'
-    const wsurl = currentIP + '/ws';
-    // const wsurl = 'https://liust.local/ws';
-    const socket = io(wsurl, {
-      transports: ['websocket'], // 强制使用 websocket 协议
-      upgrade: true
-    });
-
-    // 2. 监听连接成功的事件
-    socket.on('connect', () => {
-      console.log('✅ 已成功连接到机器人 WebSocket 服务');
-    });
-
-    // 3. 监听服务器推送的消息 (对应 Python 中的 socketio.emit('robot_command', ...))
-    socket.on('btp_action', (action) => {
-      console.log('📩 收到实时指令:', action);
-      setBTPAction(action);
-    });
-    
-
-    // 4. 监听连接断开
-    socket.on('disconnect', () => {
-      console.log('❌ WebSocket 连接已断开');
-    });
-
-    // 5. 组件卸载时自动断开连接，防止内存泄漏和重复连接
-    return () => {
-      socket.disconnect();
-    };
-  }, []); // 空依赖数组确保只在组件挂载时执行一次
-
-  /* ================================== Robot State Update =====================================*/
-  // const robotProps = React.useMemo(() => ({
-  //   robotNameList, robotName, theta_body, theta_tool, theta_body_left, theta_tool_left, theta_body_cam
-  // }), [robotNameList, robotName, theta_body, theta_tool, theta_body_left, theta_tool_left, theta_body_cam]);
-
-  const robotProps = {
-    robotNameList,
-    robotName,
-    theta_body: mr.rad2deg(thetaBodyRef.current),
-    theta_tool:thetaToolRightRef.current,
-    theta_body_left: mr.rad2deg(thetaBodyLeftRef.current),
-    theta_tool_left:thetaToolLeftRef.current,
-    theta_body_cam: mr.rad2deg(thetaBodyCamRef.current),
-  };
-
-  // React.useEffect(() => {
-  //   window.robotRefs = {
-  //     theta_body:thetaBodyRef,
-  //     theta_tool:thetaToolRightRef,
-  //     theta_body_left:thetaBodyLeftRef,
-  //     theta_tool_left:thetaToolLeftRef,
-  //     theta_body_cam,
-  //   };
-  // }, []);
-
-  /* ================================== VR Animation Loop =====================================*/
-  const receiveStateRef = React.useRef(true); // VR MQTT switch
-  const [, tick] = React.useReducer(x => x + 1, 0);
-  const [, setNow] = React.useState(Date.now());
-
-  const lastRenderTimeRef = React.useRef(0);
-  const lastUIUpdateTimeRef = React.useRef(0);
-  const lastMQTTPublishTimeRef = React.useRef(0);
-  // const sequenceNumberRef = React.useRef(0); // Check packet loss
-
-  const showMenuRef = React.useRef(showMenu);
-  const shareControlRef = React.useRef(shareControl);
-  React.useEffect(() => {
-    showMenuRef.current = showMenu;
-  }, [showMenu]);
-
-  React.useEffect(() => {
-    shareControlRef.current = shareControl;
-  }, [shareControl]);
-
-  const MQTT_PUBLISH_INTERVAL = 1000 / 50; // MQTT Publish FPS (25Hz)
-
-  const onXRFrameMQTT = React.useCallback((time, frame) => {
-    if (!vrModeRef.current) return;
-    frame.session.requestAnimationFrame(onXRFrameMQTT);
-
-    const dt = (time - lastRenderTimeRef.current) / 1000; // ms -> s
-    dtRef.current = dt;
-    
-    lastRenderTimeRef.current = time;
-    // setNow(performance.now()); 
-    tick(); // Trigger re-render
-
-    // MQTT Publish
-    if (time - lastMQTTPublishTimeRef.current >= MQTT_PUBLISH_INTERVAL) {
-      lastMQTTPublishTimeRef.current = time;
-
-      if (mqttclient && receiveStateRef.current && !showMenuRef.current && !shareControlRef.current) {
-        const time = Date.now();
-        // const seq = sequenceNumberRef.current++; // Check packet loss
-
-        const ctrl_msg = {
-          header: {
-            timestamp: time,
-            devId: idtopic,
-          },
-          left: {
-            arm: thetaBodyLeftRef.current,
-            hand: mr.deg2rad(thetaToolLeftRef.current),
-          },
-          right: {
-            arm: thetaBodyRef.current,
-            hand: mr.deg2rad(thetaToolRightRef.current),
-          },
-          waist: {
-            joints: thetaBodyCamRef.current,
-          }
-        };
-
-        publishMQTT(
-          MQTT_CTRL_TOPIC + idtopic, // Topic: control/user-id
-          JSON.stringify(ctrl_msg), // Message: {timestamp, devId, left: {arm, hand}, right: {arm, hand}}
-          0 // QoS
-        );
-
-      }
-    }
-
   }, []);
 
   // Robot Secene Render
@@ -1462,30 +1415,12 @@ export default function DynamicHome(props) {
         // onVideoStream3={setWebcamStream3} 
       />
 
-      {/* <WebRTC_Video_Send 
-        VR_Left_Stream={vrLeftStream}
-        VR_Right_Stream={vrRightStream}
-      /> */}
-
-      {/* <WebRTC_Video_Send_Data
-        VR_Left_Stream={vrLeftStream}
-        VR_Right_Stream={vrRightStream}
-        controlData={controlData}
-        recvData={DataRecv}
-      />
-
-      <WebRTC_Data_Recv
-        channelId="sora_liust_vr_left"
-        onControlData={setDataRecv}
-      /> */}
-
       <RobotScene
         robot_assets={robot_assets}
         rendered={rendered}
 
         robotProps={robotProps}
         interfacePropos={interfacePropos}
-        btp_action={btp_action}
         view_cam_pose={view_cam_pose}
         viewer={props.viewer}
         monitor={props.monitor}
@@ -1517,6 +1452,10 @@ export default function DynamicHome(props) {
         showMenu={showMenu}
         showVideo={showVideo}
         showModel={showModel}
+
+        // SAP
+        btp_action={btpActionMsg}
+        scan_data={scan_data}
       />
     </>
   );

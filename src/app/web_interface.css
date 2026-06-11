@@ -145,6 +145,22 @@
     };
 }
 
+.unrequest-robot {
+    position: fixed;
+    top: 250px;
+    left: 10px;
+    width: 240px;
+    background-color:rgba(192,192,192,0.2);
+    padding: 10px;
+    display: grid;
+    button {
+        margin: 5px;
+        padding: 10px;
+        font-size: 1em;
+        cursor: pointer;
+    };
+}
+
 .robot-id {
   position: fixed;
   top: 133px;

@@ -33,6 +33,7 @@ export default function WebInterface(props) {
   const {joint_limits_cam} = props
 
   const {robotID} = props
+  const {time_offset} = props
 
   const setViewCamPose = (index) => (e) => {
     let value = Number.parseFloat(e.target.value || 0);
@@ -47,6 +48,7 @@ export default function WebInterface(props) {
     <>
       <div className="mqtt-broker">
         MQTT Broker URL: <span>{mqttBrokerURL}</span>
+        {/* Time Offset: <span>{time_offset} ms</span> */}
       </div>
 
       <div className="user-uuid">
@@ -58,8 +60,24 @@ export default function WebInterface(props) {
         Recv Channel 1 (G1 VRCam): <span>{soraConfig.G1_VRCAM_CHANNEL}</span><br/>
       </div>
 
+      <div className="robot-id">
+        Robot ID: <span> {robotID} </span>
+      </div>
 
-      <div className="view-cam" >
+      <div className="request-robot">
+        <button onClick={props.requestRobot}>
+          Request Robot
+        </button>
+      </div>
+
+      {/* <div className="unrequest-robot">
+        <button onClick={props.unrequestRobot}>
+          Release Robot
+        </button>
+      </div> */}
+
+
+      {/* <div className="view-cam" >
         {vr_mode?null:<><span>View Cam Pose</span>
         <div className="row mb-0">
           <div className="col-md-4"><label htmlFor="c_pos_x_number" className="form-label"><span className="form-control-plaintext">Left/Right</span></label></div>
@@ -87,7 +105,7 @@ export default function WebInterface(props) {
         </div>
         <div className="row mb-2">
         </div></>}
-      </div>
+      </div> */}
       
       <div className="right-arm">
         <span>Right Arm</span>
@@ -228,19 +246,6 @@ export default function WebInterface(props) {
           ))}
         </div>
       </div>
-
-      <div className="request-robot">
-        <button onClick={props.requestRobot}>
-          Request Robot
-        </button>
-      </div>
-      
-      <div className="robot-id">
-        Robot ID: <span> {robotID} </span>
-      </div>
-
-
-
     </>
     )
   }

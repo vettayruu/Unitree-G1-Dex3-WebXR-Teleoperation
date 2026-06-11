@@ -39,6 +39,7 @@ export default function RobotScene(props) {
 
     // SAP BTP
     btp_action,
+    scan_data,
 
   } = props;
 
@@ -115,11 +116,6 @@ export default function RobotScene(props) {
     }
   }, [showVideo]);
 
-  const [scannerInfo, setScannerInfo] = React.useState({
-    Product: 'PRD5678',
-    Destination: 'DEST4321',
-  });
-
   const [ewmInfo, setEWMStatus] = React.useState(
     {
       Warehouse: null,
@@ -137,7 +133,7 @@ export default function RobotScene(props) {
   };
 
   React.useEffect(() => {
-    if (btp_action.WarehouseTask) {
+    if (btp_action.taskID) {
       setEWMStatus(prev => ({ ...prev, Warehouse: "ok" }));
     }
 
@@ -188,66 +184,65 @@ export default function RobotScene(props) {
         <a-assets>
           <video id="stereoVideo" autoPlay playsInline crossOrigin="anonymous" muted></video>
         </a-assets>
+        {showModel && (
+          <a-entity position={vrcam_position} rotation={vrcam_rotation}>
+            <Select_Robot 
+              {...robotProps} 
+              // modelOpacity={props.modelOpacity}
+              position_left={leftArmPosition}
+              position_right={rightArmPosition}
+              joint_limits_right={joint_limits_right}
+              joint_limits_left={joint_limits_left}
+              indicator_visibility={props.indicator}
+            />
 
-        <a-entity position={vrcam_position} rotation={vrcam_rotation}>
-              {showModel && (
-                <Select_Robot 
-                  {...robotProps} 
-                  // modelOpacity={props.modelOpacity}
-                  position_left={leftArmPosition}
-                  position_right={rightArmPosition}
-                  joint_limits_right={joint_limits_right}
-                  joint_limits_left={joint_limits_left}
-                  indicator_visibility={props.indicator}
-                />
-              )}
-
-              <a-sphere 
-                position={`${position_ee[0]} ${position_ee[1]} ${position_ee[2]}`} 
-                scale="0.012 0.012 0.012" 
-                color={stateCodeColor}
-                visible={true}></a-sphere>
-              <a-entity
-                position={`${position_ee[0]} ${position_ee[1]} ${position_ee[2]}`}
-                // ZYX
-                rotation={`${euler_ee_deg[0]} ${-euler_ee_deg[2]} ${-euler_ee_deg[1]} `}
-              >
-                <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0700" radius="0.0015" color="red" /> 
-                <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
-                <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0500" radius="0.0015" color="blue" />
-              </a-entity>
-
-              <a-sphere 
-                position={`${position_ee_left[0]} ${position_ee_left[1]} ${position_ee_left[2]}`} 
-                scale="0.012 0.012 0.012" 
-                color={stateCodeColorLeft}
-                visible={true}></a-sphere>
-              <a-entity
-                position={`${position_ee_left[0]} ${position_ee_left[1]} ${position_ee_left[2]}`}
-                // ZYX
-                rotation={`${euler_ee_deg_left[0]} ${-euler_ee_deg_left[2]} ${-euler_ee_deg_left[1]} `}
-                >
-                <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0700" radius="0.0015" color="red" /> 
-                <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
-                <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0500" radius="0.0015" color="blue" />
-              </a-entity>
-
-              <a-sphere 
-                position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`} 
-                scale="0.012 0.012 0.012" 
-                color={stateCodeColorCam}
-                visible={true}></a-sphere>
-              <a-entity
-                position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`}
-                // ZYX
-                rotation={`${euler_ee_deg_cam[0]} ${-euler_ee_deg_cam[2]} ${-euler_ee_deg_cam[1]} `}
-              >
-                <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0500" radius="0.0015" color="red" /> 
-                <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
-                <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0700" radius="0.0015" color="blue" />
-              </a-entity>
-
+            <a-sphere 
+              position={`${position_ee[0]} ${position_ee[1]} ${position_ee[2]}`} 
+              scale="0.012 0.012 0.012" 
+              color={stateCodeColor}
+              visible={true}></a-sphere>
+            <a-entity
+              position={`${position_ee[0]} ${position_ee[1]} ${position_ee[2]}`}
+              // ZYX
+              rotation={`${euler_ee_deg[0]} ${-euler_ee_deg[2]} ${-euler_ee_deg[1]} `}
+            >
+              <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0700" radius="0.0015" color="red" /> 
+              <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
+              <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0500" radius="0.0015" color="blue" />
             </a-entity>
+
+            <a-sphere 
+              position={`${position_ee_left[0]} ${position_ee_left[1]} ${position_ee_left[2]}`} 
+              scale="0.012 0.012 0.012" 
+              color={stateCodeColorLeft}
+              visible={true}></a-sphere>
+            <a-entity
+              position={`${position_ee_left[0]} ${position_ee_left[1]} ${position_ee_left[2]}`}
+              // ZYX
+              rotation={`${euler_ee_deg_left[0]} ${-euler_ee_deg_left[2]} ${-euler_ee_deg_left[1]} `}
+              >
+              <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0700" radius="0.0015" color="red" /> 
+              <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
+              <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0500" radius="0.0015" color="blue" />
+            </a-entity>
+
+            <a-sphere 
+              position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`} 
+              scale="0.012 0.012 0.012" 
+              color={stateCodeColorCam}
+              visible={true}></a-sphere>
+            <a-entity
+              position={`${position_ee_cam[0]} ${position_ee_cam[1]} ${position_ee_cam[2]}`}
+              // ZYX
+              rotation={`${euler_ee_deg_cam[0]} ${-euler_ee_deg_cam[2]} ${-euler_ee_deg_cam[1]} `}
+            >
+              <a-cylinder position="0      0     -0.015" rotation="90 0  0 " height="0.0500" radius="0.0015" color="red" /> 
+              <a-cylinder position="-0.015      0     0" rotation="0  0  90" height="0.0500" radius="0.0015" color="green" />
+              <a-cylinder position="0      0.025      0" rotation="0  90 0 " height="0.0700" radius="0.0015" color="blue" />
+            </a-entity>
+
+          </a-entity>
+        )}
 
         {/* Light */}
         <a-entity light="type: directional; color: #FFF; intensity: 0.5" position="1 1 1"></a-entity>
@@ -262,7 +257,7 @@ export default function RobotScene(props) {
           <a-camera id="camera" cursor="rayOrigin: mouse;" position="0 0 0">
 
             <a-entity 
-              position="-0.5 -0.20 -1.2" 
+              position="-0.53 -0.30 -1.2" 
               rotation="-10 30 -12" 
               scale="0.6 0.6 0.6"
               highlight 
@@ -270,10 +265,10 @@ export default function RobotScene(props) {
             >
               <a-plane
                 width="1.0"
-                height="0.6"
+                height="0.45"
                 color="#111"
                 opacity="0.5" 
-                position="0 0 0"
+                position="0 0.1 0"
               ></a-plane>
 
               <a-text 
@@ -286,9 +281,9 @@ export default function RobotScene(props) {
               ></a-text>
 
               {[
-                { name: "Warehouse", value: btp_action.WarehouseTask || "---", status: ewmInfo.Warehouse || "null" },
+                { name: "TaskID", value: btp_action.taskID || "---", status: ewmInfo.Warehouse || "null" },
                 // { name: "Order", value: btp_action.WarehouseOrder || "---", status: ewmInfo.Order || "null" },
-                { name: "Product", value: btp_action.Product || "---", status: ewmInfo.Product || "null" },
+                { name: "ProductID", value: btp_action.productID || "---", status: ewmInfo.Product || "null" },
                 // { name: "Destination", value: btp_action.DestinationStorageBin || "---", status: ewmInfo.Destination || "null" },
               ].map((item, index) => (
                 <a-entity key={item.name} position={`0 ${0.08 - index * 0.1} 0.01`}>
@@ -312,11 +307,11 @@ export default function RobotScene(props) {
                   ></a-text>
 
                   {/* Status Indicator */}
-                  <a-entity 
+                  {/* <a-entity 
                     geometry="primitive: circle; radius: 0.015" 
                     material={`color: ${statusColors[item.status]}; shader: flat`}
                     position="0.36 0 0.01"
-                  ></a-entity>
+                  ></a-entity> */}
 
                 </a-entity>
               ))}
@@ -332,10 +327,10 @@ export default function RobotScene(props) {
             >
               <a-plane
                 width="1.0"
-                height="0.6"
+                height="0.35"
                 color="#111"
                 opacity="0.5" 
-                position="0 0 0"
+                position="0 0.13 0"
               ></a-plane>
 
               <a-text 
@@ -348,10 +343,8 @@ export default function RobotScene(props) {
               ></a-text>
 
               {[
-                // { name: "Warehouse", value: btp_action.EWMWarehouse || "---", status: ewmInfo.Warehouse || "null" },
-                // { name: "Order", value: btp_action.WarehouseOrder || "---", status: ewmInfo.Order || "null" },
-                { name: "Product", value: scannerInfo.Product || "---", status: ewmInfo.Product || "null" },
-                { name: "Destination", value: scannerInfo.Destination || "---", status: ewmInfo.Destination || "null" },
+                // { name: "Value", value: scan_data?.value || "---", status: ewmInfo.Product || "null" },
+                { name: "Value", value: scan_data?.value || "---" },
               ].map((item, index) => (
                 <a-entity key={item.name} position={`0 ${0.08 - index * 0.1} 0.01`}>
                   
@@ -372,11 +365,11 @@ export default function RobotScene(props) {
                     font={font_path}
                   ></a-text>
 
-                  <a-entity 
+                  {/* <a-entity 
                     geometry="primitive: circle; radius: 0.015" 
                     material={`color: ${statusColors[item.status]}; shader: flat`}
                     position="0.36 0 0.01"
-                  ></a-entity>
+                  ></a-entity> */}
 
                 </a-entity>
                   )
@@ -398,14 +391,14 @@ export default function RobotScene(props) {
         </a-entity>)}
 
         {showMenu && (
-          <a-entity id="setting" position="1.0 0.8 -1.2" rotation="0 -37 0" highlight button-action>
+          <a-entity id="setting" position="1.0 0.45 -1.2" rotation="0 -37 0" highlight button-action>
             {/* Background Plane */}
             <a-plane
               width="1.2"
-              height="1.35"
+              height="1.0"
               color="#222"
               opacity="1.0"
-              position="0 0.05 0"
+              position="0 0.20 0"
               // class="raycastable"
             ></a-plane><a-text value="Robot Settings" align="center" color="#fff" width="2.0" position="0 0.60 0.01" font={font_path}></a-text>
             {/* Button 1 */}
@@ -436,37 +429,35 @@ export default function RobotScene(props) {
             <a-entity id="button5" position="-0.3 0.0 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Indicator \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
+            ><a-text value="Show Model \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
             {/* Button 6 */}
             <a-entity id="button6" position="0.3 0.0 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Indicator \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
+            ><a-text value="Show Model \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
-            {/* Button 7 */}
-            <a-entity id="button7" position="-0.3 -0.2 0.01" class="raycastable menu-button"
+            {/* Button 7,8 Visual Assist */}
+            {/* <a-entity id="button7" position="-0.3 -0.2 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
             ><a-text value="Visual Assist \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
-            {/* Button 8 */}
             <a-entity id="button8" position="0.3 -0.2 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Visual Assist \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
+            ><a-text value="Visual Assist \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity> */}
 
-            {/* Button 9 */}
-            <a-entity id="button9" position="-0.3 -0.4 0.01" class="raycastable menu-button"
+            {/* Button 9,10 Whole Body Control */}
+            {/* <a-entity id="button9" position="-0.3 -0.4 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
             ><a-text value="Whole Body Control \n On" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
-            {/* Button 10 */}
             <a-entity id="button10" position="0.3 -0.4 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.18`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Whole Body Control \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
+            ><a-text value="Whole Body Control \n Off" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity> */}
 
           </a-entity>
         )}
@@ -514,12 +505,12 @@ export default function RobotScene(props) {
             <a-entity id="sap-data-stop" position="0.010 0.10 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.15`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Finish" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
+            ><a-text value="Stop" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
-            <a-entity id="sap-data-upload" position="0.480 0.10 0.01" class="raycastable menu-button"
+            <a-entity id="sap-data-reset" position="0.480 0.10 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.15`}
               material="color: white; opacity: 0.95"
-            ><a-text value="Upload" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
+            ><a-text value="Reset" align="center" color="#fff" width="1.0" position="0 0 0.01" font={font_path}></a-text></a-entity>
 
             {/* <a-entity id="btp_complete" position="0.010 -0.10 0.01" class="raycastable menu-button"
               geometry={`primitive: plane; width: ${botton_width}; height: 0.15`}
