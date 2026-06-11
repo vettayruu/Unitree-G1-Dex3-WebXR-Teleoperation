@@ -41,115 +41,170 @@ After starting, you will see two URLs:
 **Open the browser in your VR device and enter `https://192.168.197.**:****` to access the web interface.**
 
 ---
-## Step 2: Robot Communication Network Setting
+## Step 2: Robot Communication Network Setup
 
-This repository requires mosquitto and nginx for the robot communication. The mosquitto servers as a MQTT broker and nginx changes the http to the https for VR. VR only receive message as https.
-`Robot_Control/MQTT` folder gives an example of settings on Windows and ubuntu.
+This repository requires **Mosquitto** and **nginx** for robot communication.
+Mosquitto acts as an MQTT broker, and nginx proxies HTTP traffic to HTTPS for the VR client, which only accepts secure HTTPS connections.
 
-Installation on Windows:
-Download (mosquitto)[https://mosquitto.org/download/]
-Download (nginx)[https://nginx.org/en/download.html]
+The `Robot_Control/MQTT` folder contains example configuration files for both Windows and Ubuntu.
 
-Setup mosquitto:
-Open the config file `mosquitto.conf` in the installed folder, add 
+---
+
+### Installation on Windows
+For Windows, download the required software:
+- [Mosquitto](https://mosquitto.org/download/)
+- [Nginx](https://nginx.org/en/download.html)
+
+
+### Mosquitto Setup
+
+Open the configuration file `mosquitto.conf` in the installation folder and add the following:
 
 ```bash
 listener 1883
-
 listener 9001
 protocol websockets
-
 allow_anonymous true
 ```
 
-the port number can be changed by the user. 
-In this example, port 1883 is http and 9001 is websocket.
+> Port `1883` is used for standard MQTT (TCP) and port `9001` for MQTT over WebSockets.
+> The port numbers can be changed as needed.
 
-Setup nginx:
-Open the config file `conf/nginx.conf`
 
-https server
-```bash
-listen 443 ssl default_server;
-listen [::]:443 ssl default_server;
-```
+### SSL Certificate
 
-check your host name
-server name should be same as the host.
+nginx requires an SSL certificate to serve HTTPS.
+The following steps generate a **self-signed certificate** for local development use.
 
-```bash
-        server_name [your_hostname_here];
+Run `generate-ssl-cert.js` to generate self-signed certificate.
 
-        ssl_certificate     /home/liu_ucl/cert.pem;
-        ssl_certificate_key /home/liu_ucl/key.pem;
+> **Note:** Browsers will show a security warning for self-signed certificates.
+> You will need to manually accept the certificate the first time you visit the site.
 
-        ssl_protocols TLSv1.2 TLSv1.3;
 
-        ssl_session_cache    shared:SSL:10m;
-        ssl_session_timeout  10m;
-        ssl_ciphers  HIGH:!aNULL:!MD5;
-        ssl_prefer_server_ciphers  on;
-```
+### Nginx Setup
 
-MQTT
-```bash
-        location /mqtt {
-          proxy_pass http://127.0.0.1:9001;
+Open the configuration file at `conf/nginx.conf` and replace its contents with `nginx.conf`.
 
-          proxy_http_version 1.1;
-          proxy_set_header Upgrade $http_upgrade;
-          proxy_set_header Connection "upgrade";
 
-          proxy_set_header Host $host;
+### Nginx Commands on Windows
 
-          proxy_read_timeout 86400s;
-          proxy_send_timeout 86400s;
-        }
-```
+| Action | Command |
+|---|---|
+| Start nginx | `start nginx` |
+| Stop nginx | `taskkill /f /im nginx.exe` |
 
-Websocket
-```bash
-        location /socket.io {
-          proxy_pass http://127.0.0.1:8080/socket.io;
+Every time changing the config file, nginx should be restarted.
 
-          proxy_http_version 1.1;
 
-          proxy_set_header Upgrade $http_upgrade;
-          proxy_set_header Connection "upgrade";
+### Verify the Setup
 
-          proxy_set_header Host $host;
-          proxy_set_header X-Real-IP $remote_addr;
-          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-          proxy_set_header X-Forwarded-Proto $scheme;
+1. Open `https://localhost` or `https://liust.local` — you should see the **nginx welcome page**.
+2. Open `https://localhost/mqtt` — you should see **502 Bad Gateway**, which is expected when Mosquitto is not yet running.
 
-          proxy_buffering off;
+> Since this uses a self-signed certificate, your browser will show a warning on first visit.
+> Click **Advanced → Proceed** to accept it.
 
-          proxy_read_timeout 86400s;
-          proxy_send_timeout 86400s;
-        }
-```
+---
+### Installation on Ubuntu
 
-Check if there is error in config file
+Install Mosquitto and nginx using `apt`:
 
 ```bash
-nginx -t
+sudo apt update
+sudo apt install -y mosquitto mosquitto-clients nginx
 ```
 
-Start nginx
+Confirm both services are running:
+
 ```bash
-nginx start
+sudo systemctl status mosquitto
+sudo systemctl status nginx
 ```
 
-After change the settings restart the nginx
+---
+
+### Mosquitto Setup
+
+Open the configuration file:
+
 ```bash
-nginx restart
+sudo nano /etc/mosquitto/mosquitto.conf
 ```
 
-Confirm your nginx settings.
-Input `https://localhost` or `https://[your_server_name]`, you should see welcome nginx.
-Input `https://[your_server_name]/mqtt`, your should see 502.
+Add the following lines:
 
-Since it is the self certification, sometime you need to verify.
+```
+listener 1883
+listener 9001
+protocol websockets
+allow_anonymous true
+```
+
+Restart Mosquitto to apply the changes:
+
+```bash
+sudo systemctl restart mosquitto
+```
+
+> Port `1883` is used for standard MQTT (TCP) and port `9001` for MQTT over WebSockets.
+> The port numbers can be changed as needed.
+
+---
+
+### SSL Certificate
+
+Run the following command to generate a self-signed certificate:
+
+```bash
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/ssl/key.pem \
+  -out /etc/ssl/cert.pem \
+  -subj "/CN=localhost" \
+  -addext "subjectAltName=IP:127.0.0.1,DNS:localhost,DNS:liust.local"
+```
+
+| File | Description |
+|---|---|
+| `/etc/ssl/cert.pem` | Public certificate sent to clients |
+| `/etc/ssl/key.pem` | Private key — keep this secure |
+
+> **Note:** Browsers will show a security warning for self-signed certificates.
+> You will need to manually accept the certificate the first time you visit the site.
+
+---
+
+### nginx Setup
+
+Open the configuration file:
+
+```bash
+sudo nano /etc/nginx/nginx.conf
+```
+
+Replace its contents with the nginx.conf.
+Don't forget to change the server name and the path of SSL.
+
+---
+
+### nginx Commands
+
+| Action | Command |
+|---|---|
+| Validate config | `sudo nginx -t` |
+| Start nginx | `sudo systemctl start nginx` |
+| Reload after changes | `sudo systemctl reload nginx` |
+
+---
+
+### Verify the Setup
+
+1. Open `https://localhost` or `https://liust.local` — you should see the **nginx welcome page**.
+2. Open `https://localhost/mqtt` — you should see **502 Bad Gateway**, which is expected when Mosquitto is not yet running.
+
+> Since this uses a self-signed certificate, your browser will show a warning on first visit.
+> Click **Advanced → Proceed** to accept it.
+
 
 ---
 ## Step 3: Simulator Setup
