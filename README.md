@@ -307,10 +307,10 @@ The operation is based on hand tracking. Gestures are desgined for robot control
   <p><em>Figure: Gesture grip (thumb and index).</em></p>
 </div>
 
-<div align="center">
+<!-- <div align="center">
   <img src="./Readme_img/G1_middle_grip.jpg" alt="sim" width="480"/>
   <p><em>Figure: Gesture grip (middle).</em></p>
-</div>
+</div> -->
 
 
 
