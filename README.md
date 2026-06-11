@@ -1,13 +1,13 @@
 # Unitree-G1-Dex3 WebXR Teleoperation Operation Manual
 
 ## Quick Start
-- [Step 1: Run HTTPS Server](#step-1-run-https-server)
+- [Step 1: Install and Run HTTPS Server](#step-1-install-and-run-https-server)
 - [Step 2: Build MQTT Broker](#step-2-build-mqtt-broker)
 - [Step 3: Simulator Setup](#step-3-simulator-setup)
 - [Step 4: Operate the Robot in Simulator](#step-4-operate-the-robot-in-simulator)
 
 ---
-## Step 1: Run HTTPS Server
+## Step 1: Install and Run HTTPS Server
 
 💡 **If this is your first time running the project, install the required Node.js modules:**
 ```bash
@@ -41,8 +41,115 @@ After starting, you will see two URLs:
 **Open the browser in your VR device and enter `https://192.168.197.**:****` to access the web interface.**
 
 ---
-## Step 2: Build MQTT Broker
-Follow the repository: [https://github.com/vettayruu/Metawork_MQTT_Protocol]
+## Step 2: Robot Communication Network Setting
+
+This repository requires mosquitto and nginx for the robot communication. The mosquitto servers as a MQTT broker and nginx changes the http to the https for VR. VR only receive message as https.
+`Robot_Control/MQTT` folder gives an example of settings on Windows and ubuntu.
+
+Installation on Windows:
+Download (mosquitto)[https://mosquitto.org/download/]
+Download (nginx)[https://nginx.org/en/download.html]
+
+Setup mosquitto:
+Open the config file `mosquitto.conf` in the installed folder, add 
+
+```bash
+listener 1883
+
+listener 9001
+protocol websockets
+
+allow_anonymous true
+```
+
+the port number can be changed by the user. 
+In this example, port 1883 is http and 9001 is websocket.
+
+Setup nginx:
+Open the config file `conf/nginx.conf`
+
+https server
+```bash
+listen 443 ssl default_server;
+listen [::]:443 ssl default_server;
+```
+
+check your host name
+server name should be same as the host.
+
+```bash
+        server_name [your_hostname_here];
+
+        ssl_certificate     /home/liu_ucl/cert.pem;
+        ssl_certificate_key /home/liu_ucl/key.pem;
+
+        ssl_protocols TLSv1.2 TLSv1.3;
+
+        ssl_session_cache    shared:SSL:10m;
+        ssl_session_timeout  10m;
+        ssl_ciphers  HIGH:!aNULL:!MD5;
+        ssl_prefer_server_ciphers  on;
+```
+
+MQTT
+```bash
+        location /mqtt {
+          proxy_pass http://127.0.0.1:9001;
+
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+
+          proxy_set_header Host $host;
+
+          proxy_read_timeout 86400s;
+          proxy_send_timeout 86400s;
+        }
+```
+
+Websocket
+```bash
+        location /socket.io {
+          proxy_pass http://127.0.0.1:8080/socket.io;
+
+          proxy_http_version 1.1;
+
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+
+          proxy_buffering off;
+
+          proxy_read_timeout 86400s;
+          proxy_send_timeout 86400s;
+        }
+```
+
+Check if there is error in config file
+
+```bash
+nginx -t
+```
+
+Start nginx
+```bash
+nginx start
+```
+
+After change the settings restart the nginx
+```bash
+nginx restart
+```
+
+Confirm your nginx settings.
+Input `https://localhost` or `https://[your_server_name]`, you should see welcome nginx.
+Input `https://[your_server_name]/mqtt`, your should see 502.
+
+Since it is the self certification, sometime you need to verify.
 
 ---
 ## Step 3: Simulator Setup
