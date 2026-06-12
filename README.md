@@ -238,23 +238,6 @@ Don't forget to change the server name and the path of SSL.
 </div>
 
 ---
-## Step 4: Connection between the Manager and Client
-
-### 1. Run the Manager
-In folder `Robot_Control/MQTT`, run
-
-```Python
-python SAP_Device_Data_Manager.py
-```
-
-```Python
-python MQTT_Client_SAP.py
-```
-
-
-
-
----
 ## Step 4: Operate the Robot in Simulator
 
 ### 1. Run the MQTT Client
