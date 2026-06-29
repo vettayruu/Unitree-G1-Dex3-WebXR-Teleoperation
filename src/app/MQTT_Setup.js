@@ -11,12 +11,11 @@ export default function MQTT_Setup({
 
   // Robot State
   robot_state: setRobotState,
-  scan_data: setScanData,
+  scanData: setScanData,
 
 }) {
 
   const robotIDRef = useRef(null);
-  const SAP_WT_TOPIC = "sap/matching/I55834";
 
   useEffect(() => {
     // connect to MQTT broker  
@@ -26,7 +25,6 @@ export default function MQTT_Setup({
       window.mqttClient.on('connect', () => {
         console.log('MQTT connected!');
         subscribeMQTT(MQTT_DEVICE_TOPIC + idtopic); // Request Permission
-        // subscribeMQTT(SAP_WT_TOPIC); // Subscribe to BTP Action Topic
       });
     }
 
@@ -69,12 +67,6 @@ export default function MQTT_Setup({
       if (!props.viewer && topic === MQTT_ROBOT_SCAN_TOPIC + robotIDRef.current) {
           setScanData(data);
           console.log("Received Scan Data:", data);
-      }
-
-      if (topic === SAP_WT_TOPIC) {
-        console.log("Message from BTP Action:", data);
-        setBtpActionMsg(data);
-        return;
       }
 
   };

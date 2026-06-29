@@ -365,7 +365,7 @@ export default function DynamicHome(props) {
   const [robot_state, setRobotState] = React.useState(null);
 
   // Scan Data
-  const [scan_data, setScanData] = React.useState({});
+  const [scanData, setScanData] = React.useState({});
 
   /* ---------------------- Right Arm Initialize ------------------------------------*/
   const [rightArmInitialized, setRightArmInitialized] = React.useState(false);
@@ -875,14 +875,14 @@ export default function DynamicHome(props) {
             // newMiddleRight = [middle_meta_right * 85, middle_meta_right * 40];
 
             // Box Grasping
-            // newThumbRight = [0, -thumb_index_right * 30, -thumb_index_right * 30];
-            // newIndexRight = [thumb_index_right * 85, thumb_index_right * 30];
-            // newMiddleRight = [thumb_index_right * 85, thumb_index_right * 30];
+            newThumbRight = [0, -thumb_index_right * 30, -thumb_index_right * 30];
+            newIndexRight = [thumb_index_right * 85, thumb_index_right * 30];
+            newMiddleRight = [thumb_index_right * 85, thumb_index_right * 30];
 
             // Object Grasping
-            newThumbRight = [-thumb_index_right * 35, -thumb_index_right * 40, -thumb_index_right * 40];
-            newIndexRight = [thumb_index_right * 60, thumb_index_right * 60];
-            newMiddleRight = [middle_meta_right * 70, middle_meta_right * 85];
+            // newThumbRight = [-thumb_index_right * 35, -thumb_index_right * 40, -thumb_index_right * 40];
+            // newIndexRight = [thumb_index_right * 60, thumb_index_right * 60];
+            // newMiddleRight = [middle_meta_right * 70, middle_meta_right * 85];
 
             break;
     }
@@ -940,14 +940,15 @@ export default function DynamicHome(props) {
               // newIndexLeft = [-index_meta_left * 90, -index_meta_left * 90];
               // newMiddleLeft = [-middle_meta_left * 90, -middle_meta_left * 90];
 
+              // Box Grasping
               newThumbLeft = [0, thumb_index_left * 30, thumb_index_left * 30];
               newIndexLeft = [-thumb_index_left * 85, -thumb_index_left * 30];
               newMiddleLeft = [-thumb_index_left * 85, -thumb_index_left * 30];
 
               // Object Grasping
-              newThumbLeft = [-thumb_index_left * 35, thumb_index_left * 40, thumb_index_left * 40];
-              newIndexLeft = [-thumb_index_left * 60, -thumb_index_left * 60];
-              newMiddleLeft = [-middle_meta_left * 70, -middle_meta_left * 85];
+              // newThumbLeft = [-thumb_index_left * 35, thumb_index_left * 40, thumb_index_left * 40];
+              // newIndexLeft = [-thumb_index_left * 60, -thumb_index_left * 60];
+              // newMiddleLeft = [-middle_meta_left * 70, -middle_meta_left * 85];
 
               break;
       }
@@ -1058,16 +1059,10 @@ export default function DynamicHome(props) {
   
   /*------------------------ Get message from BTP Action by WebSocket/MQTT ---------------------------*/
   const [btpActionMsg, setBTPActionMsg] = React.useState({});
-  const [btpMethod, setBTPMethod] = React.useState('ws'); // 'ws' or 'mqtt'
   const socketRef = React.useRef(null);
 
   React.useEffect(() => {
-    if (btpMethod !== 'ws') return;
-
     const wsurl = 'https://liust.local/ws';
-    // const wsurl = 'https://santolina/ws';
-    // const wsurl = 'https://133.6.254.50/ws';
-    // const wsurl = currentIP + '/ws';
     const socket = io(wsurl, {
       transports: ['websocket'],
       upgrade: true
@@ -1083,6 +1078,9 @@ export default function DynamicHome(props) {
       const t0 = Date.now();
       socket.emit("sync_time_ping", { client_t0: t0 });
       console.log("⏱️ Time sync ping sent with client timestamp:", t0);
+
+      console.log(`🔄 [WS-Sync] Requesting cache for: ${idtopic}`);
+      socket.emit("task_cache", { userId: idtopic });
     });
 
     socket.on("sync_time_pong", (data) => {
@@ -1106,6 +1104,23 @@ export default function DynamicHome(props) {
       console.log("📩 Recv Message from BTP Action:", action);
       setBTPActionMsg(action); 
     });
+
+    socket.on('get_cache', (data) => { 
+      console.log("📩 [Cache] Recv Message from BTP Action:", data);
+      
+      // 1. 拿到原始的列表
+      const cacheList = data?.cache;
+      
+      // 2. 🚀 使用解构赋值：直接提取出列表中的第 0 个元素，重命名为 cachedObj
+      if (Array.isArray(cacheList) && cacheList.length > 0) {
+        const [cachedObj] = cacheList; // 等同于 const cachedObj = cacheList[0];
+        
+        if (cachedObj && cachedObj.userID) {
+          console.log("✅ [Cache] Destructured successfully:", cachedObj);
+          setBTPActionMsg(cachedObj); 
+        }
+      }
+    });
     
     socket.on('disconnect', () => { console.log('❌ WebSocket to BTP is Disconnected'); });
 
@@ -1114,17 +1129,6 @@ export default function DynamicHome(props) {
       socket.disconnect(); 
     };
   }, [idtopic]);
-
-  // 2. 🚀 封装一个专门用于“发送反馈”的动作函数（在物理任务完成、或定时高频同步时调用）
-  // const sendRobotFeedback = () => {
-  //   if (!socketRef.current || !socketRef.current.connected) {
-  //     console.error("❌ WebSocket 未连接或尚未初始化，无法发送数据");
-  //     return;
-  //   }
-  // socketRef.current.emit('robot_feedback', currentFeedbackData);
-  // console.log("📤 已成功通过 WebSocket 发送实时反馈:", currentFeedbackData);
-  // };
-
 
   /* ============================== MQTT ==========================================*/
   // Robot Request
@@ -1160,7 +1164,7 @@ export default function DynamicHome(props) {
 
     // Robot State
     robot_state: setRobotState,
-    scan_data: setScanData,
+    scanData: setScanData,
 
   });
 
@@ -1173,12 +1177,12 @@ export default function DynamicHome(props) {
       clearTimeout(connectionWatchdogRef.current);
     }
 
-    // Watchdog Timer: If no robot state update for 3 seconds, consider connection lost
+    // Watchdog Timer: If no robot state update for 5 seconds, consider connection lost
     connectionWatchdogRef.current = setTimeout(() => {
-      console.warn("Connection lost. No robot message update for 3 seconds. Please request again.");
+      console.warn("Connection lost. No robot message update for 5 seconds. Please request again.");
       setRobotID(null);
       setRobotState(null); 
-    }, 3000); // 3000ms = 3s
+    }, 5000); // 5s
 
     if (robotRequested) {
       // User Info
@@ -1246,31 +1250,6 @@ export default function DynamicHome(props) {
   //     theta_body_cam,
   //   };
   // }, []);
-
-  const handleTask = React.useCallback(async (action) => {
-       if (action === "start") {
-        publishMQTT(MQTT_ROBOT_DATA_TOPIC + idtopic, JSON.stringify({
-          time: Date.now() + timeOffsetRef.current, 
-          taskId: btpActionMsg.taskID || null,
-          userId: idtopic,
-          record: "on" 
-        }), 1);
-       } else if (action === "stop") {
-        publishMQTT(MQTT_ROBOT_DATA_TOPIC + idtopic, JSON.stringify({ 
-          time: Date.now() + timeOffsetRef.current,
-          taskId: btpActionMsg.taskID || null,
-          userId: idtopic,
-          record: "off" 
-        }), 1);
-       } else if (action === "reset") {
-        publishMQTT(MQTT_ROBOT_DATA_TOPIC + idtopic, JSON.stringify({ 
-          time: Date.now() + timeOffsetRef.current,
-          taskId: btpActionMsg.taskID || null,
-          userId: idtopic,
-          record: "reset" 
-        }), 1);
-       }
-    }, []);
 
   /* ================================== VR Animation Loop =====================================*/
   const receiveStateRef = React.useRef(true); // VR MQTT switch
@@ -1400,9 +1379,6 @@ export default function DynamicHome(props) {
       setShowModel,
       setShareControl,
       setWholeBodyControl,
-
-      // SAP Task Menu
-      handleTask,
     });
   }, []);
 
@@ -1416,6 +1392,7 @@ export default function DynamicHome(props) {
       />
 
       <RobotScene
+        time_offset={timeOffsetRef.current}
         robot_assets={robot_assets}
         rendered={rendered}
 
@@ -1454,8 +1431,8 @@ export default function DynamicHome(props) {
         showModel={showModel}
 
         // SAP
-        btp_action={btpActionMsg}
-        scan_data={scan_data}
+        apiData={btpActionMsg}
+        scanData={scanData}
       />
     </>
   );
