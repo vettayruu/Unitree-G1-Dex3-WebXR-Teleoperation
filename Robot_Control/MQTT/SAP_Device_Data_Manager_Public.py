@@ -6,7 +6,7 @@ DataLogger 新增功能说明
 触发链路（完全由 MQTT 驱动，无需改动前端）：
 
   1. /offer  POST  → BTP 下发 taskID，转发 btp_action 给对应 user WebSocket
-             同时 DataLogger.on_task_assigned(user_id, task_id)
+             同时 DataLogger.on_user_online(user_id)
              → 订阅 data/<user_id>
 
   2. MQTT  data/<user_id>  payload: {"record": "on"}
@@ -15,7 +15,7 @@ DataLogger 新增功能说明
              → 开始缓存控制消息（带服务器时间戳）
 
   3. MQTT  control/<user_id>  payload: 任意 JSON
-             → 追加一行到内存缓冲区（timestamp_recv + 所有字段展开）
+             → 追加一行到内存缓冲区（timestamp_ms + 所有字段展开）
 
   4. MQTT  data/<user_id>  payload: {"record": "off"}
              → 停止录制，取消订阅 control/<user_id>
@@ -23,7 +23,7 @@ DataLogger 新增功能说明
              → 清理本次会话状态
 
 状态机：
-  IDLE ──on_task_assigned──► WAITING
+  IDLE ──on_user_online──► WAITING
   WAITING ──record:on──► RECORDING
   RECORDING ──record:off──► IDLE  (同时写 CSV)
 """
@@ -40,6 +40,10 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Optional
+
+import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 import paho.mqtt.client as mqtt
 from flask import Flask, Response, jsonify, request
@@ -61,12 +65,13 @@ logger = logging.getLogger("SAP")
 # ---------------------------------------------------------------------------
 @dataclass
 class Config:
-    mqtt_host: str = "127.0.0.1"
+    mqtt_host: str = "liust.local"
     mqtt_port: int = 443
     flask_host: str = "0.0.0.0"
     flask_port: int = 8080
     active_devices_path: str = "active_devices.json"
     log_dir: str = "logs"           # CSV 保存目录
+    result_upload_url: str = "https://133.6.254.50/upload" # Upload result to public server
 
 
 # ===========================================================================
@@ -82,12 +87,15 @@ class RecordState(Enum):
 class _Session:
     """单个用户的录制会话（内部用）"""
     user_id:       str
-    task_id:       str
     state:         RecordState  = RecordState.WAITING
+    # header 从 record:on 消息中提取，原样保存，写入 CSV 注释行和 task_log
+    header:        dict         = field(default_factory=dict)
+    # task_id 从 header["WarehouseTask"] 读取，用作 CSV 文件名
+    task_id:       str          = ""
     buffer:        list[dict]   = field(default_factory=list)
-    columns:       list[str]    = field(default_factory=list)   # CSV 列顺序（按首包确定）
-    start_time_ms: int          = 0                             # record:on 时刻（毫秒时间戳）
-    start_dt:      str          = ""                            # 同上，人类可读 datetime 字符串
+    columns:       list[str]    = field(default_factory=list)
+    start_time_ms: int          = 0      # record:on 时刻（毫秒）
+    start_dt:      str          = ""     # 同上，人类可读
 
 
 class DataLogger:
@@ -96,9 +104,10 @@ class DataLogger:
     只负责订阅 / 取消订阅 / 记录 / 落盘，不持有独立连接。
     """
 
-    def __init__(self, mqtt_client: mqtt.Client, log_dir: str) -> None:
+    def __init__(self, mqtt_client: mqtt.Client, log_dir: str, upload_url: str = "") -> None:
         self._client  = mqtt_client
         self._log_dir = log_dir
+        self._upload_url = upload_url
         self._lock    = threading.Lock()
         self._sessions: dict[str, _Session] = {}   # user_id -> _Session
         os.makedirs(log_dir, exist_ok=True)
@@ -106,22 +115,19 @@ class DataLogger:
     # ------------------------------------------------------------------
     # 外部调用：DeviceManager / Flask 路由触发
     # ------------------------------------------------------------------
-    def on_task_assigned(self, user_id: str, task_id: str) -> None:
+    def on_user_online(self, user_id: str) -> None:
         """
         /offer 转发成功后调用。
-        若该用户已有进行中的会话则先强制结束（保护性处理）。
+        确保 data/<user_id> 已订阅、会话已建立。
+        taskID 和 header 由后续 record:on 消息决定，不在这里绑定。
         """
         with self._lock:
             if user_id in self._sessions:
-                logger.warning("[LOGGER] User '%s' had an unfinished session; force-closing it.", user_id)
-                self._force_close(user_id)
-
-            self._sessions[user_id] = _Session(user_id=user_id, task_id=task_id)
-
-        # 订阅 data/<user_id> 以等待 record:on / off 指令
-        data_topic = f"data/{user_id}"
-        self._client.subscribe(data_topic, qos=1)
-        logger.info("[LOGGER] Task '%s' assigned to user '%s'. Watching: %s", task_id, user_id, data_topic)
+                logger.info("[LOGGER] User '%s' already has a session; keeping it.", user_id)
+                return
+            self._sessions[user_id] = _Session(user_id=user_id)
+        self._client.subscribe(f"data/{user_id}", qos=1)
+        logger.info("[LOGGER] User '%s' online; watching data/%s", user_id, user_id)
 
     def on_user_disconnected(self, user_id: str) -> None:
         """用户 WebSocket 断开时由 DeviceManager 通知，强制结束录制。"""
@@ -131,23 +137,29 @@ class DataLogger:
                 if sess.state == RecordState.RECORDING:
                     logger.warning("[LOGGER] User '%s' disconnected during recording; saving partial data.", user_id)
                     self._save_csv(sess)
-                self._cleanup(user_id)
+                else:
+                    self._cleanup(user_id)
 
     # ------------------------------------------------------------------
     # MQTT 消息入口（由 DeviceManager._on_message 路由进来）
     # ------------------------------------------------------------------
     def handle_data_message(self, user_id: str, data: dict) -> None:
-        """处理 data/<user_id> 的消息（record 指令）"""
-        record_cmd = data.get("record", "").strip().lower()
+        """
+        处理 data/<user_id> 的消息（record 指令）。
+        消息格式（VR 端发出）：
+          { header: {...}, time: <ms>, task: "<id>", record: "on"|"off"|"reset" }
+        """
+        record_cmd = str(data.get("record", "")).strip().lower()
 
         with self._lock:
             sess = self._sessions.get(user_id)
             if sess is None:
-                logger.warning("[LOGGER] Received data msg for unknown user '%s'", user_id)
+                logger.debug("[LOGGER] Ignored data msg for unregistered user '%s'", user_id)
                 return
 
             if record_cmd == "on":
-                self._start_recording(sess)
+                header = data.get("header", {})
+                self._start_recording(sess, header)
             elif record_cmd == "off":
                 self._stop_recording(sess)
             elif record_cmd == "reset":
@@ -165,7 +177,6 @@ class DataLogger:
             row: dict = {"timestamp_recv": int(time.time() * 1000)}
             row.update(data)
 
-            # 第一帧确定列顺序
             if not sess.columns:
                 sess.columns = list(row.keys())
                 logger.info("[LOGGER] CSV columns fixed for task '%s': %s", sess.task_id, sess.columns)
@@ -175,53 +186,60 @@ class DataLogger:
     # ------------------------------------------------------------------
     # 内部状态机操作（必须在 _lock 内调用）
     # ------------------------------------------------------------------
-    def _start_recording(self, sess: _Session) -> None:
+    def _start_recording(self, sess: _Session, header: dict) -> None:
         if sess.state != RecordState.WAITING:
             logger.warning("[LOGGER] record:on received but state=%s for user '%s'", sess.state, sess.user_id)
             return
 
-        now_ms             = int(time.time() * 1000)
+        now_ms = int(time.time() * 1000)
+
+        # task_id 优先取 header["WarehouseTask"]，回退到 header["task"]，最后用时间戳兜底
+        sess.header        = header
+        sess.task_id       = str(header.get("WarehouseTask") or header.get("task") or now_ms)
         sess.state         = RecordState.RECORDING
         sess.buffer        = []
         sess.columns       = []
         sess.start_time_ms = now_ms
         sess.start_dt      = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now_ms / 1000))
 
-        ctrl_topic = f"control/{sess.user_id}"
-        self._client.subscribe(ctrl_topic, qos=0)
-        logger.info("[LOGGER] ▶ Recording started | task=%s | started_at=%s", sess.task_id, sess.start_dt)
+        self._client.subscribe(f"control/{sess.user_id}", qos=0)
+        logger.info(
+            "[LOGGER] ▶ Recording started | task=%s | user=%s | started_at=%s",
+            sess.task_id, sess.user_id, sess.start_dt,
+        )
 
     def _stop_recording(self, sess: _Session) -> None:
         if sess.state != RecordState.RECORDING:
             logger.warning("[LOGGER] record:off received but state=%s for user '%s'", sess.state, sess.user_id)
             return
-
         self._save_csv(sess)
-        # self._cleanup(sess.user_id)
+        sess.state = RecordState.WAITING
 
     def _reset_recording(self, sess: _Session) -> None:
         """
         清空当前录制数据，回到 WAITING 状态重新开始。
-        · RECORDING 中：取消订阅 control，清空 buffer，等待下一次 record:on
-        · WAITING 中：仅清空（本来就是空的），打 info 提示
-        · IDLE：忽略（会话已结束）
+        · RECORDING：取消订阅 control，丢弃 buffer，等待下一次 record:on
+        · WAITING：仅清空（本来就是空的）
+        · IDLE：忽略
         """
         if sess.state == RecordState.IDLE:
             logger.warning("[LOGGER] record:reset ignored: session already idle for user '%s'", sess.user_id)
             return
 
         if sess.state == RecordState.RECORDING:
-            # self._client.unsubscribe(f"control/{sess.user_id}")
+            self._client.unsubscribe(f"control/{sess.user_id}")
             logger.info(
                 "[LOGGER] ↺ Reset: discarded %d frames for task '%s'",
                 len(sess.buffer), sess.task_id,
             )
 
-        # sess.state = RecordState.WAITING
-        sess.buffer = []
-        sess.columns = []
+        sess.state         = RecordState.WAITING
+        sess.header        = {}
+        sess.task_id       = ""
+        sess.buffer        = []
+        sess.columns       = []
         sess.start_time_ms = 0
-        # sess.start_dt = ""
+        sess.start_dt      = ""
         logger.info("[LOGGER] ↺ Recording reset | user='%s' | ready for next record:on", sess.user_id)
 
     def _save_csv(self, sess: _Session) -> None:
@@ -230,9 +248,10 @@ class DataLogger:
 
         if not sess.buffer:
             logger.warning("[LOGGER] No data recorded for task '%s'; skipping CSV write.", sess.task_id)
+            sess.state = RecordState.WAITING
             return
 
-        # ─────────────── 写 CSV ──────────────────────────────────────────
+        # ── 写 CSV（顶部附 header 注释行，方便离线查阅）──────────────────
         all_keys: list[str] = list(dict.fromkeys(
             k for row in sess.buffer for k in row
         ))
@@ -242,6 +261,8 @@ class DataLogger:
 
         try:
             with open(csv_path, "w", newline="", encoding="utf-8") as f:
+                for k, v in sess.header.items():
+                    f.write(f"# {k}: {v}\n")
                 writer = csv.DictWriter(f, fieldnames=columns, extrasaction="ignore")
                 writer.writeheader()
                 writer.writerows(sess.buffer)
@@ -251,28 +272,24 @@ class DataLogger:
             )
         except OSError as exc:
             logger.error("[LOGGER] Failed to write CSV: %s", exc)
+            return
 
-        # ── 用首尾控制帧的 timestamp_recv 计算实际操作时长 ────────────────
+        # ── 用首尾帧的 timestamp_recv 计算实际操作时长 ────────────────────
         t_first = sess.buffer[0].get("timestamp_recv")
         t_last  = sess.buffer[-1].get("timestamp_recv")
         if t_first is not None and t_last is not None:
             task_time_ms = int(t_last) - int(t_first)
         else:
-            # 降级：用 record:on → record:off 的时间差
             task_time_ms = int(time.time() * 1000) - sess.start_time_ms
-            logger.warning(
-                "[LOGGER] 'timestamp_recv' missing in buffer; falling back to record-on/off duration."
-            )
+            logger.warning("[LOGGER] 'timestamp_recv' missing; falling back to record-on/off duration.")
 
         # ── 追加任务摘要到 task_log.json ─────────────────────────────────
         self._append_task_log(
-            datetime=sess.start_dt,
+            start_dt=sess.start_dt,
             task_id=sess.task_id,
-            user_id=sess.user_id,
             task_time_ms=task_time_ms,
+            header=sess.header,
         )
-
-        self._cleanup(sess.user_id)
 
     def get_task_log(self) -> list:
         """读取 task_log.json 并返回记录列表；文件不存在或损坏则返回空列表。"""
@@ -289,22 +306,20 @@ class DataLogger:
 
     def _append_task_log(
         self,
-        datetime: str,
+        start_dt: str,
         task_id: str,
-        user_id: str,
         task_time_ms: int,
+        header: dict,
     ) -> None:
-        """将 {datetime, taskID, userId, taskTime} 追加写入 logs/task_log.json。"""
+        """将任务摘要（含完整 header）追加写入 logs/task_log.json。"""
         log_path = os.path.join(self._log_dir, "task_log.json")
 
         entry = {
-            "datetime":  datetime,
-            "taskID":    task_id,
-            "userID":    user_id,
-            "taskTime(s)":  round(task_time_ms / 1000, 1),
+            "timeStart":    start_dt,
+            "taskTime(s)": round(task_time_ms / 1000, 1),
+            **header,          # 展开 header：userID/robot/warehouse/WarehouseTask/Product 等
         }
 
-        # 读取现有记录（文件不存在则从空列表开始）
         records: list[dict] = []
         if os.path.exists(log_path):
             try:
@@ -322,24 +337,45 @@ class DataLogger:
             with open(log_path, "w", encoding="utf-8") as f:
                 json.dump(records, f, ensure_ascii=False, indent=2)
             logger.info(
-                "[LOGGER] ■ task_log updated: taskId=%s userId=%s taskTime=%.1fs",
-                task_id, user_id, task_time_ms / 1000,
+                "[LOGGER] ■ task_log updated: task=%s taskTime=%.1fs",
+                task_id, task_time_ms / 1000,
             )
         except OSError as exc:
             logger.error("[LOGGER] Failed to write task_log.json: %s", exc)
 
+        # ── 异步上传到远端服务器 ──────────────────────────────────────────
+        if self._upload_url:
+            threading.Thread(
+                target=self._upload_result,
+                args=(entry,),
+                daemon=True,
+            ).start()
+
+    def _upload_result(self, entry: dict) -> None:
+        """在独立线程中 POST 单条任务结果，不阻塞 MQTT 主循环。"""
+        try:
+            resp = requests.post(
+                self._upload_url,
+                json=entry,
+                timeout=10,
+                verify=False, # 服务器使用自签名证书，跳过验证
+            )
+            resp.raise_for_status()
+            logger.info(
+                "[LOGGER] ↑ Uploaded result to %s | status=%d",
+                self._upload_url, resp.status_code,
+            )
+        except requests.exceptions.RequestException as exc:
+            logger.error("[LOGGER] Failed to upload result: %s", exc)
+
     def _cleanup(self, user_id: str) -> None:
-        """取消订阅并移除会话（必须在 _lock 内调用）"""
+        """取消订阅并移除会话"""
         sess = self._sessions.pop(user_id, None)
         if sess is None:
             return
         self._client.unsubscribe(f"data/{user_id}")
         self._client.unsubscribe(f"control/{user_id}")
         logger.info("[LOGGER] Session cleaned up for user '%s'", user_id)
-
-    def _force_close(self, user_id: str) -> None:
-        """不保存，直接清理（必须在 _lock 内调用）"""
-        self._cleanup(user_id)
 
 
 # ===========================================================================
@@ -371,7 +407,7 @@ class DeviceManager:
         self._client = self._build_mqtt_client()
 
         # DataLogger 共享同一个 MQTT client
-        self.data_logger = DataLogger(self._client, config.log_dir)
+        self.data_logger = DataLogger(self._client, config.log_dir, config.result_upload_url)
 
     # ------------------------------------------------------------------
     # MQTT 初始化
@@ -596,6 +632,7 @@ def create_app(config: Config):
     app      = Flask(__name__)
     socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
     sid_mapping: dict = {}
+    task_cache: dict = {}
     manager  = DeviceManager(config, socketio, sid_mapping)
 
     # ---- HTTP 路由 --------------------------------------------------------
@@ -607,7 +644,8 @@ def create_app(config: Config):
             return jsonify({"status": "error", "message": "No JSON payload"}), 400
 
         target_id = data.get("userID")
-        task_id   = data.get("taskID")          # BTP 下发的任务 ID
+        # task_id   = data.get("task")
+        warehouse = data.get("warehouse")
         if not target_id:
             return jsonify({"status": "error", "message": "Missing 'userID'"}), 400
 
@@ -615,13 +653,16 @@ def create_app(config: Config):
         if not sid:
             return jsonify({"status": "failed", "message": f"User {target_id} not connected"}), 404
 
-        # 1. 转发给前端
+        # 1. 转发给前端，并缓存当前任务
         socketio.emit("btp_action", data, to=sid, namespace="/ws")
-        logger.info("[OFFER] Dispatched taskID='%s' to user '%s'", task_id, target_id)
+        logger.info("[OFFER] Dispatched '%s' tasks to user '%s'", warehouse, target_id)
 
-        # 2. 若携带 taskID，激活 DataLogger 会话
-        if task_id:
-            manager.data_logger.on_task_assigned(target_id, task_id)
+        task_cache[target_id] = [data]
+        logger.info("[CACHE] Updated cache with '%s' tasks for user '%s'",
+                    warehouse, target_id)
+
+        # 2. 确保 DataLogger 会话已建立（taskID 将由 record:on 消息提供）
+        manager.data_logger.on_user_online(target_id)
 
         return jsonify({"status": "dispatched", "msg": f"Sent to {target_id}"}), 200
 
@@ -633,7 +674,7 @@ def create_app(config: Config):
         )
 
     @app.route("/result", methods=["GET"])
-    def handle_result():
+    def handle_task_result():
         records = manager.data_logger.get_task_log()
         return Response(
             json.dumps(records, ensure_ascii=False, indent=2),
@@ -672,6 +713,17 @@ def create_app(config: Config):
         emit("sync_time_pong", {
             "client_t0":   data.get("client_t0"),
             "server_time": int(time.time() * 1000),
+        })
+
+    @socketio.on("task_cache", namespace="/ws")
+    def handle_get_cache(data):
+        user_id = data.get("userId")
+        if not user_id:
+            return
+
+        msg_cache = task_cache.get(user_id, [])
+        emit("get_cache", {
+            "cache": msg_cache
         })
 
     return app, socketio, sid_mapping, manager
