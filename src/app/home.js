@@ -268,8 +268,8 @@ export default function DynamicHome(props) {
 
   // Menu
   const [showMenu, setShowMenu] = React.useState(true);
-  const [hmdControl, setHmdControl] = React.useState(false);
-  const [showVideo, setShowVideo] = React.useState(false);
+  const [hmdControl, setHmdControl] = React.useState(false); // HMD control flag
+  const [showVideo, setShowVideo] = React.useState(false); // Show video feed flag
   const [VR_Control_Mode, setControlMode] = React.useState('inSpace'); // 'inSpace' or 'inBody', not used currently
   const [indicator, setIndicator] = React.useState('false');
   const [shareControl, setShareControl] = React.useState(false);
@@ -500,7 +500,7 @@ export default function DynamicHome(props) {
   const [cameraYaw, setCameraYaw] = React.useState(0); // Camera Yaw Angle in Radians
   React.useEffect(() => {
     if (showVideo)
-      setCameraYaw(42.5 * Math.PI / 180);
+      setCameraYaw(47.0 * Math.PI / 180);
     else
       setCameraYaw(0);
   }, [showVideo]);
@@ -833,6 +833,53 @@ export default function DynamicHome(props) {
   const thetaToolRightRef = React.useRef(theta_tool);
   const thetaToolLeftRef = React.useRef(theta_tool_left);
 
+  // React.useEffect(() => {
+  //   if (thumb_index_inter_right > 0.95) {
+  //     setScanData(scanDataRaw);
+  //   }
+  // }, [thumb_index_inter_right]);
+
+  // 在你的主程序/父组件内：
+  // 1. 在组件顶部（useEffect 外部）或 useRef 中声明一个开关锁，记录上一次是否已经发送过 ON
+  const hasFiredOnRef = React.useRef(false);
+
+  React.useEffect(() => {
+    // 容错处理：确保 robotID 存在时才执行逻辑
+    if (!robotID) return;
+    const targetTopic = `scan/user/${robotID}`; 
+
+    // 条件 A：手指极度贴合（> 0.98），且【之前没有发送过 ON】
+    if (thumb_index_inter_right > 0.95) {
+      if (!hasFiredOnRef.current) {
+        const payload = JSON.stringify({
+          action: "on",
+          time: Date.now()
+        });
+
+        console.log("🚀 [MQTT] 发送抓取/扫码开启信号 (仅此一次):", payload);
+        publishMQTT(targetTopic, payload, 1);
+        
+        hasFiredOnRef.current = true; // 🌟 锁住！防止重复发送
+      }
+    } 
+    
+    // 条件 B：手指松开（比如小于 0.60），且【当前处于 ON 的状态】
+    else if (thumb_index_inter_right < 0.75) {
+      if (hasFiredOnRef.current) {
+        const payload = JSON.stringify({
+          action: "off",
+          time: Date.now()
+        });
+
+        console.log("🛑 [MQTT] 发送释放/扫码关闭信号:", payload);
+        publishMQTT(targetTopic, payload, 1);
+        
+        hasFiredOnRef.current = false; // 🌟 解锁！允许下一次捏合时再次触发 ON
+      }
+    }
+
+  }, [thumb_index_inter_right, robotID]);
+
   const pinchThreshold = 0.78; 
   const releaseThreshold = 0.75; 
 
@@ -846,6 +893,13 @@ export default function DynamicHome(props) {
     if (handGestureModeRight === 'free') {
         const isIndexPinching = thumb_index_right > pinchThreshold;
         const isMiddlePinching = thumb_middle_right > pinchThreshold;
+        const isScan = thumb_index_inter_right > 0.6;
+
+        if (isScan && thumb_index_inter_right > thumb_index_right) {
+            setHandGestureModeRight('scan');
+        } else {
+            setHandGestureModeRight('free');
+        }
 
         // if (isIndexPinching && thumb_index_right > thumb_middle_right) {
         //     setHandGestureModeRight('thumb-index');
@@ -868,6 +922,12 @@ export default function DynamicHome(props) {
             newIndexRight = [index_meta_right * 75, index_meta_right * 75];
             newMiddleRight = [thumb_middle_right * 75, thumb_middle_right * 35];
             if (thumb_middle_right < releaseThreshold) setHandGestureModeRight('free');
+            break;
+        case 'scan':
+            newThumbRight = [0, -thumb_index_inter_right * 85, -thumb_index_inter_right * 85];
+            newIndexRight = [index_meta_right * 85, index_meta_right * 85];
+            newMiddleRight = [middle_meta_right * 85, middle_meta_right * 85];
+            if (thumb_index_inter_right < 0.55) setHandGestureModeRight('free');
             break;
         default: // 'free'
             // newThumbRight = [0, -thumb_index_inter_right * 30, -thumb_index_inter_right * 40];
@@ -921,6 +981,7 @@ export default function DynamicHome(props) {
       //         setHandGestureModeLeft('free');
       //     }
       // }
+      
 
       switch (handGestureModeLeft) {
           case 'thumb-index':
@@ -1057,7 +1118,7 @@ export default function DynamicHome(props) {
   ]);
 
   
-  /*------------------------ Get message from BTP Action by WebSocket/MQTT ---------------------------*/
+  /*------------------------ Get message from BTP Action by WebSocket ---------------------------*/
   const [btpActionMsg, setBTPActionMsg] = React.useState({});
   const socketRef = React.useRef(null);
 
