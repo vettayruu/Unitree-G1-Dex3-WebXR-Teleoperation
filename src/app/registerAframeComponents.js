@@ -1,5 +1,3 @@
-import { t } from "numeric";
-
 let registered = false;
 export default function registerAframeComponents(options) {
   if (registered) return;
@@ -190,58 +188,10 @@ export default function registerAframeComponents(options) {
         this.hmdProxy.quaternion.set(pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
         // this.hmdProxy.updateMatrixWorld();
 
-        // 同步到你的逻辑中
         set_controller_object_cam(this.hmdProxy);
         // console.log('HMD Position:', this.hmdProxy.position);
         // console.log('HMD Rotation:', this.hmdProxy.quaternion);
       }
-    }
-  });
-
-
-  AFRAME.registerComponent('jtext', {
-    schema: {
-      text: { type: 'string', default: '' },
-      width: { type: 'number', default: 1 },
-      height: { type: 'number', default: 0.12 },
-      color: { type: 'string', default: 'black' },
-      background: { type: 'string', default: 'white' },
-      border: { type: 'string', default: 'black' }
-    },
-    init: function () {
-      const el = this.el;
-      const data = this.data;
-      const bg = document.createElement('a-plane');
-      bg.setAttribute('width', data.width);
-      bg.setAttribute('height', data.height);
-      bg.setAttribute('color', data.background);
-      bg.setAttribute('position', '0 0 0.01');
-      bg.setAttribute('opacity', '0.8');
-      const text = document.createElement('a-entity');
-      text.setAttribute('troika-text', {
-        value: data.text,
-        align: 'center',
-        color: data.color,
-        fontSize: 0.05,
-        maxWidth: data.width * 0.9,
-        font: "BIZUDPGothic-Bold.ttf",
-      });
-      text.setAttribute('position', '0 0 0.01');
-      this.text = text;
-      el.appendChild(bg);
-      el.appendChild(text);
-    },
-    update: function (oldData) {
-      const data = this.data;
-      this.text.setAttribute('troika-text', {
-        value: data.text,
-        align: 'center',
-        color: data.color,
-        fontSize: 0.05,
-        maxWidth: data.width * 0.95,
-        font: "BIZUDPGothic-Bold.ttf",
-      });
-      this.text.setAttribute('position', '0 0 0.01');
     }
   });
 
@@ -404,32 +354,6 @@ export default function registerAframeComponents(options) {
       const box = new THREE.Box3().setFromObject(mesh).expandByVector(padding);
 
       this.helper.box.copy(box);
-    }
-  });
-  
-
-  AFRAME.registerComponent('follow-camera', {
-    schema: {
-      offset: { type: 'vec3', default: { x: 0, y: 0, z: -1 } } // Offset relative to the camera
-    },
-    tick: function () {
-      const cameraEl = this.el.sceneEl.camera.el; // Get the camera entity
-      if (!cameraEl) return;
-
-      // Get the camera's world position and rotation
-      const cameraWorldPosition = new THREE.Vector3();
-      const cameraWorldRotation = new THREE.Euler();
-      cameraEl.object3D.getWorldPosition(cameraWorldPosition);
-      cameraEl.object3D.getWorldRotation(cameraWorldRotation);
-
-      // Apply the offset relative to the camera's position
-      const offset = new THREE.Vector3(this.data.offset.x, this.data.offset.y, this.data.offset.z);
-      offset.applyEuler(cameraWorldRotation); // Rotate the offset based on the camera's rotation
-      const newPosition = cameraWorldPosition.add(offset);
-
-      // Update the position and rotation of the entity
-      this.el.object3D.position.copy(newPosition);
-      this.el.object3D.rotation.copy(cameraWorldRotation);
     }
   });
 
@@ -927,7 +851,7 @@ export default function registerAframeComponents(options) {
       // 普通按钮如果没有被激活，或者数据录制按钮悬停时，提供标志性的蓝色悬停反馈
       if (groupIdx === -1 || evt.target !== this.activeBtns[groupIdx]) {
         // 临时存储原有颜色，用于 Leave 时恢复（针对 React 按钮动态色极其有用）
-        evt.target.setAttribute('data-pre-hover-color', evt.target.getAttribute('material').color);
+        // evt.target.setAttribute('data-pre-hover-color', evt.target.getAttribute('material').color);
         evt.target.setAttribute('material', 'color', '#046de7');
       }
     },
@@ -1063,233 +987,548 @@ export default function registerAframeComponents(options) {
   // 15-19 ["ring-finger-metacarpal", "ring-finger-phalanx-proximal", "ring-finger-phalanx-intermediate", "ring-finger-phalanx-distal", "ring-finger-tip"],
   // 20-24 ["pinky-finger-metacarpal", "pinky-finger-phalanx-proximal", "pinky-finger-phalanx-intermediate", "pinky-finger-phalanx-distal", "pinky-finger-tip"]
   AFRAME.registerComponent('vr-hand-as-controller', {
-  schema: {
-    hand: { type: 'string', default: 'right' },
-  },
+    schema: {
+      hand: { type: 'string', default: 'right' },
+    },
 
-  init: function () {
-    this.jointObjects = {
-      wrist: new THREE.Object3D(),
-      thumbTip: new THREE.Object3D(),
-      indexTip: new THREE.Object3D(),
-      indexInter: new THREE.Object3D(),
-      indexMeta: new THREE.Object3D(),
-      middleTip: new THREE.Object3D(),
-      middleMeta: new THREE.Object3D(),
-      pinkyTip: new THREE.Object3D(),
-    };
+    init: function () {
+      this.jointObjects = {
+        wrist: new THREE.Object3D(),
+        thumbTip: new THREE.Object3D(),
+        indexTip: new THREE.Object3D(),
+        indexInter: new THREE.Object3D(),
+        indexMeta: new THREE.Object3D(),
+        middleTip: new THREE.Object3D(),
+        middleMeta: new THREE.Object3D(),
+        pinkyTip: new THREE.Object3D(),
+      };
 
-    // ✅ 添加菜单手势状态管理
-    this.menuGestureState = {
-      isGestureActive: false,       // 当前手势是否激活
-      gestureStartTime: 0,          // 手势开始时间
-      lastToggleTime: 0,            // 上次切换菜单的时间
-      HOLD_DURATION: 600,           // 需要保持手势的时间（毫秒）
-      COOLDOWN_DURATION: 1000,      // 冷却时间，防止误触发
-    };
-  },
+      // ✅ 添加菜单手势状态管理
+      this.menuGestureState = {
+        isGestureActive: false,       // 当前手势是否激活
+        gestureStartTime: 0,          // 手势开始时间
+        lastToggleTime: 0,            // 上次切换菜单的时间
+        HOLD_DURATION: 600,           // 需要保持手势的时间（毫秒）
+        COOLDOWN_DURATION: 1000,      // 冷却时间，防止误触发
+      };
+    },
 
-  getJointPose: function(jointName) {
-    return this.jointObjects[jointName];
-  },
-  
-  tick: function () {
-    const sceneEl = this.el.sceneEl;
-    const frame = sceneEl.frame;
-    const renderer = sceneEl.renderer;
+    getJointPose: function(jointName) {
+      return this.jointObjects[jointName];
+    },
+    
+    tick: function () {
+      const sceneEl = this.el.sceneEl;
+      const frame = sceneEl.frame;
+      const renderer = sceneEl.renderer;
 
-    if (!frame || !renderer.xr.enabled) return;
+      if (!frame || !renderer.xr.enabled) return;
 
-    const session = renderer.xr.getSession();
-    if (!session) return;
+      const session = renderer.xr.getSession();
+      if (!session) return;
 
-    const inputSource = Array.from(session.inputSources).find(
-      s => s.hand && s.handedness === this.data.hand
-    );
+      const inputSource = Array.from(session.inputSources).find(
+        s => s.hand && s.handedness === this.data.hand
+      );
 
-    if (inputSource) {
-      const refSpace = renderer.xr.getReferenceSpace();
-      const hand = inputSource.hand;
+      if (inputSource) {
+        const refSpace = renderer.xr.getReferenceSpace();
+        const hand = inputSource.hand;
 
-      // Get poses for hand joints
-      const wristPose = frame.getJointPose(hand.get('wrist'), refSpace);
-      const thumbTipPose = frame.getJointPose(hand.get('thumb-tip'), refSpace);
-      const indexTipPose = frame.getJointPose(hand.get('index-finger-tip'), refSpace);
-      const indexMetaPose = frame.getJointPose(hand.get('index-finger-metacarpal'), refSpace);
-      const indexInterPose = frame.getJointPose(hand.get('index-finger-phalanx-intermediate'), refSpace);
-      const middleTipPose = frame.getJointPose(hand.get('middle-finger-tip'), refSpace);
-      const middleMetaPose = frame.getJointPose(hand.get('middle-finger-metacarpal'), refSpace);
-      const pinkyTipPose = frame.getJointPose(hand.get('pinky-finger-tip'), refSpace);
+        // Get poses for hand joints
+        const wristPose = frame.getJointPose(hand.get('wrist'), refSpace);
+        const thumbTipPose = frame.getJointPose(hand.get('thumb-tip'), refSpace);
+        const indexTipPose = frame.getJointPose(hand.get('index-finger-tip'), refSpace);
+        const indexMetaPose = frame.getJointPose(hand.get('index-finger-metacarpal'), refSpace);
+        const indexInterPose = frame.getJointPose(hand.get('index-finger-phalanx-intermediate'), refSpace);
+        const middleTipPose = frame.getJointPose(hand.get('middle-finger-tip'), refSpace);
+        const middleMetaPose = frame.getJointPose(hand.get('middle-finger-metacarpal'), refSpace);
+        const pinkyTipPose = frame.getJointPose(hand.get('pinky-finger-tip'), refSpace);
 
-      if (!wristPose || !thumbTipPose || !indexTipPose || !indexMetaPose || !middleTipPose || !middleMetaPose || !pinkyTipPose) {
-        return; 
-      }
+        if (!wristPose || !thumbTipPose || !indexTipPose || !indexMetaPose || !middleTipPose || !middleMetaPose || !pinkyTipPose) {
+          return; 
+        }
 
-      // Update joint positions and orientations
-      const { position: pWrist, orientation: qWrist } = wristPose.transform;
-      this.jointObjects.wrist.position.set(pWrist.x, pWrist.y, pWrist.z);
-      this.jointObjects.wrist.quaternion.set(qWrist.x, qWrist.y, qWrist.z, qWrist.w);
+        // Update joint positions and orientations
+        const { position: pWrist, orientation: qWrist } = wristPose.transform;
+        this.jointObjects.wrist.position.set(pWrist.x, pWrist.y, pWrist.z);
+        this.jointObjects.wrist.quaternion.set(qWrist.x, qWrist.y, qWrist.z, qWrist.w);
 
-      const { position: pThumb, orientation: qThumb } = thumbTipPose.transform;
-      this.jointObjects.thumbTip.position.set(pThumb.x, pThumb.y, pThumb.z);
-      this.jointObjects.thumbTip.quaternion.set(qThumb.x, qThumb.y, qThumb.z, qThumb.w);
+        const { position: pThumb, orientation: qThumb } = thumbTipPose.transform;
+        this.jointObjects.thumbTip.position.set(pThumb.x, pThumb.y, pThumb.z);
+        this.jointObjects.thumbTip.quaternion.set(qThumb.x, qThumb.y, qThumb.z, qThumb.w);
 
-      const { position: pIndexTip, orientation: qIndexTip } = indexTipPose.transform;
-      this.jointObjects.indexTip.position.set(pIndexTip.x, pIndexTip.y, pIndexTip.z);
-      this.jointObjects.indexTip.quaternion.set(qIndexTip.x, qIndexTip.y, qIndexTip.z, qIndexTip.w);
+        const { position: pIndexTip, orientation: qIndexTip } = indexTipPose.transform;
+        this.jointObjects.indexTip.position.set(pIndexTip.x, pIndexTip.y, pIndexTip.z);
+        this.jointObjects.indexTip.quaternion.set(qIndexTip.x, qIndexTip.y, qIndexTip.z, qIndexTip.w);
 
-      const { position: pIndexMeta, orientation: qIndexMeta } = indexMetaPose.transform;
-      this.jointObjects.indexMeta.position.set(pIndexMeta.x, pIndexMeta.y, pIndexMeta.z);
-      this.jointObjects.indexMeta.quaternion.set(qIndexMeta.x, qIndexMeta.y, qIndexMeta.z, qIndexMeta.w);
+        const { position: pIndexMeta, orientation: qIndexMeta } = indexMetaPose.transform;
+        this.jointObjects.indexMeta.position.set(pIndexMeta.x, pIndexMeta.y, pIndexMeta.z);
+        this.jointObjects.indexMeta.quaternion.set(qIndexMeta.x, qIndexMeta.y, qIndexMeta.z, qIndexMeta.w);
 
-      const { position: pIndexInter, orientation: qIndexInter } = indexInterPose.transform;
-      this.jointObjects.indexInter.position.set(pIndexInter.x, pIndexInter.y, pIndexInter.z);
-      this.jointObjects.indexInter.quaternion.set(qIndexInter.x, qIndexInter.y, qIndexInter.z, qIndexInter.w);
+        const { position: pIndexInter, orientation: qIndexInter } = indexInterPose.transform;
+        this.jointObjects.indexInter.position.set(pIndexInter.x, pIndexInter.y, pIndexInter.z);
+        this.jointObjects.indexInter.quaternion.set(qIndexInter.x, qIndexInter.y, qIndexInter.z, qIndexInter.w);
 
-      const { position: pMiddleTip, orientation: qMiddleTip } = middleTipPose.transform;
-      this.jointObjects.middleTip.position.set(pMiddleTip.x, pMiddleTip.y, pMiddleTip.z);
-      this.jointObjects.middleTip.quaternion.set(qMiddleTip.x, qMiddleTip.y, qMiddleTip.z, qMiddleTip.w);
+        const { position: pMiddleTip, orientation: qMiddleTip } = middleTipPose.transform;
+        this.jointObjects.middleTip.position.set(pMiddleTip.x, pMiddleTip.y, pMiddleTip.z);
+        this.jointObjects.middleTip.quaternion.set(qMiddleTip.x, qMiddleTip.y, qMiddleTip.z, qMiddleTip.w);
 
-      const { position: pMiddleMeta, orientation: qMiddleMeta } = middleMetaPose.transform;
-      this.jointObjects.middleMeta.position.set(pMiddleMeta.x, pMiddleMeta.y, pMiddleMeta.z);
-      this.jointObjects.middleMeta.quaternion.set(qMiddleMeta.x, qMiddleMeta.y, qMiddleMeta.z, qMiddleMeta.w);
+        const { position: pMiddleMeta, orientation: qMiddleMeta } = middleMetaPose.transform;
+        this.jointObjects.middleMeta.position.set(pMiddleMeta.x, pMiddleMeta.y, pMiddleMeta.z);
+        this.jointObjects.middleMeta.quaternion.set(qMiddleMeta.x, qMiddleMeta.y, qMiddleMeta.z, qMiddleMeta.w);
 
-      const { position: pPinkyTip, orientation: qPinkyTip } = pinkyTipPose.transform;
-      this.jointObjects.pinkyTip.position.set(pPinkyTip.x, pPinkyTip.y, pPinkyTip.z);
-      this.jointObjects.pinkyTip.quaternion.set(qPinkyTip.x, qPinkyTip.y, qPinkyTip.z, qPinkyTip.w);
+        const { position: pPinkyTip, orientation: qPinkyTip } = pinkyTipPose.transform;
+        this.jointObjects.pinkyTip.position.set(pPinkyTip.x, pPinkyTip.y, pPinkyTip.z);
+        this.jointObjects.pinkyTip.quaternion.set(qPinkyTip.x, qPinkyTip.y, qPinkyTip.z, qPinkyTip.w);
 
-      // Retargeting
-      const dThumbIndex = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.indexTip.position);
-      const dIndexTipMeta = this.jointObjects.indexTip.position.distanceTo(this.jointObjects.indexMeta.position);
+        // Retargeting
+        const dThumbIndex = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.indexTip.position);
+        const dIndexTipMeta = this.jointObjects.indexTip.position.distanceTo(this.jointObjects.indexMeta.position);
 
-      const dThumbMiddle = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.middleTip.position);
-      const dMiddleTipMeta = this.jointObjects.middleTip.position.distanceTo(this.jointObjects.middleMeta.position);
+        const dThumbMiddle = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.middleTip.position);
+        const dMiddleTipMeta = this.jointObjects.middleTip.position.distanceTo(this.jointObjects.middleMeta.position);
 
-      const dThumbIndexInter = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.indexInter.position);
-      
-      let thumbIndexTipRatio = 0;
-      let thumbMiddleRatio = 0;
-      let indexMetaRatio = 0;
-      let middleMetaRatio = 0;
-      let thumbIndexInterRatio = 0;
+        const dThumbIndexInter = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.indexInter.position);
+        
+        let thumbIndexTipRatio = 0;
+        let thumbMiddleRatio = 0;
+        let indexMetaRatio = 0;
+        let middleMetaRatio = 0;
+        let thumbIndexInterRatio = 0;
 
-      if (dThumbIndex < 0.018) {
-        thumbIndexTipRatio = 1;
-      } else if (dThumbIndex > 0.09) {
-        thumbIndexTipRatio = 0;
-      } else {
-        thumbIndexTipRatio = 1 - (dThumbIndex - 0.018) / (0.09 - 0.018);
-      }
-
-      if (dIndexTipMeta < 0.07) {
-        indexMetaRatio = 1;
-      } else if (dIndexTipMeta > 0.14) {
-        indexMetaRatio = 0;
-      } else {
-        indexMetaRatio = 1 - (dIndexTipMeta - 0.07) / (0.14 - 0.07);
-      }
-
-      if (dThumbMiddle < 0.02) {
-        thumbMiddleRatio = 1;
-      } else if (dThumbMiddle > 0.095) {
-        thumbMiddleRatio = 0;
-      } else {
-        thumbMiddleRatio = 1 - (dThumbMiddle - 0.02) / (0.095 - 0.02);
-      }
-      
-      if (dMiddleTipMeta < 0.07) {
-        middleMetaRatio = 1;
-      } else if (dMiddleTipMeta > 0.15) {
-        middleMetaRatio = 0;
-      } else {
-        middleMetaRatio = 1 - (dMiddleTipMeta - 0.07) / (0.15 - 0.07);
-      }
-
-      if (dThumbIndexInter < 0.025) {
-        thumbIndexInterRatio = 1;
-      } else if (dThumbIndexInter > 0.10) {
-        thumbIndexInterRatio = 0;
-      } else {
-        thumbIndexInterRatio = 1 - (dThumbIndexInter - 0.025) / (0.10 - 0.025);
-      }
-
-      // Hand Trigger
-      const angleIndex = this.jointObjects.indexTip.quaternion.angleTo(this.jointObjects.indexMeta.quaternion);
-      const angleMiddle = this.jointObjects.middleTip.quaternion.angleTo(this.jointObjects.middleMeta.quaternion);
-
-      const isIndexOpen = angleIndex < 0.5;
-      const isMiddleOpen = angleMiddle < 0.5;
-
-      const isTriggered = !(isIndexOpen && isMiddleOpen);
-
-      // ✅ 优化后的菜单手势检测（拇指-小指触碰）
-      const dThumbPinky = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.pinkyTip.position);
-      const currentTime = performance.now();
-      const state = this.menuGestureState;
-
-      // 检测手势是否满足触发条件
-      const isGestureDetected = dThumbPinky < 0.028; // 触发距离,m
-
-      if (isGestureDetected) {
-        if (!state.isGestureActive) {
-          // 手势刚开始
-          state.isGestureActive = true;
-          state.gestureStartTime = currentTime;
-          console.log('👆 拇指-小指手势开始');
+        if (dThumbIndex < 0.018) {
+          thumbIndexTipRatio = 1;
+        } else if (dThumbIndex > 0.09) {
+          thumbIndexTipRatio = 0;
         } else {
-          // 手势持续中，检查是否达到触发时长
-          const holdDuration = currentTime - state.gestureStartTime;
-          const timeSinceLastToggle = currentTime - state.lastToggleTime;
-          
-          if (holdDuration >= state.HOLD_DURATION && 
-              timeSinceLastToggle >= state.COOLDOWN_DURATION &&
-              !state.hasTriggered) { // 防止长按期间重复触发
-            
-            // ✅ 自动切换菜单状态
-            setShowMenu((prev) => {
-              console.log(`🎯 菜单自动切换: ${prev ? 'OFF' : 'ON'} (按住 ${holdDuration.toFixed(0)}ms)`);
-              return !prev;
-            });
-            
-            state.lastToggleTime = currentTime;
-            state.hasTriggered = true; // 标记已触发
-          }
+          thumbIndexTipRatio = 1 - (dThumbIndex - 0.018) / (0.09 - 0.018);
         }
-      } else {
-        // 手势结束
-        if (state.isGestureActive) {
-          const holdDuration = currentTime - state.gestureStartTime;
-          
-          if (!state.hasTriggered) {
-            console.log(`❌ 手势时间不足: ${holdDuration.toFixed(0)}ms (需要 ${state.HOLD_DURATION}ms)`);
-          }
-          
-          state.isGestureActive = false;
-          state.hasTriggered = false; // 重置触发标记
-        }
-      }
 
-      // Update
-      if (this.data.hand === 'right') {
-        set_trigger_on(isTriggered);
-        set_controller_object(this.jointObjects.wrist);
-        setThumbIndexRight(Math.max(0, Math.min(1, thumbIndexTipRatio)));
-        setThumbMiddleRight(Math.max(0, Math.min(1, thumbMiddleRatio)));
-        setIndexMetaRight(Math.max(0, Math.min(1, indexMetaRatio)));
-        setMiddleMetaRight(Math.max(0, Math.min(1, middleMetaRatio)));
-        setThumbIndexInterRight(Math.max(0, Math.min(1, thumbIndexInterRatio)));
-      } else {
-        set_trigger_on_left(isTriggered);
-        set_controller_object_left(this.jointObjects.wrist);
-        setThumbIndexLeft(Math.max(0, Math.min(1, thumbIndexTipRatio)));
-        setThumbMiddleLeft(Math.max(0, Math.min(1, thumbMiddleRatio)));
-        setIndexMetaLeft(Math.max(0, Math.min(1, indexMetaRatio)));
-        setMiddleMetaLeft(Math.max(0, Math.min(1, middleMetaRatio)));
-        setThumbIndexInterLeft(Math.max(0, Math.min(1, thumbIndexInterRatio)));
+        if (dIndexTipMeta < 0.07) {
+          indexMetaRatio = 1;
+        } else if (dIndexTipMeta > 0.14) {
+          indexMetaRatio = 0;
+        } else {
+          indexMetaRatio = 1 - (dIndexTipMeta - 0.07) / (0.14 - 0.07);
+        }
+
+        if (dThumbMiddle < 0.02) {
+          thumbMiddleRatio = 1;
+        } else if (dThumbMiddle > 0.095) {
+          thumbMiddleRatio = 0;
+        } else {
+          thumbMiddleRatio = 1 - (dThumbMiddle - 0.02) / (0.095 - 0.02);
+        }
+        
+        if (dMiddleTipMeta < 0.07) {
+          middleMetaRatio = 1;
+        } else if (dMiddleTipMeta > 0.15) {
+          middleMetaRatio = 0;
+        } else {
+          middleMetaRatio = 1 - (dMiddleTipMeta - 0.07) / (0.15 - 0.07);
+        }
+
+        // if (dThumbIndexInter < 0.025) {
+        //   thumbIndexInterRatio = 1;
+        // } else if (dThumbIndexInter > 0.10) {
+        //   thumbIndexInterRatio = 0;
+        // } else {
+        //   thumbIndexInterRatio = 1 - (dThumbIndexInter - 0.025) / (0.10 - 0.025);
+        // }
+
+        if (dThumbIndexInter < 0.010) {
+          thumbIndexInterRatio = 1;
+        } else if (dThumbIndexInter > 0.10) {
+          thumbIndexInterRatio = 0;
+        } else {
+          thumbIndexInterRatio = 1 - (dThumbIndexInter - 0.010) / (0.10 - 0.010);
+        }
+
+        // Hand Trigger
+        const angleIndex = this.jointObjects.indexTip.quaternion.angleTo(this.jointObjects.indexMeta.quaternion);
+        const angleMiddle = this.jointObjects.middleTip.quaternion.angleTo(this.jointObjects.middleMeta.quaternion);
+
+        const isIndexOpen = angleIndex < 0.5;
+        const isMiddleOpen = angleMiddle < 0.5;
+
+        const isTriggered = !(isIndexOpen && isMiddleOpen);
+
+        // ✅ 优化后的菜单手势检测（拇指-小指触碰）
+        const dThumbPinky = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.pinkyTip.position);
+        const currentTime = performance.now();
+        const state = this.menuGestureState;
+
+        // 检测手势是否满足触发条件
+        const isGestureDetected = dThumbPinky < 0.028; // 触发距离,m
+
+        if (isGestureDetected) {
+          if (!state.isGestureActive) {
+            // 手势刚开始
+            state.isGestureActive = true;
+            state.gestureStartTime = currentTime;
+            console.log('👆 拇指-小指手势开始');
+          } else {
+            // 手势持续中，检查是否达到触发时长
+            const holdDuration = currentTime - state.gestureStartTime;
+            const timeSinceLastToggle = currentTime - state.lastToggleTime;
+            
+            if (holdDuration >= state.HOLD_DURATION && 
+                timeSinceLastToggle >= state.COOLDOWN_DURATION &&
+                !state.hasTriggered) { // 防止长按期间重复触发
+              
+              // ✅ 自动切换菜单状态
+              setShowMenu((prev) => {
+                console.log(`🎯 菜单自动切换: ${prev ? 'OFF' : 'ON'} (按住 ${holdDuration.toFixed(0)}ms)`);
+                return !prev;
+              });
+              
+              state.lastToggleTime = currentTime;
+              state.hasTriggered = true; // 标记已触发
+            }
+          }
+        } else {
+          // 手势结束
+          if (state.isGestureActive) {
+            const holdDuration = currentTime - state.gestureStartTime;
+            
+            if (!state.hasTriggered) {
+              console.log(`❌ 手势时间不足: ${holdDuration.toFixed(0)}ms (需要 ${state.HOLD_DURATION}ms)`);
+            }
+            
+            state.isGestureActive = false;
+            state.hasTriggered = false; // 重置触发标记
+          }
+        }
+
+        // Update
+        if (this.data.hand === 'right') {
+          set_trigger_on(isTriggered);
+          set_controller_object(this.jointObjects.wrist);
+          setThumbIndexRight(Math.max(0, Math.min(1, thumbIndexTipRatio)));
+          setThumbMiddleRight(Math.max(0, Math.min(1, thumbMiddleRatio)));
+          setIndexMetaRight(Math.max(0, Math.min(1, indexMetaRatio)));
+          setMiddleMetaRight(Math.max(0, Math.min(1, middleMetaRatio)));
+          setThumbIndexInterRight(Math.max(0, Math.min(1, thumbIndexInterRatio)));
+        } else {
+          set_trigger_on_left(isTriggered);
+          set_controller_object_left(this.jointObjects.wrist);
+          setThumbIndexLeft(Math.max(0, Math.min(1, thumbIndexTipRatio)));
+          setThumbMiddleLeft(Math.max(0, Math.min(1, thumbMiddleRatio)));
+          setIndexMetaLeft(Math.max(0, Math.min(1, indexMetaRatio)));
+          setMiddleMetaLeft(Math.max(0, Math.min(1, middleMetaRatio)));
+          setThumbIndexInterLeft(Math.max(0, Math.min(1, thumbIndexInterRatio)));
+        }
       }
-    }
-  },
-});
+    },
+  });
+
+  // Hand Tracking with Laser Pointer. Not stable yet, so commented out for now.
+  // AFRAME.registerComponent('vr-hand-as-controller', {
+  //   schema: {
+  //     hand: { type: 'string', default: 'right' },
+  //   },
+
+  //   remove: function () {
+  //     if (this.laserLine) {
+  //       this.el.sceneEl.object3D.remove(this.laserLine);
+  //     }
+  //   },
+
+  //   getJointPose: function(jointName) {
+  //     return this.jointObjects[jointName];
+  //   },
+
+  //   init: function () {
+  //     this.jointObjects = {
+  //       wrist: new THREE.Object3D(),
+  //       thumbTip: new THREE.Object3D(),
+  //       indexTip: new THREE.Object3D(),
+  //       indexInter: new THREE.Object3D(),
+  //       indexMeta: new THREE.Object3D(),
+  //       middleTip: new THREE.Object3D(),
+  //       middleMeta: new THREE.Object3D(),
+  //       pinkyTip: new THREE.Object3D(),
+  //     };
+
+  //     // ✅ 添加菜单手势状态管理
+  //     this.menuGestureState = {
+  //       isGestureActive: false,       // 当前手势是否激活
+  //       gestureStartTime: 0,          // 手势开始时间
+  //       lastToggleTime: 0,            // 上次切换菜单的时间
+  //       HOLD_DURATION: 600,           // 需要保持手势的时间（毫秒）
+  //       COOLDOWN_DURATION: 1000,      // 冷却时间，防止误触发
+  //     };
+
+  //     // ✅ 激光线可视化对象
+  //     const laserMaterial = new THREE.LineBasicMaterial({ color: '#4CC3D9' });
+  //     const laserGeometry = new THREE.BufferGeometry().setFromPoints([
+  //       new THREE.Vector3(0, 0, 0),
+  //       new THREE.Vector3(0, 0, -1)
+  //     ]);
+  //     this.laserLine = new THREE.Line(laserGeometry, laserMaterial);
+  //     this.laserLine.raycast = () => {};
+  //     this.laserLine.visible = false;
+  //     this.el.sceneEl.object3D.add(this.laserLine);
+
+  //     this.raycaster = new THREE.Raycaster();
+  //     this.wasPinching = false;
+  //     this.currentIntersection = null;
+
+  //     // ✅ 默认前向量，如果测试后发现激光方向不对（比如朝手背/手心而非指尖方向），
+  //     // 尝试改成 (0,1,0)、(0,0,1)、(0,-1,0) 等其他轴向
+  //     this.forwardVector = new THREE.Vector3(0, 0, -1);
+
+  //   },
+  
+  //   tick: function () {
+  //     const sceneEl = this.el.sceneEl;
+  //     const frame = sceneEl.frame;
+  //     const renderer = sceneEl.renderer;
+
+  //     if (!frame || !renderer.xr.enabled) return;
+
+  //     const session = renderer.xr.getSession();
+  //     if (!session) return;
+
+  //     const inputSource = Array.from(session.inputSources).find(
+  //       s => s.hand && s.handedness === this.data.hand
+  //     );
+
+  //     if (inputSource) {
+  //       const refSpace = renderer.xr.getReferenceSpace();
+  //       const hand = inputSource.hand;
+
+  //       // Get poses for hand joints
+  //       const wristPose = frame.getJointPose(hand.get('wrist'), refSpace);
+  //       const thumbTipPose = frame.getJointPose(hand.get('thumb-tip'), refSpace);
+  //       const indexTipPose = frame.getJointPose(hand.get('index-finger-tip'), refSpace);
+  //       const indexMetaPose = frame.getJointPose(hand.get('index-finger-metacarpal'), refSpace);
+  //       const indexInterPose = frame.getJointPose(hand.get('index-finger-phalanx-intermediate'), refSpace);
+  //       const middleTipPose = frame.getJointPose(hand.get('middle-finger-tip'), refSpace);
+  //       const middleMetaPose = frame.getJointPose(hand.get('middle-finger-metacarpal'), refSpace);
+  //       const pinkyTipPose = frame.getJointPose(hand.get('pinky-finger-tip'), refSpace);
+
+  //       if (!wristPose || !thumbTipPose || !indexTipPose || !indexMetaPose || !middleTipPose || !middleMetaPose || !pinkyTipPose) {
+  //         return; 
+  //       }
+
+  //       // Update joint positions and orientations
+  //       const { position: pWrist, orientation: qWrist } = wristPose.transform;
+  //       this.jointObjects.wrist.position.set(pWrist.x, pWrist.y, pWrist.z);
+  //       this.jointObjects.wrist.quaternion.set(qWrist.x, qWrist.y, qWrist.z, qWrist.w);
+
+  //       const { position: pThumb, orientation: qThumb } = thumbTipPose.transform;
+  //       this.jointObjects.thumbTip.position.set(pThumb.x, pThumb.y, pThumb.z);
+  //       this.jointObjects.thumbTip.quaternion.set(qThumb.x, qThumb.y, qThumb.z, qThumb.w);
+
+  //       const { position: pIndexTip, orientation: qIndexTip } = indexTipPose.transform;
+  //       this.jointObjects.indexTip.position.set(pIndexTip.x, pIndexTip.y, pIndexTip.z);
+  //       this.jointObjects.indexTip.quaternion.set(qIndexTip.x, qIndexTip.y, qIndexTip.z, qIndexTip.w);
+
+  //       const { position: pIndexMeta, orientation: qIndexMeta } = indexMetaPose.transform;
+  //       this.jointObjects.indexMeta.position.set(pIndexMeta.x, pIndexMeta.y, pIndexMeta.z);
+  //       this.jointObjects.indexMeta.quaternion.set(qIndexMeta.x, qIndexMeta.y, qIndexMeta.z, qIndexMeta.w);
+
+  //       const { position: pIndexInter, orientation: qIndexInter } = indexInterPose.transform;
+  //       this.jointObjects.indexInter.position.set(pIndexInter.x, pIndexInter.y, pIndexInter.z);
+  //       this.jointObjects.indexInter.quaternion.set(qIndexInter.x, qIndexInter.y, qIndexInter.z, qIndexInter.w);
+
+  //       const { position: pMiddleTip, orientation: qMiddleTip } = middleTipPose.transform;
+  //       this.jointObjects.middleTip.position.set(pMiddleTip.x, pMiddleTip.y, pMiddleTip.z);
+  //       this.jointObjects.middleTip.quaternion.set(qMiddleTip.x, qMiddleTip.y, qMiddleTip.z, qMiddleTip.w);
+
+  //       const { position: pMiddleMeta, orientation: qMiddleMeta } = middleMetaPose.transform;
+  //       this.jointObjects.middleMeta.position.set(pMiddleMeta.x, pMiddleMeta.y, pMiddleMeta.z);
+  //       this.jointObjects.middleMeta.quaternion.set(qMiddleMeta.x, qMiddleMeta.y, qMiddleMeta.z, qMiddleMeta.w);
+
+  //       const { position: pPinkyTip, orientation: qPinkyTip } = pinkyTipPose.transform;
+  //       this.jointObjects.pinkyTip.position.set(pPinkyTip.x, pPinkyTip.y, pPinkyTip.z);
+  //       this.jointObjects.pinkyTip.quaternion.set(qPinkyTip.x, qPinkyTip.y, qPinkyTip.z, qPinkyTip.w);
+
+  //       // Retargeting
+  //       const dThumbIndex = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.indexTip.position);
+  //       const dIndexTipMeta = this.jointObjects.indexTip.position.distanceTo(this.jointObjects.indexMeta.position);
+
+  //       const dThumbMiddle = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.middleTip.position);
+  //       const dMiddleTipMeta = this.jointObjects.middleTip.position.distanceTo(this.jointObjects.middleMeta.position);
+
+  //       const dThumbIndexInter = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.indexInter.position);
+        
+  //       let thumbIndexTipRatio = 0;
+  //       let thumbMiddleRatio = 0;
+  //       let indexMetaRatio = 0;
+  //       let middleMetaRatio = 0;
+  //       let thumbIndexInterRatio = 0;
+
+  //       if (dThumbIndex < 0.018) {
+  //         thumbIndexTipRatio = 1;
+  //       } else if (dThumbIndex > 0.09) {
+  //         thumbIndexTipRatio = 0;
+  //       } else {
+  //         thumbIndexTipRatio = 1 - (dThumbIndex - 0.018) / (0.09 - 0.018);
+  //       }
+
+  //       if (dIndexTipMeta < 0.07) {
+  //         indexMetaRatio = 1;
+  //       } else if (dIndexTipMeta > 0.14) {
+  //         indexMetaRatio = 0;
+  //       } else {
+  //         indexMetaRatio = 1 - (dIndexTipMeta - 0.07) / (0.14 - 0.07);
+  //       }
+
+  //       if (dThumbMiddle < 0.02) {
+  //         thumbMiddleRatio = 1;
+  //       } else if (dThumbMiddle > 0.095) {
+  //         thumbMiddleRatio = 0;
+  //       } else {
+  //         thumbMiddleRatio = 1 - (dThumbMiddle - 0.02) / (0.095 - 0.02);
+  //       }
+        
+  //       if (dMiddleTipMeta < 0.07) {
+  //         middleMetaRatio = 1;
+  //       } else if (dMiddleTipMeta > 0.15) {
+  //         middleMetaRatio = 0;
+  //       } else {
+  //         middleMetaRatio = 1 - (dMiddleTipMeta - 0.07) / (0.15 - 0.07);
+  //       }
+
+  //       // if (dThumbIndexInter < 0.025) {
+  //       //   thumbIndexInterRatio = 1;
+  //       // } else if (dThumbIndexInter > 0.10) {
+  //       //   thumbIndexInterRatio = 0;
+  //       // } else {
+  //       //   thumbIndexInterRatio = 1 - (dThumbIndexInter - 0.025) / (0.10 - 0.025);
+  //       // }
+
+  //       if (dThumbIndexInter < 0.010) {
+  //         thumbIndexInterRatio = 1;
+  //       } else if (dThumbIndexInter > 0.10) {
+  //         thumbIndexInterRatio = 0;
+  //       } else {
+  //         thumbIndexInterRatio = 1 - (dThumbIndexInter - 0.010) / (0.10 - 0.010);
+  //       }
+
+  //       // Hand Trigger
+  //       const angleIndex = this.jointObjects.indexTip.quaternion.angleTo(this.jointObjects.indexMeta.quaternion);
+  //       const angleMiddle = this.jointObjects.middleTip.quaternion.angleTo(this.jointObjects.middleMeta.quaternion);
+
+  //       const isIndexOpen = angleIndex < 0.5;
+  //       const isMiddleOpen = angleMiddle < 0.5;
+
+  //       const isTriggered = !(isIndexOpen && isMiddleOpen);
+
+  //       // ✅ 优化后的菜单手势检测（拇指-小指触碰）
+  //       const dThumbPinky = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.pinkyTip.position);
+  //       const currentTime = performance.now();
+  //       const state = this.menuGestureState;
+
+  //       // 检测手势是否满足触发条件
+  //       const isGestureDetected = dThumbPinky < 0.028; // 触发距离,m
+
+  //       if (isGestureDetected) {
+  //         if (!state.isGestureActive) {
+  //           // 手势刚开始
+  //           state.isGestureActive = true;
+  //           state.gestureStartTime = currentTime;
+  //           console.log('👆 拇指-小指手势开始');
+  //         } else {
+  //           // 手势持续中，检查是否达到触发时长
+  //           const holdDuration = currentTime - state.gestureStartTime;
+  //           const timeSinceLastToggle = currentTime - state.lastToggleTime;
+            
+  //           if (holdDuration >= state.HOLD_DURATION && 
+  //               timeSinceLastToggle >= state.COOLDOWN_DURATION &&
+  //               !state.hasTriggered) { // 防止长按期间重复触发
+              
+  //             // ✅ 自动切换菜单状态
+  //             setShowMenu((prev) => {
+  //               console.log(`🎯 菜单自动切换: ${prev ? 'OFF' : 'ON'} (按住 ${holdDuration.toFixed(0)}ms)`);
+  //               return !prev;
+  //             });
+              
+  //             state.lastToggleTime = currentTime;
+  //             state.hasTriggered = true; // 标记已触发
+  //           }
+  //         }
+  //       } else {
+  //         // 手势结束
+  //         if (state.isGestureActive) {
+  //           const holdDuration = currentTime - state.gestureStartTime;
+            
+  //           if (!state.hasTriggered) {
+  //             console.log(`❌ 手势时间不足: ${holdDuration.toFixed(0)}ms (需要 ${state.HOLD_DURATION}ms)`);
+  //           }
+            
+  //           state.isGestureActive = false;
+  //           state.hasTriggered = false; // 重置触发标记
+  //         }
+  //       }
+
+  //       // Update
+  //       if (this.data.hand === 'right') {
+  //         set_trigger_on(isTriggered);
+  //         set_controller_object(this.jointObjects.wrist);
+  //         setThumbIndexRight(Math.max(0, Math.min(1, thumbIndexTipRatio)));
+  //         setThumbMiddleRight(Math.max(0, Math.min(1, thumbMiddleRatio)));
+  //         setIndexMetaRight(Math.max(0, Math.min(1, indexMetaRatio)));
+  //         setMiddleMetaRight(Math.max(0, Math.min(1, middleMetaRatio)));
+  //         setThumbIndexInterRight(Math.max(0, Math.min(1, thumbIndexInterRatio)));
+  //       } else {
+  //         set_trigger_on_left(isTriggered);
+  //         set_controller_object_left(this.jointObjects.wrist);
+  //         setThumbIndexLeft(Math.max(0, Math.min(1, thumbIndexTipRatio)));
+  //         setThumbMiddleLeft(Math.max(0, Math.min(1, thumbMiddleRatio)));
+  //         setIndexMetaLeft(Math.max(0, Math.min(1, indexMetaRatio)));
+  //         setMiddleMetaLeft(Math.max(0, Math.min(1, middleMetaRatio)));
+  //         setThumbIndexInterLeft(Math.max(0, Math.min(1, thumbIndexInterRatio)));
+  //       }
+
+  //       // ✅ 用手腕朝向作为激光方向，不再用食指差分
+  //       const direction = this.forwardVector.clone()
+  //         .applyQuaternion(this.jointObjects.wrist.quaternion)
+  //         .normalize();
+
+  //       // const direction = new THREE.Vector3()
+  //       // .subVectors(this.jointObjects.wrist.position, this.jointObjects.indexMeta.position)
+  //       // .normalize();
+
+  //       // ✅ 关键修复：加上父级 offset 实体的世界位置偏移，让激光和可视化的手模型对齐
+  //       const parentOffset = new THREE.Vector3();
+  //       if (this.el.parentEl && this.el.parentEl.object3D) {
+  //         this.el.parentEl.object3D.getWorldPosition(parentOffset);
+  //       }
+
+  //       const origin = this.jointObjects.wrist.position.clone().add(parentOffset);
+
+  //       this.laserLine.visible = true;
+  //       this.raycaster.set(origin, direction);
+  //       this.raycaster.far = 10;
+
+  //       const targets = Array.from(document.querySelectorAll('.raycastable'))
+  //         .map(el => el.object3D)
+  //         .filter(Boolean);
+
+  //       const intersects = this.raycaster.intersectObjects(targets, true);
+  //       this.currentIntersection = intersects.length > 0 ? intersects[0] : null;
+
+  //       const endPoint = this.currentIntersection
+  //         ? this.currentIntersection.point
+  //         : origin.clone().add(direction.clone().multiplyScalar(2));
+
+  //       this.laserLine.geometry.setFromPoints([origin, endPoint]);
+  //       this.laserLine.geometry.attributes.position.needsUpdate = true;
+
+  //       // ✅ 点击触发（上升沿检测，避免重复触发）
+  //       const isPinching = dThumbIndex < 0.018;
+  //       if (isPinching && !this.wasPinching && this.currentIntersection) {
+  //         this.currentIntersection.object.el.dispatchEvent(new Event('click'));
+  //       }
+  //       this.wasPinching = isPinching;
+
+  //     }
+  //   },
+  // });
 
   AFRAME.registerComponent('finger-distance-visualizer', {
     schema: {
@@ -1368,6 +1607,7 @@ export default function registerAframeComponents(options) {
       this.line.visible = false;
       this.textEl.setAttribute('visible', false);
     }
+    
   });
 
   // 新增：显示关节角度的可视化组件
@@ -1428,4 +1668,162 @@ export default function registerAframeComponents(options) {
       this.textEl.setAttribute('visible', false);
     }
   });
+
+  /*------------------------------ UI ------------------------------*/
+  AFRAME.registerGeometry('rounded-rect', {
+    schema: {
+      width: {type: 'number', default: 1},
+      height: {type: 'number', default: 1},
+      radius: {type: 'number', default: 0.05}
+    },
+    init: function (data) {
+      const { width: w, height: h, radius: r } = data;
+      const shape = new THREE.Shape();
+      const x = -w / 2;
+      const y = -h / 2;
+
+      shape.moveTo(x, y + r);
+      shape.lineTo(x, y + h - r);
+      shape.quadraticCurveTo(x, y + h, x + r, y + h);
+      shape.lineTo(x + w - r, y + h);
+      shape.quadraticCurveTo(x + w, y + h, x + w, y + h - r);
+      shape.lineTo(x + w, y + r);
+      shape.quadraticCurveTo(x + w, y, x + w - r, y);
+      shape.lineTo(x + r, y);
+      shape.quadraticCurveTo(x, y, x, y + r);
+
+      this.geometry = new THREE.ShapeGeometry(shape);
+    }
+  });
+
+  AFRAME.registerComponent('rounded-rect-border', {
+    schema: {
+      width: {type: 'number', default: 1},
+      height: {type: 'number', default: 1},
+      radius: {type: 'number', default: 0.05},
+      color: {type: 'color', default: '#ffffff'},
+      opacity: {type: 'number', default: 1}
+    },
+    init: function () {
+      this.buildBorder();
+    },
+    update: function () {
+      this.buildBorder();
+    },
+    buildBorder: function () {
+      const data = this.data;
+      const w = data.width, h = data.height, r = Math.min(data.radius, w / 2, h / 2);
+      const x = -w / 2, y = -h / 2;
+
+      const shape = new THREE.Shape();
+      shape.moveTo(x, y + r);
+      shape.lineTo(x, y + h - r);
+      shape.quadraticCurveTo(x, y + h, x + r, y + h);
+      shape.lineTo(x + w - r, y + h);
+      shape.quadraticCurveTo(x + w, y + h, x + w, y + h - r);
+      shape.lineTo(x + w, y + r);
+      shape.quadraticCurveTo(x + w, y, x + w - r, y);
+      shape.lineTo(x + r, y);
+      shape.quadraticCurveTo(x, y, x, y + r);
+
+      const points = shape.getPoints(32); // 32段分辨率，圆角够平滑
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const material = new THREE.LineBasicMaterial({
+        color: data.color,
+        transparent: data.opacity < 1,
+        opacity: data.opacity
+      });
+
+      this.el.removeObject3D('border');
+      const line = new THREE.LineLoop(geometry, material);
+      line.position.z = 0.001; // 避免和底面 z-fighting
+      line.raycast = () => {};
+      this.el.setObject3D('border', line);
+    },
+    remove: function () {
+      this.el.removeObject3D('border');
+    }
+  });
+
+  AFRAME.registerComponent('hand-tracking-laser', {
+    schema: {
+      hand: {type: 'string', default: 'right'}
+    },
+    init: function () {
+      this.raycaster = null;
+      this.line = null;
+      this.pinchStarted = false;
+      this.currentIntersection = null;
+
+      // 创建激光线的可视化对象
+      const material = new THREE.LineBasicMaterial({ color: '#4CC3D9' });
+      const points = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)];
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      this.lineObj = new THREE.Line(geometry, material);
+      this.lineObj.raycast = () => {}; // 激光线本身不参与射线检测
+      this.el.sceneEl.object3D.add(this.lineObj);
+
+      // 监听捏合手势（WebXR Hand Input 标准事件）
+      this.el.addEventListener('pinchstarted', this.onPinchStarted.bind(this));
+      this.el.addEventListener('pinchended', this.onPinchEnded.bind(this));
+    },
+
+    onPinchStarted: function () {
+      this.pinchStarted = true;
+      if (this.currentIntersection) {
+        // 模拟触发标准 click 事件，让 onClick 监听器正常工作
+        this.currentIntersection.object.el.dispatchEvent(new Event('click'));
+      }
+    },
+
+    onPinchEnded: function () {
+      this.pinchStarted = false;
+    },
+
+    tick: function () {
+      const handEl = this.el;
+      const indexTip = handEl.components['hand-tracking-controls'] &&
+                        handEl.components['hand-tracking-controls'].bones &&
+                        handEl.components['hand-tracking-controls'].bones['index-finger-tip'];
+
+      if (!indexTip) return;
+
+      // 用食指指尖位置和指向作为激光起点和方向
+      const origin = new THREE.Vector3();
+      indexTip.getWorldPosition(origin);
+
+      const direction = new THREE.Vector3(0, 0, -1);
+      direction.applyQuaternion(indexTip.getWorldQuaternion(new THREE.Quaternion()));
+
+      if (!this.raycaster) {
+        this.raycaster = new THREE.Raycaster();
+      }
+      this.raycaster.set(origin, direction);
+      this.raycaster.far = 10;
+
+      // 只检测 .raycastable 元素
+      const targets = Array.from(document.querySelectorAll('.raycastable'))
+        .map(el => el.object3D)
+        .filter(Boolean);
+
+      const intersects = this.raycaster.intersectObjects(targets, true);
+      this.currentIntersection = intersects.length > 0 ? intersects[0] : null;
+
+      // 更新激光线的可视化长度
+      const points = [
+        origin,
+        this.currentIntersection
+          ? this.currentIntersection.point
+          : origin.clone().add(direction.multiplyScalar(2))
+      ];
+      this.lineObj.geometry.setFromPoints(points);
+    },
+
+    remove: function () {
+      if (this.lineObj) {
+        this.el.sceneEl.object3D.remove(this.lineObj);
+      }
+    }
+  });
+
 }

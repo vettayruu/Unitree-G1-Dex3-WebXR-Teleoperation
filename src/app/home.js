@@ -1,32 +1,3 @@
-"use client";
-
-(function() {
-    if (typeof window === 'undefined') return;
-
-    const NativeBinding = window.XRWebGLBinding;
-    if (!NativeBinding) return;
-
-    window.XRWebGLBinding = function(session, gl) {
-        if (!session || !(session instanceof XRSession)) {
-
-            return new Proxy({}, {
-                get: (target, prop) => {
-                    return () => { 
-                        console.debug(`WebXR call '${prop}' ignored.`); 
-                    };
-                }
-            });
-        }
-
-        try {
-            return new NativeBinding(session, gl);
-        } catch (e) {
-            console.error("Critical error in Native XRWebGLBinding:", e);
-            return {};
-        }
-    };
-})();
-
 import 'aframe'
 let THREE;
 if (typeof window !== 'undefined' && window.AFRAME) {
@@ -37,11 +8,11 @@ import * as React from 'react'
 import numeric, { t } from 'numeric';
 
 import { WebRTC_G1_VRCam, WebRTC_Video_Send, WebRTC_Video_Send_Data, WebRTC_Data_Recv } from '../lib/WebRTC_Sora';
-import RobotScene from './RobotScene';
+import RobotScene from './RobotScene_SAPNOW';
 import registerAframeComponents from './registerAframeComponents'; 
 import MQTT_Setup from './MQTT_Setup';
 import { mqttclient, idtopic, version, publishMQTT, subscribeMQTT, codeType, currentIP } from '../lib/MetaworkMQTT'
-import { MQTT_REGISTER_TOPIC, MQTT_CTRL_TOPIC, MQTT_DEVICE_TOPIC, MQTT_REQUEST_TOPIC, MQTT_UNREQUEST_TOPIC, MQTT_ROBOT_DATA_TOPIC } from '../lib/MetaworkMQTT';
+import { MQTT_REGISTER_TOPIC, MQTT_CTRL_TOPIC, MQTT_DEVICE_TOPIC, MQTT_REQUEST_TOPIC, MQTT_UNREQUEST_TOPIC, MQTT_ROBOT_DATA_TOPIC, MQTT_ROBOT_STATE_TOPIC, MQTT_ROBOT_SCAN_TOPIC  } from '../lib/MetaworkMQTT';
 import { IK_joint_velocity_limit, IK_joint_velocity, IK_finger, Retarget } from '../modern_robotics/spatialKinematics.js';
 import { io } from 'socket.io-client';
 
@@ -312,7 +283,8 @@ export default function DynamicHome(props) {
   const [robotID, setRobotID] = React.useState(null);
 
   // View Camera Pose
-  const [view_cam_pose, setViewCamPose] = React.useState([0.24, 0.20, -0.67, 0, 150, 0]);
+  // const [view_cam_pose, setViewCamPose] = React.useState([0.24, 0.20, -0.67, 0, 150, 0]);
+  const [view_cam_pose, setViewCamPose] = React.useState([0.0, 0.3, 0.5, 0, 0, 0]);
 
   // WebRTC Recv
   const [webcamStream1, setWebcamStream1] = React.useState(null);
@@ -1124,6 +1096,7 @@ export default function DynamicHome(props) {
 
   React.useEffect(() => {
     const wsurl = 'https://liust.local/ws';
+    // const wsurl = currentIP + '/ws';
     const socket = io(wsurl, {
       transports: ['websocket'],
       upgrade: true
@@ -1157,13 +1130,18 @@ export default function DynamicHome(props) {
       // Time Offset = Calibrated Server Time - Client Local Time when Pong is received
       timeOffsetRef.current = calibratedTime - t1;
       setTimeOffset(timeOffsetRef.current);
-
       console.log(`⏱️ Time sync successful! Single-way network delay: ${networkDelay}ms, Local time offset: ${timeOffsetRef.current}ms`);
     });
 
     socket.on('btp_action', (action) => { 
       console.log("📩 Recv Message from BTP Action:", action);
       setBTPActionMsg(action); 
+      publishMQTT(MQTT_DEVICE_TOPIC + action.robot, JSON.stringify({ controller: "browser", devId: idtopic }), 1)
+      console.log(`🔄 [BTP Action] Published to MQTT for robotID: ${action.robot}`);
+      setRobotID(action.robot); // Update robotID based on BTP action
+      setRobotRequested(true);
+      subscribeMQTT(MQTT_ROBOT_STATE_TOPIC + action.robot);  // 新增
+      subscribeMQTT(MQTT_ROBOT_SCAN_TOPIC + action.robot);   // 新增
     });
 
     socket.on('get_cache', (data) => { 
@@ -1172,13 +1150,18 @@ export default function DynamicHome(props) {
       // 1. 拿到原始的列表
       const cacheList = data?.cache;
       
-      // 2. 🚀 使用解构赋值：直接提取出列表中的第 0 个元素，重命名为 cachedObj
       if (Array.isArray(cacheList) && cacheList.length > 0) {
         const [cachedObj] = cacheList; // 等同于 const cachedObj = cacheList[0];
         
         if (cachedObj && cachedObj.userID) {
           console.log("✅ [Cache] Destructured successfully:", cachedObj);
           setBTPActionMsg(cachedObj); 
+          publishMQTT(MQTT_DEVICE_TOPIC + cachedObj.robot, JSON.stringify({ controller: "browser", devId: idtopic }), 1)
+          console.log(`🔄 [Cache] Published to MQTT for robotID: ${cachedObj.robot}`);
+          setRobotID(cachedObj.robot);
+          setRobotRequested(true);
+          subscribeMQTT(MQTT_ROBOT_STATE_TOPIC + cachedObj.robot);  // 新增
+          subscribeMQTT(MQTT_ROBOT_SCAN_TOPIC + cachedObj.robot);   // 新增
         }
       }
     });
@@ -1220,7 +1203,9 @@ export default function DynamicHome(props) {
     // MQTT Client and Topics
     props,
     requestRobot,
-    robotID: setRobotID,
+    // robotID: setRobotID,
+    robotID: robotID,        // 改动：传当前值
+    setRobotID: setRobotID,  // 改动：单独传 setter
     btpActionMsg: setBTPActionMsg,
 
     // Robot State
@@ -1247,7 +1232,7 @@ export default function DynamicHome(props) {
 
     if (robotRequested) {
       // User Info
-      publishMQTT("sap/dev/" + robotID, JSON.stringify({ controller: "browser", devId: idtopic }), 1)
+      publishMQTT(MQTT_DEVICE_TOPIC + robotID, JSON.stringify({ controller: "browser", devId: idtopic }), 1)
       
       // Update robot state as Robot Request
       if (robot_state == null) return;
