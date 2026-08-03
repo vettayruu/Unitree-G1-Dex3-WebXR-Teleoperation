@@ -6,7 +6,10 @@ export default function MQTT_Setup({
   // MQTT Client and Topics
   props,
   requestRobot,
-  robotID: setRobotID,
+  // robotID: setRobotID,
+  robotID: currentRobotID,   // 改动：这里改成接收当前 robotID 的值，而不是 setter
+  setRobotID,                // 改动：setter 单独用一个明确的 prop 名
+
   btpActionMsg: setBtpActionMsg,
 
   // Robot State
@@ -16,6 +19,10 @@ export default function MQTT_Setup({
 }) {
 
   const robotIDRef = useRef(null);
+
+  useEffect(() => {
+    robotIDRef.current = currentRobotID;
+  }, [currentRobotID]);
 
   useEffect(() => {
     // connect to MQTT broker  

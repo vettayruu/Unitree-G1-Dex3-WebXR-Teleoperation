@@ -13,8 +13,10 @@ import registerAframeComponents from './registerAframeComponents';
 import MQTT_Setup from './MQTT_Setup';
 import { mqttclient, idtopic, version, publishMQTT, subscribeMQTT, codeType, currentIP } from '../lib/MetaworkMQTT'
 import { MQTT_REGISTER_TOPIC, MQTT_CTRL_TOPIC, MQTT_DEVICE_TOPIC, MQTT_REQUEST_TOPIC, MQTT_UNREQUEST_TOPIC, MQTT_ROBOT_DATA_TOPIC, MQTT_ROBOT_STATE_TOPIC, MQTT_ROBOT_SCAN_TOPIC  } from '../lib/MetaworkMQTT';
-import { IK_joint_velocity_limit, IK_joint_velocity, IK_finger, Retarget } from '../modern_robotics/spatialKinematics.js';
+import { IK_joint_velocity_limit, IK_joint_velocity_limit_dq } from '../modern_robotics/spatialKinematics.js';
 import { io } from 'socket.io-client';
+import {performTimeSync} from '../lib/timeSync.js';
+import {roundArray, getAxisAngleFromQuatDiff, ScrewAxisToRMatrix} from '../lib/mathFunction.js';
 
 // On Windows, run the following command to allow script execution at first:
 // Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
@@ -28,13 +30,7 @@ const RobotKinematics = require('../modern_robotics/modern_robotics_Kinematics.j
 const robot_assets = [
     { robotId: "body", robot_model: "unitree_g1_dex3" },
 ];
-
 const Euler_order = 'ZYX'; // Euler angle order
-
-// MQTT Topics
-// const MQTT_REQUEST_TOPIC = "sap/request";
-// const MQTT_UNREQUEST_TOPIC = "sap/unrequest";
-// const MQTT_CTRL_TOPIC = "control/"; 
 
 // IK State Codes
 const STATE_CODES = {
@@ -58,16 +54,6 @@ const loadRobotParams = (robot_model) => {
   };
 };
 
-function rotz(theta) {
-  const c = Math.cos(theta);
-  const s = Math.sin(theta);
-  return [
-    [c, -s, 0],
-    [s,  c, 0],
-    [0,  0, 1],
-  ];
-}
-
 function worlr2three(v) {
     return [-v[1], v[2], -v[0]];
 }
@@ -75,42 +61,6 @@ function worlr2three(v) {
 function three2world(v) {
     return [-v[2], -v[0], v[1]];
 }
-
-function getAxisAngleFromQuatDiff(q_curr, q_init) {
-    // 1. 计算相对四元数 Q_rel = Q_curr * inv(Q_init)
-    // THREE.js 中：q_rel = q_curr * q_init.inverse()
-    const q_rel = new THREE.Quaternion().copy(q_init).invert().premultiply(q_curr);
-    
-    // 2. 提取角度 theta = 2 * acos(w)
-    const w = Math.max(-1, Math.min(1, q_rel.w));
-    const theta = 2 * Math.acos(w);
-    
-    // 3. 提取单位轴 (x, y, z) / sin(theta/2)
-    const s = Math.sqrt(1 - w * w);
-    
-    if (s > 1e-6) {
-        const axis = [q_rel.x / s, q_rel.y / s, q_rel.z / s];
-        return { axis, theta };
-    } else {
-        return { axis: [0, 0, 1], theta: 0 };
-    }
-  }
-
-function ScrewAxisToRMatrix(axis, theta) {
-    const [nx, ny, nz] = axis;
-    const s = Math.sin(theta);
-    const c = Math.cos(theta);
-    const v = 1 - c; // versine of theta
-
-    // 罗德里格斯公式直接构造矩阵分量
-    // R = I*cos(theta) + [axis]_x*sin(theta) + axis*axis^T*(1-cos(theta))
-    return [
-        [nx * nx * v + c,      nx * ny * v - nz * s,  nx * nz * v + ny * s],
-        [nx * ny * v + nz * s, ny * ny * v + c,       ny * nz * v - nx * s],
-        [nx * nz * v - ny * s, ny * nz * v + nx * s,  nz * nz * v + c     ]
-    ];
-}
-
 
 /* ============================= Main Component ==========================================*/
 export default function DynamicHome(props) {
@@ -316,12 +266,16 @@ export default function DynamicHome(props) {
   /* ---------------------- Control Parameters ------------------------------------*/
   // Right Arm 
   const [theta_body, setThetaBody] = React.useState([0, 0, 0, 0, 0, 0, 0, 0]);
+  const [dtheta_body, setDThetaBody] = React.useState([0, 0, 0, 0, 0, 0, 0, 0]);
+
   const [theta_tool, setThetaTool] = React.useState([0, 0, 0, 0, 0, 0, 0]);
   const [joint_limits_right, setJointLimitsRight] = React.useState([]);
   const [rightArmPosition, setRightArmPosition] = React.useState("0.0, 0.0, 0.0");
 
   // Left Arm
   const [theta_body_left, setThetaBodyLeft] = React.useState([0, 0, 0, 0, 0, 0, 0, 0]);
+   const [dtheta_body_left, setDThetaBodyLeft] = React.useState([0, 0, 0, 0, 0, 0, 0, 0]);
+
   const [theta_tool_left, setThetaToolLeft] = React.useState([0, 0, 0, 0, 0, 0, 0]);
   const [joint_limits_left, setJointLimitsLeft] = React.useState([]);
   const [leftArmPosition, setLeftArmPosition] = React.useState("0.0, 0.0, 0.0");
@@ -329,9 +283,6 @@ export default function DynamicHome(props) {
   // CAM Arm
   const [theta_body_cam, setThetaBodyCam] = React.useState([0, 0, 0]);
   const [joint_limits_cam, setJointLimitsCam] = React.useState([]);
-
-  // Collision Check
-  const [collision, setCollision] = React.useState(false);
 
   // Robot State
   const [robot_state, setRobotState] = React.useState(null);
@@ -534,7 +485,6 @@ export default function DynamicHome(props) {
         newT, M_right, Slist_right, Blist_right, 
         joint_limits_right, 
         thetaBodyRef.current,
-        // theta_body, 
         VR_Control_Mode, 
         dtRef.current
       );
@@ -551,6 +501,7 @@ export default function DynamicHome(props) {
 
       setThetaBody(new_theta_body);
       setErrorCode(error_code);
+      
       setPositionEE(p_right);
       setREE(R_right);
       setEuler(euler_ee);
@@ -598,7 +549,7 @@ export default function DynamicHome(props) {
       setREE(R_right);
       setEuler(euler_ee);
     }
-  }, [theta_body, position_ee, R_ee, theta_body_cam]);
+  }, [theta_body, dtheta_body, position_ee, R_ee, theta_body_cam]);
 
   /*======================= VR Left Arm Control ====================================*/
   const lastVRPosRef_left = React.useRef(null);
@@ -678,6 +629,7 @@ export default function DynamicHome(props) {
 
       setThetaBodyLeft(new_theta_body);
       setErrorCodeLeft(error_code);
+
       setPositionEELeft(p_left);
       setREELeft(R_left);
       setEulerEELeft(euler_ee_left);
@@ -726,7 +678,7 @@ export default function DynamicHome(props) {
       setREELeft(R_left);
       setEulerEELeft(euler_ee_left);
     } 
-  }, [theta_body_left, position_ee_left, R_ee_left, theta_body_cam]);
+  }, [theta_body_left, dtheta_body_left, position_ee_left, R_ee_left, theta_body_cam]);
 
   //   React.useEffect(() => {
   //     thetaBodyLeftRef.current = theta_body_left;
@@ -1018,30 +970,6 @@ export default function DynamicHome(props) {
     }
   }, [thumbstick_down_right]);
 
-  /*========================= Collision Check ================================*/
-  // const thetaHistoryRef = React.useRef([]);
-  // const thetaLeftHistoryRef = React.useRef([]);
-
-  // React.useEffect(() => {
-  //   if (!collision) {
-  //     thetaHistoryRef.current.push(theta_body);
-  //     thetaLeftHistoryRef.current.push(theta_body_left);
-
-  //     if (thetaHistoryRef.current.length > 5) thetaHistoryRef.current.shift();
-  //     if (thetaLeftHistoryRef.current.length > 5) thetaLeftHistoryRef.current.shift();
-  //   } else if (collision) {
-  //     if (thetaHistoryRef.current.length > 0 && thetaLeftHistoryRef.current.length > 0) {
-  //       const last = thetaHistoryRef.current.pop();
-  //       const lastLeft = thetaLeftHistoryRef.current.pop();
-
-  //       setThetaBody(last);
-  //       setThetaBodyLeft(lastLeft);
-
-  //       console.warn("🔁 Return to last valid theta due to collision");
-  //     }
-  //   }
-  // }, [collision, theta_body, theta_body_left]);
-
 
   /* ========================= Web Interface (Only for Web Control) =========================*/
   const lastInterfacePropsRef = React.useRef(null);
@@ -1108,29 +1036,16 @@ export default function DynamicHome(props) {
       console.log("✅ WebSocket connected!");
       socket.emit("register_user", { userId: idtopic }); 
 
-      // Time Sync: Send client's current timestamp to server to calculate offset
-      const t0 = Date.now();
-      socket.emit("sync_time_ping", { client_t0: t0 });
-      console.log("⏱️ Time sync ping sent with client timestamp:", t0);
+      performTimeSync(socket).then((offset) => {
+        if (offset !== null) {
+          timeOffsetRef.current = offset;
+          setTimeOffset(offset);
+          console.log(`⏱️ Time sync successful! Local time offset: ${offset}ms`);
+        }
+      });
 
       console.log(`🔄 [WS-Sync] Requesting cache for: ${idtopic}`);
       socket.emit("task_cache", { userId: idtopic });
-    });
-
-    socket.on("sync_time_pong", (data) => {
-      const t1 = Date.now(); // Time Recvived Pong from Server
-      const t0 = data.client_t0; // Original Client Timestamp sent to Server
-      const server_time = data.server_time; // Server Timestamp when it received the ping
-
-      // Round Trip Time (RTT) = Time from Client to Server and back
-      const rtt = t1 - t0;
-      const networkDelay = Math.floor(rtt / 2);
-      const calibratedTime = server_time + networkDelay;
-      
-      // Time Offset = Calibrated Server Time - Client Local Time when Pong is received
-      timeOffsetRef.current = calibratedTime - t1;
-      setTimeOffset(timeOffsetRef.current);
-      console.log(`⏱️ Time sync successful! Single-way network delay: ${networkDelay}ms, Local time offset: ${timeOffsetRef.current}ms`);
     });
 
     socket.on('btp_action', (action) => { 
@@ -1343,15 +1258,15 @@ export default function DynamicHome(props) {
             // taskId: btpActionMsg.taskID || null,
           },
           left: {
-            arm: thetaBodyLeftRef.current,
-            hand: mr.deg2rad(thetaToolLeftRef.current),
+            arm: roundArray(thetaBodyLeftRef.current),
+            hand: roundArray(mr.deg2rad(thetaToolLeftRef.current)),
           },
           right: {
-            arm: thetaBodyRef.current,
-            hand: mr.deg2rad(thetaToolRightRef.current),
+            arm: roundArray(thetaBodyRef.current),
+            hand: roundArray(mr.deg2rad(thetaToolRightRef.current)),
           },
           waist: {
-            joints: thetaBodyCamRef.current,
+            joints: roundArray(thetaBodyCamRef.current),
           }
         };
         
@@ -1406,10 +1321,6 @@ export default function DynamicHome(props) {
 
       // HMD
       set_controller_object_cam,
-
-      //Collision Check
-      // collision,
-      setCollision,
 
       // VR Camera Pose
       setViewCamPose,

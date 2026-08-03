@@ -75,6 +75,7 @@ export default function RobotScene(props) {
   const [activeProductId, setActiveProduct] = React.useState(null);
   const [taskMsg, setTaskMsg] = React.useState("");
   
+  const [timenow, now] = React.useState(Date.now());
   // Webcam Stream
   React.useEffect(() => {
     if (props.webcamStream1 && props.showVideo) {
@@ -87,7 +88,7 @@ export default function RobotScene(props) {
         });
       }
     }
-  }, [props.webcamStream1, props.showVideo]);
+  }, [props.webcamStream1, props.showVideo, timenow]);
 
   // React.useEffect(() => {
   //   if (props.webcamStream2) {
@@ -880,14 +881,16 @@ export default function RobotScene(props) {
 
         <a-entity id="hand-offset-left" position="0.00 -0.685 0.31">
           <a-entity 
-            hand-tracking-controls="hand: left; modelStyle: mesh" vr-hand-as-controller="hand: left" >
-          </a-entity>
+            hand-tracking-controls="hand: left; modelStyle: mesh" 
+            vr-hand-as-controller={`hand: left; showMenu: ${showMenu}`}
+          ></a-entity>
         </a-entity>
 
         <a-entity id="hand-offset-right" position="-0.005 -0.685 0.301">
           <a-entity 
-            hand-tracking-controls="hand: right; modelStyle: mesh" vr-hand-as-controller="hand: right" >
-          </a-entity>
+            hand-tracking-controls="hand: right; modelStyle: mesh" 
+            vr-hand-as-controller={`hand: right; showMenu: ${showMenu}`}
+          ></a-entity>
         </a-entity>
 
         <a-entity vr-controller-hmd></a-entity>
