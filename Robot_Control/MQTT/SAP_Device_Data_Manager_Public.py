@@ -161,7 +161,8 @@ class DataLogger:
                 header = data.get("header", {})
                 self._start_recording(sess, header)
             elif record_cmd == "off":
-                self._stop_recording(sess)
+                header = data.get("header", {})
+                self._stop_recording(sess, header)
             elif record_cmd == "reset":
                 self._reset_recording(sess)
             else:
@@ -208,10 +209,23 @@ class DataLogger:
             sess.task_id, sess.user_id, sess.start_dt,
         )
 
-    def _stop_recording(self, sess: _Session) -> None:
+    # def _stop_recording(self, sess: _Session) -> None:
+    #     if sess.state != RecordState.RECORDING:
+    #         logger.warning("[LOGGER] record:off received but state=%s for user '%s'", sess.state, sess.user_id)
+    #         return
+    #     self._save_csv(sess)
+    #     sess.state = RecordState.WAITING
+
+    def _stop_recording(self, sess: _Session, header: dict) -> None:
         if sess.state != RecordState.RECORDING:
             logger.warning("[LOGGER] record:off received but state=%s for user '%s'", sess.state, sess.user_id)
             return
+
+        # stop 消息的 header 包含更完整的信息（如 destination），合并覆盖 start 时的 header
+        if header:
+            sess.header.update(header)
+            logger.info("[LOGGER] Header updated from record:off | task=%s", sess.task_id)
+
         self._save_csv(sess)
         sess.state = RecordState.WAITING
 
@@ -662,7 +676,7 @@ def create_app(config: Config):
                     warehouse, target_id)
 
         # 2. 确保 DataLogger 会话已建立（taskID 将由 record:on 消息提供）
-        manager.data_logger.on_user_online(target_id)
+        # manager.data_logger.on_user_online(target_id)
 
         return jsonify({"status": "dispatched", "msg": f"Sent to {target_id}"}), 200
 
@@ -699,6 +713,7 @@ def create_app(config: Config):
             sid_mapping[user_id] = request.sid
             logger.info("[WS] Bound user '%s' -> sid '%s'", user_id, request.sid)
             emit("response", {"status": "registered", "userId": user_id})
+            manager.data_logger.on_user_online(user_id)
 
     @socketio.on("disconnect", namespace="/ws")
     def on_ws_disconnect():
@@ -708,12 +723,19 @@ def create_app(config: Config):
             manager.data_logger.on_user_disconnected(uid)
             logger.info("[WS] User '%s' disconnected.", uid)
 
+    # @socketio.on("sync_time_ping", namespace="/ws")
+    # def on_sync_time(data):
+    #     emit("sync_time_pong", {
+    #         "client_t0":   data.get("client_t0"),
+    #         "server_time": int(time.time() * 1000),
+    #     })
+
     @socketio.on("sync_time_ping", namespace="/ws")
     def on_sync_time(data):
-        emit("sync_time_pong", {
-            "client_t0":   data.get("client_t0"),
+        return {
+            "client_t0": data.get("client_t0"),
             "server_time": int(time.time() * 1000),
-        })
+        }
 
     @socketio.on("task_cache", namespace="/ws")
     def handle_get_cache(data):
