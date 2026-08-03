@@ -97,10 +97,10 @@ class Dex1IntegratedManager:
         for msg in [self.left_gripper_msg, self.right_gripper_msg]:
             msg.cmds[0].dq = 0.0
             msg.cmds[0].tau = 0.0
-            # msg.cmds[0].kp = 2.00  # 静态控制刚性
-            # msg.cmds[0].kd = 0.20  # 静态控制阻尼
-            msg.cmds[0].kp = 0.75 # 静态控制刚性
-            msg.cmds[0].kd = 0.25  # 静态控制阻尼
+            msg.cmds[0].kp = 3.0  # 静态控制刚性
+            msg.cmds[0].kd = 0.1  # 静态控制阻尼
+            # msg.cmds[0].kp = 0.75 # 静态控制刚性
+            # msg.cmds[0].kd = 0.25  # 静态控制阻尼
 
     def _precompute_sigmoid_lut(self):
         """预计算步进 S 曲线插值系数表，使夹爪起停更平滑"""
