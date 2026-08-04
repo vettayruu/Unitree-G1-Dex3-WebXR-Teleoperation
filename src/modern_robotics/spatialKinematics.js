@@ -241,7 +241,7 @@ function updateRobotIK(controller, isTriggerOn ) {
  */
 function IK_joint_velocity_limit(T_sd, M, Slist, Blist, jointLimits, theta_body, VR_Control_Mode, dt) {
   let thetalist_sol, ik_success;
-  const max_joint_vel = 30; // rad/s
+  const max_joint_vel = 50; // rad/s
   let error_code = STATE_CODES.NORMAL;
   const qmin = jointLimits.map(j => j.min);
   const qmax = jointLimits.map(j => j.max);
@@ -365,6 +365,68 @@ function IK_joint_velocity(T_sd, M, Slist, Blist, jointLimits, theta_body, VR_Co
   return { new_theta_body: Array.from(new_theta_body), error_code };
 }
 
+function IK_joint_velocity_limit_dq(T_sd, M, Slist, Blist, jointLimits, theta_body, VR_Control_Mode, dt) {
+  let thetalist_sol, ik_success;
+  const max_joint_vel = 50; // rad/s
+  let error_code = STATE_CODES.NORMAL;
+  const qmin = jointLimits.map(j => j.min);
+  const qmax = jointLimits.map(j => j.max);
+  const n = theta_body.length;
+
+  [thetalist_sol, ik_success] = mr.IKinSpaceNull(Slist, M, T_sd, theta_body, qmin, qmax, 1e-4, 1e-4);
+
+  if (!ik_success) {
+    console.warn("IK failed");
+    // 求解失败时，不产生任何运动，速度前馈必须置零，
+    // 否则机器人端会拿到一个"没有对应有效位置更新"的错误速度指令
+    return {
+      new_theta_body: theta_body,
+      dtheta: new Array(n).fill(0),
+      error_code: STATE_CODES.IK_FAILED
+    };
+  }
+
+  // 2. 关节位置限幅与限位检查 (Clamping)
+  let isAtLimit = false;
+  const delta_theta = new Float64Array(n);
+
+  for (let i = 0; i < n; i++) {
+    let clamped = Math.max(qmin[i], Math.min(qmax[i], thetalist_sol[i]));
+    if (clamped === qmin[i] || clamped === qmax[i]) isAtLimit = true;
+    delta_theta[i] = clamped - theta_body[i];
+  }
+
+  // 3. 速度缩放 (Velocity Scaling)
+  let total_delta = 0;
+  for (let i = 0; i < n; i++) total_delta += delta_theta[i] * delta_theta[i];
+  const total_vel = Math.sqrt(total_delta) / dt;
+
+  let scale = 1.0;
+  if (total_vel > max_joint_vel) {
+    scale = max_joint_vel / total_vel;
+    error_code = STATE_CODES.VELOCITY_LIMIT;
+    console.warn("Velocity Limit Reached");
+  } else if (isAtLimit) {
+    scale = 0.2;
+    error_code = STATE_CODES.JOINT_LIMIT;
+  }
+
+  // 4. 计算最终姿态 + 对应的关节速度前馈（同一份 delta_theta*scale 两处复用，保证一致）
+  const new_theta_body = new Float64Array(n);
+  const dtheta = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const applied_delta = delta_theta[i] * scale;
+    new_theta_body[i] = theta_body[i] + applied_delta;
+    dtheta[i] = applied_delta / dt; // 这一步实际发生的关节角速度
+  }
+
+  return {
+    new_theta_body: Array.from(new_theta_body),
+    dtheta: Array.from(dtheta),
+    error_code
+  };
+}
+
 function IK_finger(T_sd, M, Slist, theta_body, hand) {
   let thetalist_sol, ik_success;
   let error_code = STATE_CODES.NORMAL;
@@ -443,6 +505,7 @@ module.exports = {
     calculateSpatialVelocity,
     IK_joint_velocity_limit,
     IK_joint_velocity,
+    IK_joint_velocity_limit_dq,
     IK_finger,
     Retarget,
     updateRobotIK
