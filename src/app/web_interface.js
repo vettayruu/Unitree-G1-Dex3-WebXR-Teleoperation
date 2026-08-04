@@ -70,11 +70,11 @@ export default function WebInterface(props) {
         </button>
       </div>
 
-      {/* <div className="unrequest-robot">
+      <div className="unrequest-robot">
         <button onClick={props.unrequestRobot}>
           Release Robot
         </button>
-      </div> */}
+      </div>
 
 
       {/* <div className="view-cam" >
