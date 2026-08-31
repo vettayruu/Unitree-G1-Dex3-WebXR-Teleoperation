@@ -1,5 +1,6 @@
 const numeric = require('numeric'); 
 // const ml = require('ml-matrix'); 
+const RobotKinematics = require('./modern_robotics_Kinematics.js');
 
 // *** BASIC HELPER FUNCTIONS ***
 
@@ -2707,6 +2708,27 @@ function simulate_PIDcontrol(q0, dq0, q_ref, dq_ref, dt, steps, Mlist, Glist, Sl
     return [q_hist, dq_hist];
 }
 
+function loadRobotParams(robot_model) {
+  const rk = new RobotKinematics(robot_model);
+  const M = rk.get_M();
+  const Slist = rk.get_Slist();
+  const Blist = SlistToBlist(M, Slist);
+  const jointLimits = rk.jointLimits;
+  const jointInitial = rk.get_jointInitial();
+  return {
+    M, Slist, Blist,
+    jointLimits, jointInitial
+  };
+};
+
+function worlr2three(v) {
+    return [-v[1], v[2], -v[0]];
+}
+
+function three2world(v) {
+    return [-v[2], -v[0], v[1]];
+}
+
 
 // Export the functions as a module
 module.exports = {
@@ -2780,5 +2802,10 @@ module.exports = {
     CartesianTrajectory,
 
     // Robot Control
-    simulate_PIDcontrol
+    simulate_PIDcontrol,
+
+    // Functions
+    loadRobotParams,
+    worlr2three,
+    three2world
 };
