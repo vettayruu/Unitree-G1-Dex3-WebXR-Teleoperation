@@ -14,10 +14,10 @@ export var idtopic = userUUID;
 export const currentIP = typeof window !== 'undefined' ? window.location.hostname : '';
 console.log("Current IP:", currentIP);
 
-// const MQTT_BROKER_URL = "wss://sora2.uclab.jp/mqws"; // For Nagoya-U UCLab Development
+const MQTT_BROKER_URL = "wss://sora2.uclab.jp/mqws"; // For Nagoya-U UCLab Development
 // const MQTT_BROKER_URL = "wss://santolina/mqtt"; // For Local Development, change to your broker address
 // const MQTT_BROKER_URL = "wss://133.6.254.50/mqtt"; // For Internet Development, change to your broker address
-const MQTT_BROKER_URL = "wss://liust.local/mqtt";
+// const MQTT_BROKER_URL = "wss://liust.local/mqtt";
 
 export var mqttBrokerURL = MQTT_BROKER_URL;
 

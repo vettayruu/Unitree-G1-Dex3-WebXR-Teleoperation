@@ -156,80 +156,80 @@ function calculateSpatialVelocity(T_current, T_target, dt, mode) {
  * @param {Object} controller - 手柄对象 (包含 position 和 quaternion)
  * @param {Boolean} isTriggerOn - 按钮状态
  */
-function updateRobotIK(controller, isTriggerOn ) {
-  // --- 1. 运行条件检查 ---
-  // 不再需要依赖数组，每一帧手动判断
-  if (!rendered || !vrMode || showMenu || shareControl) return;
+// function updateRobotIK(controller, isTriggerOn ) {
+//   // --- 1. 运行条件检查 ---
+//   // 不再需要依赖数组，每一帧手动判断
+//   if (!rendered || !vrMode || showMenu || shareControl) return;
 
-  if (isTriggerOn) {
-    const { position: p_raw, quaternion: q_raw } = controller;
+//   if (isTriggerOn) {
+//     const { position: p_raw, quaternion: q_raw } = controller;
 
-    // --- 2. 初始帧处理 (锚点锁定) ---
-    if (!lastVRPos) {
-      lastVRPos = [p_raw.x, p_raw.y, p_raw.z];
-      lastQuat = q_raw.clone(); 
-      return;
-    }
+//     // --- 2. 初始帧处理 (锚点锁定) ---
+//     if (!lastVRPos) {
+//       lastVRPos = [p_raw.x, p_raw.y, p_raw.z];
+//       lastQuat = q_raw.clone(); 
+//       return;
+//     }
 
-    // --- A. 计算位移增量 ---
-    const pos_diff_world = mr.three2world([
-      p_raw.x - lastVRPos[0],
-      p_raw.y - lastVRPos[1],
-      p_raw.z - lastVRPos[2]
-    ]);
+//     // --- A. 计算位移增量 ---
+//     const pos_diff_world = mr.three2world([
+//       p_raw.x - lastVRPos[0],
+//       p_raw.y - lastVRPos[1],
+//       p_raw.z - lastVRPos[2]
+//     ]);
     
-    // 更新位置锚点
-    lastVRPos[0] = p_raw.x;
-    lastVRPos[1] = p_raw.y;
-    lastVRPos[2] = p_raw.z;
+//     // 更新位置锚点
+//     lastVRPos[0] = p_raw.x;
+//     lastVRPos[1] = p_raw.y;
+//     lastVRPos[2] = p_raw.z;
 
-    // --- B. 直接从四元数计算旋转轴和角度 ---
-    const { axis, theta } = getAxisAngleFromQuatDiff(q_raw, lastQuat);
+//     // --- B. 直接从四元数计算旋转轴和角度 ---
+//     const { axis, theta } = getAxisAngleFromQuatDiff(q_raw, lastQuat);
     
-    // 更新姿态锚点
-    lastQuat.copy(q_raw);
+//     // 更新姿态锚点
+//     lastQuat.copy(q_raw);
 
-    // --- C. 计算机械臂目标位姿 ---
-    const p_scale = 1.0;
-    const R_scale = 1.0;
+//     // --- C. 计算机械臂目标位姿 ---
+//     const p_scale = 1.0;
+//     const R_scale = 1.0;
     
-    const newP = [
-      position_ee[0] + pos_diff_world[0] * p_scale,
-      position_ee[1] + pos_diff_world[1] * p_scale,
-      position_ee[2] + pos_diff_world[2] * p_scale
-    ];
+//     const newP = [
+//       position_ee[0] + pos_diff_world[0] * p_scale,
+//       position_ee[1] + pos_diff_world[1] * p_scale,
+//       position_ee[2] + pos_diff_world[2] * p_scale
+//     ];
 
-    let newT;
-    if (VR_Control_Mode === 'inSpace') {
-      const axis_world = [-axis[2], -axis[0], axis[1]]; 
-      const R_rel = ScrewAxisToRMatrixOptimized(axis_world, theta * R_scale); 
-      newT = mr.RpToTrans(numeric.dot(R_rel, R_ee), newP);
-    } else {
-      const R_rel = ScrewAxisToRMatrixOptimized(axis, theta * R_scale); 
-      newT = mr.RpToTrans(numeric.dot(R_ee, R_rel), newP);
-    }
+//     let newT;
+//     if (VR_Control_Mode === 'inSpace') {
+//       const axis_world = [-axis[2], -axis[0], axis[1]]; 
+//       const R_rel = ScrewAxisToRMatrixOptimized(axis_world, theta * R_scale); 
+//       newT = mr.RpToTrans(numeric.dot(R_rel, R_ee), newP);
+//     } else {
+//       const R_rel = ScrewAxisToRMatrixOptimized(axis, theta * R_scale); 
+//       newT = mr.RpToTrans(numeric.dot(R_ee, R_rel), newP);
+//     }
 
-    // --- D. 执行 IK (如果集成了 WASM，这里直接同步调用) ---
-    // 摆脱了 React State，这里直接更新变量并驱动模型
-    const result = IK_joint_velocity_limit(
-      newT, M_right, Slist_right, Blist_right, 
-      joint_limits_right, 
-      currentThetaBody, VR_Control_Mode, dt
-    );
+//     // --- D. 执行 IK (如果集成了 WASM，这里直接同步调用) ---
+//     // 摆脱了 React State，这里直接更新变量并驱动模型
+//     const result = IK_joint_velocity_limit(
+//       newT, M_right, Slist_right, Blist_right, 
+//       joint_limits_right, 
+//       currentThetaBody, VR_Control_Mode, dt
+//     );
 
-    currentThetaBody = result.new_theta_body;
+//     currentThetaBody = result.new_theta_body;
     
-    // 驱动视图渲染（例如 A-Frame 或 Three.js 的直接操作）
-    robotModel.updateJoints(currentThetaBody);
+//     // 驱动视图渲染（例如 A-Frame 或 Three.js 的直接操作）
+//     robotModel.updateJoints(currentThetaBody);
 
-  } else {
-    // --- 重置状态 ---
-    if (lastVRPos) {
-      lastVRPos = null;
-      lastQuat = null;
-    }
-  }
-}
+//   } else {
+//     // --- 重置状态 ---
+//     if (lastVRPos) {
+//       lastVRPos = null;
+//       lastQuat = null;
+//     }
+//   }
+// }
 
 /**
  * Inverse Kinematics with Joint Velocity Limit
@@ -499,6 +499,7 @@ function Retarget(T_sd, M, Slist, theta_body) {
 }
 
 module.exports = {
+    STATE_CODES,
     calculateRelativeRotationMatrix,
     relativeRMatrixtoScrewAxis,
     ScrewAxisToRelativeRMatrix,
@@ -508,5 +509,5 @@ module.exports = {
     IK_joint_velocity_limit_dq,
     IK_finger,
     Retarget,
-    updateRobotIK
+    // updateRobotIK
 };
