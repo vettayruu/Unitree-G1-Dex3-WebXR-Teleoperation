@@ -1,66 +1,3 @@
-.right-arm{
-    position: fixed;
-    top: 5px;
-    right: 10px;
-    width: 250px;
-    background-color:rgba(192,192,192,0.2);
-    padding: 10px;
-    display: grid;
-    button {
-        margin: 5px;
-    }
-}
-
-.left-arm{
-    position: fixed;
-    top: 425px;
-    right: 10px;
-    width: 250px;
-    background-color:rgba(192,192,192,0.2);
-    padding: 10px;
-    display: grid;
-    button {
-        margin: 5px;
-    }
-}
-
-.torso{
-    position: fixed;
-    top: 5px;
-    right: 270px;
-    width: 250px;
-    background-color:rgba(192,192,192,0.2);
-    padding: 10px;
-    display: grid;
-    button {
-        margin: 5px;
-    }
-}
-
-.view-cam{
-    position: fixed;
-    top: 250px;
-    left: 10px;
-    width: 240px;
-    background-color:rgba(192,192,192,0.2);
-    padding: 10px;
-    display: grid;
-    button {
-        margin: 5px;
-    }
-}
-
-.view-cam > span,
-.right-arm > span,
-.left-arm > span,
-.torso > span {
-  display: block;
-  margin-bottom: 10px; 
-  font-weight: bold;
-  font-size: 1.1em;
-  text-align: center;
-}
-
 .mqtt-broker {
   position: fixed;
   top: 10px;
@@ -187,3 +124,46 @@
   user-select: all;
 }
 
+.joint-angle-panel {
+    position: fixed;
+    right: 10px;
+    width: 250px;
+    background-color: rgba(192, 192, 192, 0.2);
+    padding: 10px;
+}
+
+.right-arm {
+    top: 5px;
+}
+
+.left-arm {
+    top: 5px;
+    right: 262px;
+}
+
+.torso {
+    top: 263px; 
+}
+
+.joint-angle-table {
+    width: 100%;
+    margin-bottom: 0;
+    color: inherit;
+    font-size: 0.9rem;
+}
+
+.joint-angle-table th,
+.joint-angle-table td {
+    padding: 2px 8px;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.joint-angle-table thead th {
+    font-weight: 600;
+    text-align: left;
+}
+
+.joint-angle-table td:last-child {
+    text-align: right;
+    font-variant-numeric: tabular-nums; 
+}

@@ -2,7 +2,7 @@ import React from 'react';
 import Assets from './Assets';
 import { Select_Robot } from './Model';
 import WebInterface from './web_interface.js';
-import {idtopic, publishMQTT, MQTT_ROBOT_DATA_TOPIC } from '../lib/MetaworkMQTT';
+import {userUUID, publishMQTT, Topic } from '../lib/MetaworkMQTT';
 
 export default function RobotScene(props) {
   const {
@@ -74,9 +74,7 @@ export default function RobotScene(props) {
   const [activeTaskId, setActiveTaskId] = React.useState(null);
   const [activeProductId, setActiveProduct] = React.useState(null);
   const [taskMsg, setTaskMsg] = React.useState("");
-  
-  const [timenow, now] = React.useState(Date.now());
-  // Webcam Stream
+
   React.useEffect(() => {
     if (props.webcamStream1 && props.showVideo) {
       const videoEl = document.getElementById('stereoVideo');
@@ -88,7 +86,7 @@ export default function RobotScene(props) {
         });
       }
     }
-  }, [props.webcamStream1, props.showVideo, timenow]);
+  }, [props.webcamStream1, props.showVideo]);
 
   // React.useEffect(() => {
   //   if (props.webcamStream2) {
@@ -157,7 +155,7 @@ export default function RobotScene(props) {
 
   const handleRecordControl = React.useCallback(async (action) => {
         if (action === "start") {
-          publishMQTT(MQTT_ROBOT_DATA_TOPIC + idtopic, JSON.stringify({
+          publishMQTT(Topic.ROBOT_DATA + userUUID, JSON.stringify({
             header: {
               "userID": apiData?.userID || "unknown_user",
               "robot": apiData?.robot || "unknown_robot",
@@ -173,7 +171,7 @@ export default function RobotScene(props) {
         } 
         
         else if (action === "stop") {
-          publishMQTT(MQTT_ROBOT_DATA_TOPIC + idtopic, JSON.stringify({ 
+          publishMQTT(Topic.ROBOT_DATA + userUUID, JSON.stringify({ 
             header: {
               "userID": apiData?.userID || "unknown_user",
               "robot": apiData?.robot || "unknown_robot",
@@ -517,7 +515,7 @@ export default function RobotScene(props) {
 
                 <a-entity position="-0.30 0.13 0.01">
                     <a-text
-                    value={`${idtopic || "---"}`}
+                    value={`${userUUID || "---"}`}
                     position="0 0.075 0"
                     width="1.1"
                     font={font_path}
@@ -624,7 +622,7 @@ export default function RobotScene(props) {
                                     start: startTime
                                   };
 
-                                  publishMQTT(MQTT_ROBOT_DATA_TOPIC + idtopic, JSON.stringify({
+                                  publishMQTT(Topic.ROBOT_DATA + userUUID, JSON.stringify({
                                     header: {
                                       "userID": apiData?.userID || "unknown_user",
                                       "robot": apiData?.robot || "unknown_robot",
@@ -813,7 +811,7 @@ export default function RobotScene(props) {
                           timecost: timecost,
                         };
                       }
-                      publishMQTT(MQTT_ROBOT_DATA_TOPIC + idtopic, JSON.stringify({ 
+                      publishMQTT(Topic.ROBOT_DATA + userUUID, JSON.stringify({ 
                         header: {
                           "userID": apiData?.userID || "unknown_user",
                           "robot": apiData?.robot || "unknown_robot",
@@ -894,6 +892,8 @@ export default function RobotScene(props) {
         </a-entity>
 
         <a-entity vr-controller-hmd></a-entity>
+
+        <a-entity fps-counter></a-entity>
         
         {/* Show Controller Laser Pointer for Right Hand Only (for menu interaction) */}
         {showMenu && (

@@ -225,7 +225,7 @@ export default function registerAframeComponents(options) {
     optimizeFPS: function (session) {
       if (session.supportedFrameRates) {
         // Quest 3 FPS [60, 72, 80, 90, 120]. Note: higher fps usually cause overheating and battery drain.
-        const targetFPS = 60; 
+        const targetFPS = 72; 
         
         // Find max supported FPS (if 72 is not supported, fall back to highest available)
         const maxSupported = Math.max(...session.supportedFrameRates);
@@ -242,15 +242,12 @@ export default function registerAframeComponents(options) {
         console.log('ℹ️ Current Environment does not support WebXR Frame Rate API');
       }
 
-      // ✅ 降低渲染分辨率（减少 GPU 负载）
       const renderer = this.el.renderer;
       const xr = renderer.xr;
       
-      // 设置分辨率缩放比例（0.5-1.0，越小性能越好但画质越差）
-      const resolutionScale = 0.7; // 推荐 0.7-0.9，Quest 3 默认是 1.0
+      const resolutionScale = 1.0; 
       
       if (xr && xr.enabled) {
-        // WebXR 的分辨率缩放
         const baseLayer = session.renderState.baseLayer;
         if (baseLayer) {
           const currentWidth = baseLayer.framebufferWidth;
@@ -262,11 +259,10 @@ export default function registerAframeComponents(options) {
             })
           });
           
-          console.log(`📐 分辨率缩放: ${(resolutionScale * 100).toFixed(0)}% (${currentWidth}x${currentHeight} → ${Math.floor(currentWidth * resolutionScale)}x${Math.floor(currentHeight * resolutionScale)})`);
+          console.log(`Resolution Scale: ${(resolutionScale * 100).toFixed(0)}% (${currentWidth}x${currentHeight} → ${Math.floor(currentWidth * resolutionScale)}x${Math.floor(currentHeight * resolutionScale)})`);
         }
       }
       
-      // ✅ 设置 A-Frame 渲染器的像素比率（备用方案）
       renderer.setPixelRatio(resolutionScale);
     }
   });
@@ -467,18 +463,11 @@ export default function registerAframeComponents(options) {
 
   AFRAME.registerComponent('stereo-split', {
     schema: {
-      // --- 核心参数 ---
       eye: { type: 'string', default: 'left' },
       videoId: { type: 'string', default: '' },
-
-      // --- 几何体类型 ---
-      // 您可以保留这个，以便在 'plane', 'cylinder', 'sphere' 之间切换
       geometryType: { type: 'string', default: 'sphere' }, 
-
-      // --- 通用参数 ---
       radius: { type: 'number', default: 100 },
       
-      // --- 球面 (sphere) 参数 ---
       segmentsWidth: { type: 'number', default: 64 },
       segmentsHeight: { type: 'number', default: 64 },
       phiStart: { type: 'number', default: 0 },
@@ -486,7 +475,6 @@ export default function registerAframeComponents(options) {
       thetaStart: { type: 'number', default: 0 },
       thetaLength: { type: 'number', default: 180 },
 
-      // --- 平面 (plane) 参数 (备用) ---
       width: { type: 'number', default: 1 },
       height: { type: 'number', default: 1 },
     },
@@ -506,7 +494,6 @@ export default function registerAframeComponents(options) {
       const texture = new THREE.VideoTexture(this.videoEl);
       texture.colorSpace = THREE.SRGBColorSpace;
 
-      // 根据 eye 设置纹理的 repeat 和 offset
       if (this.data.eye === 'left') {
         texture.repeat.set(0.5, 1);
         texture.offset.set(0, 0);
@@ -518,7 +505,7 @@ export default function registerAframeComponents(options) {
       this.el.setAttribute('material', {
         shader: 'flat',
         src: texture,
-        side: 'double' // 对于球面或曲面，'double' 或 'back' 通常是必须的
+        side: 'back' 
       });
 
       this.updateGeometry();
@@ -526,8 +513,6 @@ export default function registerAframeComponents(options) {
     },
 
     update: function (oldData) {
-      // 如果几何体相关参数变化，则更新几何体
-      // (这里简单处理，每次update都更新)
       this.updateGeometry();
       this.updateLayer();
     },
@@ -550,7 +535,6 @@ export default function registerAframeComponents(options) {
           };
           break;
         
-        // 这里可以保留其他几何体类型作为备用
         case 'plane':
         default:
           geometryParams = {
@@ -633,140 +617,12 @@ export default function registerAframeComponents(options) {
   //     }
   //   }
   // });
-  
-  // /* Menu */
-  // AFRAME.registerComponent('highlight', {
-  //   init: function () {
-  //     var buttonEls = this.buttonEls = this.el.querySelectorAll('.menu-button');
-  //     var backgroundEl = document.querySelector('#background');
-  //     this.groups = [
-  //       ['button1', 'button2'],
-  //       ['button3', 'button4'],
-  //       ['button5', 'button6'],
-  //       ['button7', 'button8'],
-  //       ['button9', 'button10'],
-  //       ['sap-data-start', 'sap-data-stop'],
-  //       ['sap-data-complete']
-  //     ];
-  //     window.menuActiveBtnIds = window.menuActiveBtnIds || ['button1', 'button3', 'button5', 'button8', 'button10', 'sap-data-stop'];
-  //     const activeBtnIds = window.menuActiveBtnIds;
-  //     this.activeBtns = [null, null, null, null, null, null];
-
-  //     this.onClick = this.onClick.bind(this);
-  //     this.onMouseEnter = this.onMouseEnter.bind(this);
-  //     this.onMouseLeave = this.onMouseLeave.bind(this);
-  //     this.reset = this.reset.bind(this);
-
-  //     for (let groupIdx = 0; groupIdx < this.groups.length; ++groupIdx) {
-  //       const btnId = activeBtnIds[groupIdx];
-  //       const el = document.getElementById(btnId);
-  //       if (el) {
-  //         el.setAttribute('material', 'color', '#00ff00');
-  //         this.activeBtns[groupIdx] = el;
-  //       }
-  //     }
-  //     for (var i = 0; i < buttonEls.length; ++i) {
-  //       if (!activeBtnIds.includes(buttonEls[i].id)) {
-  //         buttonEls[i].setAttribute('material', 'color', 'white');
-  //       }
-  //       buttonEls[i].addEventListener('mouseenter', this.onMouseEnter);
-  //       buttonEls[i].addEventListener('mouseleave', this.onMouseLeave);
-  //       buttonEls[i].addEventListener('click', this.onClick);
-  //     }
-  //     backgroundEl.addEventListener('click', this.reset);
-  //   },
-
-  //   getGroupIndex: function (btnId) {
-  //     for (let i = 0; i < this.groups.length; ++i) {
-  //       if (this.groups[i].includes(btnId)) return i;
-  //     }
-  //     return -1;
-  //   },
-
-  //   onClick: function (evt) {
-  //     const btnId = evt.target.id;
-  //     const groupIdx = this.getGroupIndex(btnId);
-  //     if (groupIdx === -1) return;
-  //     for (const id of this.groups[groupIdx]) {
-  //       const el = document.getElementById(id);
-  //       if (el) el.setAttribute('material', 'color', 'white');
-  //     }
-  //     evt.target.setAttribute('material', 'color', '#00ff00');
-  //     this.activeBtns[groupIdx] = evt.target;
-  //     window.menuActiveBtnIds[groupIdx] = btnId;
-  //     this.el.addState('clicked');
-  //   },
-
-  //   onMouseEnter: function (evt) {
-  //     const btnId = evt.target.id;
-  //     const groupIdx = this.getGroupIndex(btnId);
-  //     if (groupIdx === -1) return;
-  //     if (evt.target !== this.activeBtns[groupIdx]) {
-  //       evt.target.setAttribute('material', 'color', '#046de7');
-  //     }
-  //   },
-
-  //   onMouseLeave: function (evt) {
-  //     const btnId = evt.target.id;
-  //     const groupIdx = this.getGroupIndex(btnId);
-  //     if (groupIdx === -1) return;
-  //     if (evt.target !== this.activeBtns[groupIdx]) {
-  //       evt.target.setAttribute('material', 'color', 'white');
-  //     }
-  //   },
-
-  //   reset: function () {
-  //     // 不重置 window.menuActiveBtnIds，只重置显示
-  //     for (let i = 0; i < this.groups.length; ++i) {
-  //       for (const id of this.groups[i]) {
-  //         const el = document.getElementById(id);
-  //         if (el) el.setAttribute('material', 'color', 'white');
-  //       }
-  //       this.activeBtns[i] = null;
-  //     }
-  //     this.el.removeState('clicked');
-  //   }
-  // });
-
-  // AFRAME.registerComponent('button-action', {
-  //   init: function () {
-  //     // Select all menu buttons
-  //     const buttonEls = document.querySelectorAll('.menu-button');
-  //     for (let i = 0; i < buttonEls.length; ++i) {
-  //       buttonEls[i].addEventListener('click', (evt) => {
-  //         const btnId = evt.currentTarget.id;
-  //         if (btnId === "button1") {
-  //           setHmdControl(false);
-  //         } else if (btnId === "button2") {
-  //           setHmdControl(true);
-  //         } else if (btnId === "button3") {
-  //           setShowVideo(false);
-  //         } else if (btnId === "button4") {
-  //           setShowVideo(true);
-  //         } else if (btnId === "button5") {
-  //           setShowModel(true);
-  //         } else if (btnId === "button6") {
-  //           setShowModel(false);
-  //         } else if (btnId === "button7") {
-  //           setShareControl(true);
-  //         } else if (btnId === "button8") {
-  //           setShareControl(false);
-  //         } else if (btnId === "button9") {
-  //           setWholeBodyControl(true);
-  //         } else if (btnId === "button10") {
-  //           setWholeBodyControl(false);
-  //         } 
-  //       });
-  //     }
-  //   }
-  // });
 
   AFRAME.registerComponent('highlight', {
     init: function () {
       var buttonEls = this.buttonEls = this.el.querySelectorAll('.menu-button');
       var backgroundEl = document.querySelector('#background');
       
-      // 1. 传统业务保留原有的单选互斥组 (1对1开关)
       this.groups = [
         ['button1', 'button2'],
         ['button3', 'button4'],
@@ -775,13 +631,11 @@ export default function registerAframeComponents(options) {
         ['button9', 'button10']
       ];
       
-      // 2. 将数据录制按钮划入独立名单，防止单选互斥逻辑破坏 React 渲染的状态
       this.dataRecordBtnIds = ['sap-data-start', 'sap-data-stop', 'sap-data-complete'];
 
       window.menuActiveBtnIds = window.menuActiveBtnIds || ['button1', 'button3', 'button5', 'button8', 'button10'];
       const activeBtnIds = window.menuActiveBtnIds;
       
-      // 动态初始化数组长度，防止写死长度导致越界
       this.activeBtns = new Array(this.groups.length).fill(null);
 
       this.onClick = this.onClick.bind(this);
@@ -789,7 +643,6 @@ export default function registerAframeComponents(options) {
       this.onMouseLeave = this.onMouseLeave.bind(this);
       this.reset = this.reset.bind(this);
 
-      // 初始化前5组单选按钮的绿光高亮
       for (let groupIdx = 0; groupIdx < this.groups.length; ++groupIdx) {
         const btnId = activeBtnIds[groupIdx];
         const el = document.getElementById(btnId);
@@ -799,10 +652,8 @@ export default function registerAframeComponents(options) {
         }
       }
       
-      // 初始化普通按钮的底色，并绑定交互事件
       for (var i = 0; i < buttonEls.length; ++i) {
         const btn = buttonEls[i];
-        // 只对前 5 组传统按钮进行底色置白初始化（数据流按钮颜色由 React 接管）
         if (!activeBtnIds.includes(btn.id) && !this.dataRecordBtnIds.includes(btn.id)) {
           btn.setAttribute('material', 'color', 'white');
         }
@@ -823,7 +674,6 @@ export default function registerAframeComponents(options) {
     onClick: function (evt) {
       const btnId = evt.target.id;
       
-      // 👉 拦截：如果是数据录制按钮，点击时跳过 A-Frame 的颜色覆盖，完全留给 React 处理
       if (this.dataRecordBtnIds.includes(btnId)) return;
 
       const groupIdx = this.getGroupIndex(btnId);
@@ -844,13 +694,10 @@ export default function registerAframeComponents(options) {
 
       if (['sap-data-start', 'sap-data-stop'].includes(btnId)) return;
       
-      // 👉 如果是数据流按钮且处于被禁用状态（无 raycastable），不触发悬停高亮
       if (this.dataRecordBtnIds.includes(btnId) && !evt.target.classList.contains('raycastable')) return;
 
       const groupIdx = this.getGroupIndex(btnId);
-      // 普通按钮如果没有被激活，或者数据录制按钮悬停时，提供标志性的蓝色悬停反馈
       if (groupIdx === -1 || evt.target !== this.activeBtns[groupIdx]) {
-        // 临时存储原有颜色，用于 Leave 时恢复（针对 React 按钮动态色极其有用）
         // evt.target.setAttribute('data-pre-hover-color', evt.target.getAttribute('material').color);
         evt.target.setAttribute('material', 'color', '#046de7');
       }
@@ -864,7 +711,6 @@ export default function registerAframeComponents(options) {
       const groupIdx = this.getGroupIndex(btnId);
       
       if (this.dataRecordBtnIds.includes(btnId)) {
-        // 👉 数据流按钮恢复 React 赋予它们的本色
         const preColor = evt.target.getAttribute('data-pre-hover-color') || '#333333';
         evt.target.setAttribute('material', 'color', preColor);
         return;
@@ -888,7 +734,6 @@ export default function registerAframeComponents(options) {
     }
   });
 
-  // 👉 保持原样，纯粹处理非 React 状态的业务绑定
   AFRAME.registerComponent('button-action', {
     init: function () {
       const buttonEls = document.querySelectorAll('.menu-button');
@@ -912,8 +757,7 @@ export default function registerAframeComponents(options) {
 
   AFRAME.registerComponent('fps-counter', {
     schema: {
-      for90fps: { default: true },
-      updateInterval: { default: 10 } // 每 N 帧更新一次
+      updateInterval: { default: 10 } 
     },
 
     init: function () {
@@ -928,7 +772,7 @@ export default function registerAframeComponents(options) {
       this.frameCount = 0;
       this.frameDuration = 0;
       this.currentFPS = 0;
-      this.fpsHistory = []; // ✅ 记录历史帧率，用于计算平均值
+      this.fpsHistory = []; 
       this.maxHistoryLength = 30;
     },
 
@@ -936,292 +780,35 @@ export default function registerAframeComponents(options) {
       this.frameCount++;
       this.frameDuration += dt;
 
-      // ✅ 每隔 N 帧计算一次 FPS
       if (this.frameCount >= this.data.updateInterval) {
         const fps = 1000 / (this.frameDuration / this.frameCount);
         this.currentFPS = fps;
 
-        // ✅ 平滑 FPS 显示（移动平均）
         this.fpsHistory.push(fps);
         if (this.fpsHistory.length > this.maxHistoryLength) {
           this.fpsHistory.shift();
         }
         const avgFPS = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
 
-        // ✅ 根据 FPS 动态调整颜色
         let color = 'green';
-        if (this.data.for90fps) {
-          if (avgFPS < 85) { color = 'yellow'; }
-          if (avgFPS < 80) { color = 'orange'; }
-          if (avgFPS < 75) { color = 'red'; }
-        } else {
-          if (avgFPS < 55) { color = 'yellow'; }
-          if (avgFPS < 45) { color = 'orange'; }
-          if (avgFPS < 30) { color = 'red'; }
-        }
+        if (avgFPS >= 59.9) { color = 'green'; }
+        else if (avgFPS >= 50) { color = 'orange'; }
+        else if (avgFPS < 50) { color = 'red'; }
 
-        // ✅ 一次性更新文本和颜色（减少 DOM 操作）
         this.el.setAttribute('text', {
           value: `${avgFPS.toFixed(0)} fps`,
           color: color
         });
 
-        // 重置计数器
         this.frameCount = 0;
         this.frameDuration = 0;
       }
     },
 
-    // ✅ 新增：外部可获取当前 FPS
     getFPS: function () {
       return this.currentFPS;
     }
   });
-
-  // ----- Hand Tracking -----
-  // WebXR Hand 25 Joints checke https://developers.meta.com/horizon/documentation/web/webxr-hands/
-  // 0     ["wrist"],
-  // 1-4   ["thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip"],
-  // 5-9   ["index-finger-metacarpal", "index-finger-phalanx-proximal", "index-finger-phalanx-intermediate", "index-finger-phalanx-distal", "index-finger-tip"],
-  // 10-14 ["middle-finger-metacarpal", "middle-finger-phalanx-proximal", "middle-finger-phalanx-intermediate", "middle-finger-phalanx-distal", "middle-finger-tip"],
-  // 15-19 ["ring-finger-metacarpal", "ring-finger-phalanx-proximal", "ring-finger-phalanx-intermediate", "ring-finger-phalanx-distal", "ring-finger-tip"],
-  // 20-24 ["pinky-finger-metacarpal", "pinky-finger-phalanx-proximal", "pinky-finger-phalanx-intermediate", "pinky-finger-phalanx-distal", "pinky-finger-tip"]
-  // AFRAME.registerComponent('vr-hand-as-controller', {
-  //   schema: {
-  //     hand: { type: 'string', default: 'right' },
-  //   },
-
-  //   init: function () {
-  //     this.jointObjects = {
-  //       wrist: new THREE.Object3D(),
-  //       thumbTip: new THREE.Object3D(),
-  //       indexTip: new THREE.Object3D(),
-  //       indexInter: new THREE.Object3D(),
-  //       indexMeta: new THREE.Object3D(),
-  //       middleTip: new THREE.Object3D(),
-  //       middleMeta: new THREE.Object3D(),
-  //       pinkyTip: new THREE.Object3D(),
-  //     };
-
-  //     // ✅ 添加菜单手势状态管理
-  //     this.menuGestureState = {
-  //       isGestureActive: false,       // 当前手势是否激活
-  //       gestureStartTime: 0,          // 手势开始时间
-  //       lastToggleTime: 0,            // 上次切换菜单的时间
-  //       HOLD_DURATION: 600,           // 需要保持手势的时间（毫秒）
-  //       COOLDOWN_DURATION: 1000,      // 冷却时间，防止误触发
-  //     };
-  //   },
-
-  //   getJointPose: function(jointName) {
-  //     return this.jointObjects[jointName];
-  //   },
-    
-  //   tick: function () {
-  //     const sceneEl = this.el.sceneEl;
-  //     const frame = sceneEl.frame;
-  //     const renderer = sceneEl.renderer;
-
-  //     if (!frame || !renderer.xr.enabled) return;
-
-  //     const session = renderer.xr.getSession();
-  //     if (!session) return;
-
-  //     const inputSource = Array.from(session.inputSources).find(
-  //       s => s.hand && s.handedness === this.data.hand
-  //     );
-
-  //     if (inputSource) {
-  //       const refSpace = renderer.xr.getReferenceSpace();
-  //       const hand = inputSource.hand;
-
-  //       // Get poses for hand joints
-  //       const wristPose = frame.getJointPose(hand.get('wrist'), refSpace);
-  //       const thumbTipPose = frame.getJointPose(hand.get('thumb-tip'), refSpace);
-  //       const indexTipPose = frame.getJointPose(hand.get('index-finger-tip'), refSpace);
-  //       const indexMetaPose = frame.getJointPose(hand.get('index-finger-metacarpal'), refSpace);
-  //       const indexInterPose = frame.getJointPose(hand.get('index-finger-phalanx-intermediate'), refSpace);
-  //       const middleTipPose = frame.getJointPose(hand.get('middle-finger-tip'), refSpace);
-  //       const middleMetaPose = frame.getJointPose(hand.get('middle-finger-metacarpal'), refSpace);
-  //       const pinkyTipPose = frame.getJointPose(hand.get('pinky-finger-tip'), refSpace);
-
-  //       if (!wristPose || !thumbTipPose || !indexTipPose || !indexMetaPose || !middleTipPose || !middleMetaPose || !pinkyTipPose) {
-  //         return; 
-  //       }
-
-  //       // Update joint positions and orientations
-  //       const { position: pWrist, orientation: qWrist } = wristPose.transform;
-  //       this.jointObjects.wrist.position.set(pWrist.x, pWrist.y, pWrist.z);
-  //       this.jointObjects.wrist.quaternion.set(qWrist.x, qWrist.y, qWrist.z, qWrist.w);
-
-  //       const { position: pThumb, orientation: qThumb } = thumbTipPose.transform;
-  //       this.jointObjects.thumbTip.position.set(pThumb.x, pThumb.y, pThumb.z);
-  //       this.jointObjects.thumbTip.quaternion.set(qThumb.x, qThumb.y, qThumb.z, qThumb.w);
-
-  //       const { position: pIndexTip, orientation: qIndexTip } = indexTipPose.transform;
-  //       this.jointObjects.indexTip.position.set(pIndexTip.x, pIndexTip.y, pIndexTip.z);
-  //       this.jointObjects.indexTip.quaternion.set(qIndexTip.x, qIndexTip.y, qIndexTip.z, qIndexTip.w);
-
-  //       const { position: pIndexMeta, orientation: qIndexMeta } = indexMetaPose.transform;
-  //       this.jointObjects.indexMeta.position.set(pIndexMeta.x, pIndexMeta.y, pIndexMeta.z);
-  //       this.jointObjects.indexMeta.quaternion.set(qIndexMeta.x, qIndexMeta.y, qIndexMeta.z, qIndexMeta.w);
-
-  //       const { position: pIndexInter, orientation: qIndexInter } = indexInterPose.transform;
-  //       this.jointObjects.indexInter.position.set(pIndexInter.x, pIndexInter.y, pIndexInter.z);
-  //       this.jointObjects.indexInter.quaternion.set(qIndexInter.x, qIndexInter.y, qIndexInter.z, qIndexInter.w);
-
-  //       const { position: pMiddleTip, orientation: qMiddleTip } = middleTipPose.transform;
-  //       this.jointObjects.middleTip.position.set(pMiddleTip.x, pMiddleTip.y, pMiddleTip.z);
-  //       this.jointObjects.middleTip.quaternion.set(qMiddleTip.x, qMiddleTip.y, qMiddleTip.z, qMiddleTip.w);
-
-  //       const { position: pMiddleMeta, orientation: qMiddleMeta } = middleMetaPose.transform;
-  //       this.jointObjects.middleMeta.position.set(pMiddleMeta.x, pMiddleMeta.y, pMiddleMeta.z);
-  //       this.jointObjects.middleMeta.quaternion.set(qMiddleMeta.x, qMiddleMeta.y, qMiddleMeta.z, qMiddleMeta.w);
-
-  //       const { position: pPinkyTip, orientation: qPinkyTip } = pinkyTipPose.transform;
-  //       this.jointObjects.pinkyTip.position.set(pPinkyTip.x, pPinkyTip.y, pPinkyTip.z);
-  //       this.jointObjects.pinkyTip.quaternion.set(qPinkyTip.x, qPinkyTip.y, qPinkyTip.z, qPinkyTip.w);
-
-  //       // Retargeting
-  //       const dThumbIndex = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.indexTip.position);
-  //       const dIndexTipMeta = this.jointObjects.indexTip.position.distanceTo(this.jointObjects.indexMeta.position);
-
-  //       const dThumbMiddle = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.middleTip.position);
-  //       const dMiddleTipMeta = this.jointObjects.middleTip.position.distanceTo(this.jointObjects.middleMeta.position);
-
-  //       const dThumbIndexInter = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.indexInter.position);
-        
-  //       let thumbIndexTipRatio = 0;
-  //       let thumbMiddleRatio = 0;
-  //       let indexMetaRatio = 0;
-  //       let middleMetaRatio = 0;
-  //       let thumbIndexInterRatio = 0;
-
-  //       if (dThumbIndex < 0.018) {
-  //         thumbIndexTipRatio = 1;
-  //       } else if (dThumbIndex > 0.09) {
-  //         thumbIndexTipRatio = 0;
-  //       } else {
-  //         thumbIndexTipRatio = 1 - (dThumbIndex - 0.018) / (0.09 - 0.018);
-  //       }
-
-  //       if (dIndexTipMeta < 0.07) {
-  //         indexMetaRatio = 1;
-  //       } else if (dIndexTipMeta > 0.14) {
-  //         indexMetaRatio = 0;
-  //       } else {
-  //         indexMetaRatio = 1 - (dIndexTipMeta - 0.07) / (0.14 - 0.07);
-  //       }
-
-  //       if (dThumbMiddle < 0.02) {
-  //         thumbMiddleRatio = 1;
-  //       } else if (dThumbMiddle > 0.095) {
-  //         thumbMiddleRatio = 0;
-  //       } else {
-  //         thumbMiddleRatio = 1 - (dThumbMiddle - 0.02) / (0.095 - 0.02);
-  //       }
-        
-  //       if (dMiddleTipMeta < 0.07) {
-  //         middleMetaRatio = 1;
-  //       } else if (dMiddleTipMeta > 0.15) {
-  //         middleMetaRatio = 0;
-  //       } else {
-  //         middleMetaRatio = 1 - (dMiddleTipMeta - 0.07) / (0.15 - 0.07);
-  //       }
-
-  //       // if (dThumbIndexInter < 0.025) {
-  //       //   thumbIndexInterRatio = 1;
-  //       // } else if (dThumbIndexInter > 0.10) {
-  //       //   thumbIndexInterRatio = 0;
-  //       // } else {
-  //       //   thumbIndexInterRatio = 1 - (dThumbIndexInter - 0.025) / (0.10 - 0.025);
-  //       // }
-
-  //       if (dThumbIndexInter < 0.010) {
-  //         thumbIndexInterRatio = 1;
-  //       } else if (dThumbIndexInter > 0.10) {
-  //         thumbIndexInterRatio = 0;
-  //       } else {
-  //         thumbIndexInterRatio = 1 - (dThumbIndexInter - 0.010) / (0.10 - 0.010);
-  //       }
-
-  //       // Hand Trigger
-  //       const angleIndex = this.jointObjects.indexTip.quaternion.angleTo(this.jointObjects.indexMeta.quaternion);
-  //       const angleMiddle = this.jointObjects.middleTip.quaternion.angleTo(this.jointObjects.middleMeta.quaternion);
-
-  //       const isIndexOpen = angleIndex < 0.5;
-  //       const isMiddleOpen = angleMiddle < 0.5;
-
-  //       const isTriggered = !(isIndexOpen && isMiddleOpen);
-
-  //       // ✅ 优化后的菜单手势检测（拇指-小指触碰）
-  //       const dThumbPinky = this.jointObjects.thumbTip.position.distanceTo(this.jointObjects.pinkyTip.position);
-  //       const currentTime = performance.now();
-  //       const state = this.menuGestureState;
-
-  //       // 检测手势是否满足触发条件
-  //       const isGestureDetected = dThumbPinky < 0.028; // 触发距离,m
-
-  //       if (isGestureDetected) {
-  //         if (!state.isGestureActive) {
-  //           // 手势刚开始
-  //           state.isGestureActive = true;
-  //           state.gestureStartTime = currentTime;
-  //           console.log('👆 拇指-小指手势开始');
-  //         } else {
-  //           // 手势持续中，检查是否达到触发时长
-  //           const holdDuration = currentTime - state.gestureStartTime;
-  //           const timeSinceLastToggle = currentTime - state.lastToggleTime;
-            
-  //           if (holdDuration >= state.HOLD_DURATION && 
-  //               timeSinceLastToggle >= state.COOLDOWN_DURATION &&
-  //               !state.hasTriggered) { // 防止长按期间重复触发
-              
-  //             // ✅ 自动切换菜单状态
-  //             setShowMenu((prev) => {
-  //               console.log(`🎯 菜单自动切换: ${prev ? 'OFF' : 'ON'} (按住 ${holdDuration.toFixed(0)}ms)`);
-  //               return !prev;
-  //             });
-              
-  //             state.lastToggleTime = currentTime;
-  //             state.hasTriggered = true; // 标记已触发
-  //           }
-  //         }
-  //       } else {
-  //         // 手势结束
-  //         if (state.isGestureActive) {
-  //           const holdDuration = currentTime - state.gestureStartTime;
-            
-  //           if (!state.hasTriggered) {
-  //             console.log(`❌ 手势时间不足: ${holdDuration.toFixed(0)}ms (需要 ${state.HOLD_DURATION}ms)`);
-  //           }
-            
-  //           state.isGestureActive = false;
-  //           state.hasTriggered = false; // 重置触发标记
-  //         }
-  //       }
-
-  //       // Update
-  //       if (this.data.hand === 'right') {
-  //         set_trigger_on(isTriggered);
-  //         set_controller_object(this.jointObjects.wrist);
-  //         setThumbIndexRight(Math.max(0, Math.min(1, thumbIndexTipRatio)));
-  //         setThumbMiddleRight(Math.max(0, Math.min(1, thumbMiddleRatio)));
-  //         setIndexMetaRight(Math.max(0, Math.min(1, indexMetaRatio)));
-  //         setMiddleMetaRight(Math.max(0, Math.min(1, middleMetaRatio)));
-  //         setThumbIndexInterRight(Math.max(0, Math.min(1, thumbIndexInterRatio)));
-  //       } else {
-  //         set_trigger_on_left(isTriggered);
-  //         set_controller_object_left(this.jointObjects.wrist);
-  //         setThumbIndexLeft(Math.max(0, Math.min(1, thumbIndexTipRatio)));
-  //         setThumbMiddleLeft(Math.max(0, Math.min(1, thumbMiddleRatio)));
-  //         setIndexMetaLeft(Math.max(0, Math.min(1, indexMetaRatio)));
-  //         setMiddleMetaLeft(Math.max(0, Math.min(1, middleMetaRatio)));
-  //         setThumbIndexInterLeft(Math.max(0, Math.min(1, thumbIndexInterRatio)));
-  //       }
-  //     }
-  //   },
-  // });
 
   // Hand Tracking with Laser Pointer. Not stable yet, so commented out for now.
   AFRAME.registerComponent('vr-hand-as-controller', {
@@ -1253,11 +840,11 @@ export default function registerAframeComponents(options) {
       };
 
       this.menuGestureState = {
-        isGestureActive: false,       // 当前手势是否激活
-        gestureStartTime: 0,          // 手势开始时间
-        lastToggleTime: 0,            // 上次切换菜单的时间
-        HOLD_DURATION: 600,           // 需要保持手势的时间（毫秒）
-        COOLDOWN_DURATION: 1000,      // 冷却时间，防止误触发
+        isGestureActive: false,      
+        gestureStartTime: 0,          
+        lastToggleTime: 0,            
+        HOLD_DURATION: 600,           
+        COOLDOWN_DURATION: 1000,      
       };
 
       const laserMaterial = new THREE.LineBasicMaterial({ color: '#4CC3D9' });
@@ -1276,23 +863,14 @@ export default function registerAframeComponents(options) {
 
       this.forwardVector = new THREE.Vector3(0, 0, -1);
 
-      // ✅ 新增:平滑后的方向四元数,初始值可以先设成单位四元数
       this.smoothedWristQuaternion = new THREE.Quaternion();
       this.smoothingInitialized = false;
 
-      // ✅ 平滑系数,0~1之间,越小越平滑(但延迟越大),越大越跟手(但抖动越明显)
       this.smoothingFactor = 0.25;
-
-      // ✅ 捏合开始时锁定的方向,用于避免触发瞬间的抖动
       this.lockedDirectionOnPinch = null;
 
-      // ✅ 新增:向内偏移15度的固定旋转偏移
-      // "向内"通常是绕 Y 轴(左右转向)旋转,左手和右手偏移方向相反
       const offsetAngleDeg = 10;
       const offsetAngleRad = THREE.MathUtils.degToRad(offsetAngleDeg);
-      
-      // 右手向内偏移(比如向左转15度,朝身体中线方向) -> 用负角度
-      // 左手向内偏移(比如向右转15度,朝身体中线方向) -> 用正角度
       const sign = -1;
       
       this.laserOffsetQuaternion = new THREE.Quaternion().setFromAxisAngle(
@@ -1482,16 +1060,11 @@ export default function registerAframeComponents(options) {
           setThumbIndexInterLeft(Math.max(0, Math.min(1, thumbIndexInterRatio)));
         }
 
-        // ✅ 对手腕旋转做平滑处理(四元数球面插值)
         if (!this.data.showMenu) {
           this.laserLine.visible = false;
           this.currentIntersection = null;
-          this.wasPinching = false; // 顺便重置捏合状态，避免菜单关闭期间残留的捏合状态影响下次打开
-          // 直接 return，跳过后面激光计算和点击判定的逻辑，节省性能
-          // 注意：如果 tick 后面还有别的逻辑（比如你的手势检测、setThumbIndexRight 等），
-          // 不要直接 return，而是用 if/else 包裹激光这部分，让其他逻辑继续执行
+          this.wasPinching = false; 
         } else {
-          // 平滑处理
           if (!this.smoothingInitialized) {
             this.smoothedWristQuaternion.copy(this.jointObjects.wrist.quaternion);
             this.smoothingInitialized = true;
@@ -1499,7 +1072,6 @@ export default function registerAframeComponents(options) {
             this.smoothedWristQuaternion.slerp(this.jointObjects.wrist.quaternion, this.smoothingFactor);
           }
 
-          // ✅ 先复制平滑后的手腕朝向,再叠加固定偏移(相乘顺序决定了偏移是"局部坐标系"还是"世界坐标系"下的旋转)
           const finalQuaternion = this.smoothedWristQuaternion.clone().multiply(this.laserOffsetQuaternion);
 
           const direction = this.forwardVector.clone()
@@ -1531,7 +1103,6 @@ export default function registerAframeComponents(options) {
           this.laserLine.geometry.setFromPoints([origin, endPoint]);
           this.laserLine.geometry.attributes.position.needsUpdate = true;
 
-          // ✅ 捏合触发判定:在"刚进入捏合"的那一帧,使用当前已经平滑过的 intersection 结果
           const isPinching = dThumbIndex < 0.018;
           if (isPinching && !this.wasPinching && this.currentIntersection) {
             this.currentIntersection.object.el.dispatchEvent(new Event('click', { bubbles: true, composed: true }));
@@ -1551,13 +1122,11 @@ export default function registerAframeComponents(options) {
     },
 
     init: function () {
-      // 1. 创建线条（用于显示距离路径）
       this.geometry = new THREE.BufferGeometry();
       this.material = new THREE.LineBasicMaterial({ color: this.data.color, depthTest: false });
       this.line = new THREE.Line(this.geometry, this.material);
       this.el.sceneEl.object3D.add(this.line);
 
-      // 2. 创建文本（用于显示具体数值）
       this.textEl = document.createElement('a-entity');
       this.textEl.setAttribute('text', {
         value: '',
@@ -1570,12 +1139,10 @@ export default function registerAframeComponents(options) {
       this.tempVecA = new THREE.Vector3();
       this.tempVecB = new THREE.Vector3();
 
-      // 3. 查找对应的 vr-hand-as-controller 组件
       this.handController = null;
     },
 
     tick: function () {
-      // 懒加载：首次查找 hand controller
       if (!this.handController) {
         const handEntities = document.querySelectorAll('[vr-hand-as-controller]');
         for (let i = 0; i < handEntities.length; i++) {
@@ -1586,43 +1153,36 @@ export default function registerAframeComponents(options) {
           }
         }
         
-        // 如果还没找到，跳过本帧
         if (!this.handController) return;
       }
 
-      // 从 vr-hand-as-controller 获取关节对象
       const jointA = this.handController.jointObjects[this.data.jointA];
       const jointB = this.handController.jointObjects[this.data.jointB];
 
       if (jointA && jointB && jointA.position && jointB.position) {
-        // 检查位置是否有效（不为零向量，表示已更新）
         if (jointA.position.lengthSq() > 0 && jointB.position.lengthSq() > 0) {
           this.tempVecA.copy(jointA.position);
           this.tempVecB.copy(jointB.position);
 
-          // 更新线条顶点
           this.geometry.setFromPoints([this.tempVecA, this.tempVecB]);
           this.line.visible = true;
 
-          // 更新文本位置和内容 (放在线条中间)
           const dist = this.tempVecA.distanceTo(this.tempVecB);
           this.textEl.setAttribute('visible', true);
           this.textEl.object3D.position.lerpVectors(this.tempVecA, this.tempVecB, 0.5);
-          this.textEl.object3D.position.y += 0.02; // 稍微向上偏移防止重叠
+          this.textEl.object3D.position.y += 0.02; 
           this.textEl.setAttribute('text', 'value', (dist * 100).toFixed(1) + ' cm');
           
           return;
         }
       }
       
-      // 如果没追踪到，隐藏
       this.line.visible = false;
       this.textEl.setAttribute('visible', false);
     }
     
   });
 
-  // 新增：显示关节角度的可视化组件
   AFRAME.registerComponent('finger-angle-visualizer', {
     schema: {
       hand: { type: 'string', default: 'right' },
@@ -1632,7 +1192,6 @@ export default function registerAframeComponents(options) {
     },
 
     init: function () {
-      // 创建文本显示角度
       this.textEl = document.createElement('a-entity');
       this.textEl.setAttribute('text', {
         value: '',
@@ -1646,7 +1205,6 @@ export default function registerAframeComponents(options) {
     },
 
     tick: function () {
-      // 懒加载 hand controller
       if (!this.handController) {
         const handEntities = document.querySelectorAll('[vr-hand-as-controller]');
         for (let i = 0; i < handEntities.length; i++) {
@@ -1664,11 +1222,9 @@ export default function registerAframeComponents(options) {
 
       if (jointA && jointB && jointA.quaternion && jointB.quaternion) {
         if (jointA.position.lengthSq() > 0 && jointB.position.lengthSq() > 0) {
-          // 计算四元数角度差
           const angle = jointA.quaternion.angleTo(jointB.quaternion);
           const angleDegrees = THREE.MathUtils.radToDeg(angle);
 
-          // 显示在两个关节中间
           this.textEl.object3D.position.lerpVectors(jointA.position, jointB.position, 0.5);
           this.textEl.object3D.position.y += 0.03;
           this.textEl.setAttribute('text', 'value', `${angleDegrees.toFixed(1)}°`);
@@ -1754,87 +1310,6 @@ export default function registerAframeComponents(options) {
     },
     remove: function () {
       this.el.removeObject3D('border');
-    }
-  });
-
-  AFRAME.registerComponent('hand-tracking-laser', {
-    schema: {
-      hand: {type: 'string', default: 'right'}
-    },
-    init: function () {
-      this.raycaster = null;
-      this.line = null;
-      this.pinchStarted = false;
-      this.currentIntersection = null;
-
-      // 创建激光线的可视化对象
-      const material = new THREE.LineBasicMaterial({ color: '#4CC3D9' });
-      const points = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)];
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      this.lineObj = new THREE.Line(geometry, material);
-      this.lineObj.raycast = () => {}; // 激光线本身不参与射线检测
-      this.el.sceneEl.object3D.add(this.lineObj);
-
-      // 监听捏合手势（WebXR Hand Input 标准事件）
-      this.el.addEventListener('pinchstarted', this.onPinchStarted.bind(this));
-      this.el.addEventListener('pinchended', this.onPinchEnded.bind(this));
-    },
-
-    onPinchStarted: function () {
-      this.pinchStarted = true;
-      if (this.currentIntersection) {
-        // 模拟触发标准 click 事件，让 onClick 监听器正常工作
-        this.currentIntersection.object.el.dispatchEvent(new Event('click'));
-      }
-    },
-
-    onPinchEnded: function () {
-      this.pinchStarted = false;
-    },
-
-    tick: function () {
-      const handEl = this.el;
-      const indexTip = handEl.components['hand-tracking-controls'] &&
-                        handEl.components['hand-tracking-controls'].bones &&
-                        handEl.components['hand-tracking-controls'].bones['index-finger-tip'];
-
-      if (!indexTip) return;
-
-      // 用食指指尖位置和指向作为激光起点和方向
-      const origin = new THREE.Vector3();
-      indexTip.getWorldPosition(origin);
-
-      const direction = new THREE.Vector3(0, 0, -1);
-      direction.applyQuaternion(indexTip.getWorldQuaternion(new THREE.Quaternion()));
-
-      if (!this.raycaster) {
-        this.raycaster = new THREE.Raycaster();
-      }
-      this.raycaster.set(origin, direction);
-      this.raycaster.far = 10;
-
-      // 只检测 .raycastable 元素
-      const targets = Array.from(document.querySelectorAll('.raycastable'))
-        .map(el => el.object3D)
-        .filter(Boolean);
-
-      const intersects = this.raycaster.intersectObjects(targets, true);
-      this.currentIntersection = intersects.length > 0 ? intersects[0] : null;
-
-      // 更新激光线的可视化长度
-      const points = [
-        origin,
-        this.currentIntersection
-          ? this.currentIntersection.point
-          : origin.clone().add(direction.multiplyScalar(2))
-      ];
-      this.lineObj.geometry.setFromPoints(points);
-    },
-
-    remove: function () {
-      if (this.lineObj) {
-        this.el.sceneEl.object3D.remove(this.lineObj);
-      }
     }
   });
 

@@ -1,18 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { connectMQTT, mqttclient, idtopic, subscribeMQTT, publishMQTT, codeType, version } from '../lib/MetaworkMQTT'
-import { MQTT_REGISTER_TOPIC, MQTT_UNREGISTER_TOPIC, MQTT_DEVICE_TOPIC, MQTT_CTRL_TOPIC, MQTT_ROBOT_STATE_TOPIC, MQTT_ROBOT_SCAN_TOPIC} from '../lib/MetaworkMQTT';
+import { connectMQTT, mqttclient, userUUID, subscribeMQTT, publishMQTT, Topic } from '../lib/MetaworkMQTT'
 
 export default function MQTT_Setup({
-  // MQTT Client and Topics
   props,
-  requestRobot,
-  // robotID: setRobotID,
-  robotID: currentRobotID,   // 改动：这里改成接收当前 robotID 的值，而不是 setter
-  setRobotID,                // 改动：setter 单独用一个明确的 prop 名
-
+  robotID: currentRobotID,   
+  setRobotID,                
   btpActionMsg: setBtpActionMsg,
-
-  // Robot State
   robot_state: setRobotState,
   scanData: setScanData,
 
@@ -27,11 +20,10 @@ export default function MQTT_Setup({
   useEffect(() => {
     // connect to MQTT broker  
     if (typeof window.mqttClient === 'undefined') {
-      // window.mqttClient = connectMQTT(requestRobot);
       window.mqttClient = connectMQTT();
       window.mqttClient.on('connect', () => {
         console.log('MQTT connected!');
-        subscribeMQTT(MQTT_DEVICE_TOPIC + idtopic); // Request Permission
+        subscribeMQTT(Topic.DEVICE + userUUID); // Request Permission
       });
     }
 
@@ -45,7 +37,7 @@ export default function MQTT_Setup({
         return;
       }
       
-      if (topic === MQTT_DEVICE_TOPIC + idtopic) {
+      if (topic === Topic.DEVICE + userUUID) {
         if (data.type != undefined) {
           console.log("Robot Requested!")
           console.log("Type:", data.type);
@@ -56,8 +48,8 @@ export default function MQTT_Setup({
           setRobotID(data.devId);
 
           // Subscribe to robot state and scan topics
-          subscribeMQTT(MQTT_ROBOT_STATE_TOPIC + data.devId);
-          subscribeMQTT(MQTT_ROBOT_SCAN_TOPIC + data.devId);
+          subscribeMQTT(Topic.ROBOT_STATE + data.devId);
+          subscribeMQTT(Topic.ROBOT_SCAN + data.devId);
 
         } else if (data.type == undefined){
           console.warn("Robot Request Failed. No Robot Available.")
@@ -67,11 +59,11 @@ export default function MQTT_Setup({
       }
 
       /* Robot State Subscription */
-      if (!props.viewer && topic === MQTT_ROBOT_STATE_TOPIC + robotIDRef.current) {
+      if (!props.viewer && topic === Topic.ROBOT_STATE + robotIDRef.current) {
           setRobotState(data);
       }
       
-      if (!props.viewer && topic === MQTT_ROBOT_SCAN_TOPIC + robotIDRef.current) {
+      if (!props.viewer && topic === Topic.ROBOT_SCAN + robotIDRef.current) {
           setScanData(data);
           console.log("Received Scan Data:", data);
       }
@@ -84,13 +76,13 @@ export default function MQTT_Setup({
   const handleBeforeUnload = () => {
     if (mqttclient != undefined) {
 
-      publishMQTT(MQTT_DEVICE_TOPIC + robotIDRef.current, JSON.stringify({ controller: "browser", devId: idtopic + "-unregister" }), 1)
+      publishMQTT(Topic.DEVICE + robotIDRef.current, JSON.stringify({ controller: "browser", devId: userUUID + "-unregister" }), 1)
       robotIDRef.current = null;
       
       // Unregister
       publishMQTT(
-        MQTT_UNREGISTER_TOPIC, 
-        JSON.stringify({ time: Date.now(), devId: idtopic }),
+        Topic.UNREGISTER, 
+        JSON.stringify({ time: Date.now(), devId: userUUID }),
         1
       );
       
