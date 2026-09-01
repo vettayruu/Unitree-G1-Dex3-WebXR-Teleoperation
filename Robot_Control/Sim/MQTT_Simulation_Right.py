@@ -2,7 +2,7 @@ import sys
 import time
 from multiprocessing import shared_memory
 import numpy as np
-from Sim.CoppeliasimControl import CoppeliasimControl
+from CoppeliasimControl import CoppeliasimControl
 
 
 if __name__ == '__main__':
