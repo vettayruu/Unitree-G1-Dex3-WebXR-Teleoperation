@@ -1,6 +1,5 @@
 import time
-from WebRTC.media_sendonly import Sendonly
-
+from media_sendonly import Sendonly
 
 class StereoSender:
     def __init__(self, signaling_urls: list[str], left_channel: str, right_channel: str):
