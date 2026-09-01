@@ -30,16 +30,10 @@ function NearZero(z) {
     Output:
         [0, 0, 0]
  */
-// function Normalize(V) {
-//     const norm = Math.sqrt(V.reduce((sum, v) => sum + v * v, 0));
-//     if (NearZero(norm)) return V.map(() => 0); 
-//     return V.map(v => v / norm);
-// }
-
 function Normalize(V) {
-    const norm = numeric.norm2(V); // ✅ 使用 numeric 内置的 L2 范数
-    if (NearZero(norm)) return numeric.rep([V.length], 0); // ✅ 返回零向量
-    return numeric.div(V, norm); // ✅ 向量除以标量
+    const norm = numeric.norm2(V); 
+    if (NearZero(norm)) return numeric.rep([V.length], 0); 
+    return numeric.div(V, norm); 
 }
 
 /* This was the original version that computed the pseudo-inverse incorrectly. It can not sovle the 6x7 matrix case correctly */
@@ -94,7 +88,7 @@ function matPinv(A) {
 //   const V = svd.rightSingularVectors;
 
 //   const tol = 1e-2;
-//   // S+ (伪逆对角阵)
+//   // S+ (pseudo-inverse of S)
 //   const S_inv = S.map(s => (Math.abs(s) > tol ? 1 / s : 0));
 //   const Splus = ml.Matrix.zeros(V.columns, U.columns);
 //   for (let i = 0; i < S_inv.length; i++) {
@@ -510,7 +504,7 @@ function MatrixLog3(R) {
     // Case 2: theta ≈ pi (Singularity)
     if (acosinput <= -0.9999999) {
         let v1, v2, v3;
-        // 寻找最大的对角元素以提高数值稳定性
+        // Find the largest diagonal element to avoid numerical instability
         if (r33 > r22 && r33 > r11) {
             const s = Math.sqrt(r33 - r11 - r22 + 1.0) * 2;
             v1 = r13 / s;
@@ -527,7 +521,6 @@ function MatrixLog3(R) {
             v2 = r21 / s;
             v3 = r31 / s;
         }
-        // 归一化并乘上 PI
         const mag = Math.sqrt(v1 * v1 + v2 * v2 + v3 * v3);
         const factor = Math.PI / mag;
         const w1 = v1 * factor, w2 = v2 * factor, w3 = v3 * factor;
@@ -537,7 +530,6 @@ function MatrixLog3(R) {
     // Case 3: Normal case
     const theta = Math.acos(acosinput);
     let factor;
-    // 小角度泰勒展开，防止 sin(theta) 近似 0
     if (theta < 1e-6) {
         factor = 0.5 * (1 + (theta * theta) / 6.0);
     } else {
@@ -725,19 +717,14 @@ function se3ToVec(se3mat) {
  *   ]
  */
 function Adjoint(T) {
-    // 假设 T 是 4x4 嵌套数组或平铺数组
-    // 直接提取 R 和 p，减少函数调用开销
     const r11 = T[0][0], r12 = T[0][1], r13 = T[0][2], px = T[0][3];
     const r21 = T[1][0], r22 = T[1][1], r23 = T[1][2], py = T[1][3];
     const r31 = T[2][0], r32 = T[2][1], r33 = T[2][2], pz = T[2][3];
 
-    // 预分配或直接返回一维数组（对现代 JS 引擎更友好）
-    // 如果必须返回 6x6 嵌套数组，建议如下手动构造：
     return [
         [r11, r12, r13, 0, 0, 0],
         [r21, r22, r23, 0, 0, 0],
         [r31, r32, r33, 0, 0, 0],
-        // 下面三行是 [p] * R 的展开计算
         [py*r31 - pz*r21, py*r32 - pz*r22, py*r33 - pz*r23, r11, r12, r13],
         [pz*r11 - px*r31, pz*r12 - px*r32, pz*r13 - px*r33, r21, r22, r23],
         [px*r21 - py*r11, px*r22 - py*r12, px*r23 - py*r13, r31, r32, r33]
@@ -869,14 +856,12 @@ function AxisAng6(expc6) {
 // }
 
 function MatrixExp6(se3mat) {
-    // 直接从 se3mat 提取分量，避免多余函数调用
     const o1 = se3mat[2][1], o2 = se3mat[0][2], o3 = se3mat[1][0]; // omega
     const v1 = se3mat[0][3], v2 = se3mat[1][3], v3 = se3mat[2][3]; // velocity v
     
     const thetaSq = o1 * o1 + o2 * o2 + o3 * o3;
     const theta = Math.sqrt(thetaSq);
 
-    // 1. 处理纯平移情况 (theta -> 0)
     if (theta < 1e-6) {
         return [
             [1, 0, 0, v1],
@@ -886,14 +871,12 @@ function MatrixExp6(se3mat) {
         ];
     }
 
-    // 2. 预计算三角函数
     const s = Math.sin(theta);
     const c = Math.cos(theta);
     const invThetaSq = 1.0 / thetaSq;
     const a = (1 - c) * invThetaSq;
     const b = (theta - s) * (invThetaSq / theta);
 
-    // 3. 计算旋转矩阵 R (直接展开 Rodrigues 公式)
     // R = I + (sin(theta)/theta)*[omg] + ((1-cos(theta))/theta^2)*[omg]^2
     const k = s / theta;
     const R = [
@@ -902,7 +885,6 @@ function MatrixExp6(se3mat) {
         [a * o1 * o3 - k * o2,     a * o2 * o3 + k * o1,     1 - a * (o1 * o1 + o2 * o2)]
     ];
 
-    // 4. 计算位移部分 p (利用叉积简化运算)
     // p = v + a*([omg]x v) + b*([omg]x ([omg]x v))
     const cross_ov = [
         o2 * v3 - o3 * v2,
@@ -993,27 +975,22 @@ function MatrixLog6(T) {
     const r21 = T[1][0], r22 = T[1][1], r23 = T[1][2], py = T[1][3];
     const r31 = T[2][0], r32 = T[2][1], r33 = T[2][2], pz = T[2][3];
 
-    // 1. 调用 MatrixLog3 并获取 theta
     const omgmat = MatrixLog3([ [r11, r12, r13], [r21, r22, r23], [r31, r32, r33] ]);
     
-    // 从矩阵中提取 omg 向量，避免重复调用函数
     const o1 = omgmat[2][1], o2 = omgmat[0][2], o3 = omgmat[1][0];
     const thetaSq = o1 * o1 + o2 * o2 + o3 * o3;
     const theta = Math.sqrt(thetaSq);
 
     let v;
     if (theta < 1e-6) {
-        // 【优化：泰勒展开】处理纯平移或极小旋转，避免分母为 0
-        // G_inv 此时近似为 I - 0.5*omgmat + (1/12)*omgmat^2
+        // G_inv ≈ I - 0.5*omgmat + (1/12)*omgmat^2
         v = [px, py, pz]; 
     } else {
         const invThetaSq = 1.0 / thetaSq;
         const halfTheta = theta / 2.0;
-        // 【优化：系数计算】
         const coeff = (1.0 - (halfTheta / Math.tan(halfTheta))) * invThetaSq;
 
-        // 【核心优化：合并 G_inv * p 计算】
-        // 不需要先算出 G_inv 矩阵，直接计算向量 v = p - 0.5 * omg x p + coeff * omg x (omg x p)
+        // v = p - 0.5 * omg x p + coeff * omg x (omg x p)
         const cross_op = [
             o2 * pz - o3 * py,
             o3 * px - o1 * pz,
@@ -1322,13 +1299,6 @@ function GetTwistFromTransform(T_sb, T_sc) {
     // Full twist S = [ω, v]
     const S = [omega_hat[0], omega_hat[1], omega_hat[2], v[0], v[1], v[2]];
     
-    // console.log("T_SE (T_sc @ T_sb⁻¹):\n", T_SE);
-    // console.log("twist vector [ωθ, vθ]:\n", twist_theta);
-    // console.log("θ:", theta);
-    // console.log("ω:", omega_hat);
-    // console.log("v:", v);
-    // console.log("Twist S = [ω, v]:", S);
-    
     return [S, theta];
 }
 
@@ -1425,12 +1395,10 @@ function FKinBody(M, Blist, thetalist) {
 
 function FKinSpace(M, Slist, thetalist) {
     let n = thetalist.length;
-    // 初始 T 为单位矩阵，我们先从左向右累加所有的 Exp
     let T = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
 
     for (let i = 0; i < n; i++) {
         const theta = thetalist[i];
-        // 只有角度不为 0 时才计算，节省微小开销
         if (Math.abs(theta) > 1e-6) {
             // 直接构造 se3 向量，不使用 map
             const s1 = Slist[0][i] * theta, s2 = Slist[1][i] * theta, s3 = Slist[2][i] * theta;
@@ -1448,7 +1416,7 @@ function FKinSpace(M, Slist, thetalist) {
         }
     }
 
-    // 最后再乘以初始位姿 M: T_final = T * M
+    // M: T_final = T * M
     return numeric.dot(T, M);
 }
 
@@ -1545,24 +1513,19 @@ function JacobianSpace(Slist, thetalist) {
     const n = thetalist.length;
     let Js = Array.from({ length: 6 }, () => new Float64Array(n));
     
-    // 第一列永远是第一个螺旋轴
     for (let r = 0; r < 6; r++) Js[r][0] = Slist[r][0];
-
-    // T 用于存储从基座到当前关节的累积变换
     let T = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
 
     for (let i = 1; i < n; i++) {
-        // 1. 计算上一个关节产生的变换
-        // 这里只计算 Exp(S_{i-1} * theta_{i-1})
+        // Exp(S_{i-1} * theta_{i-1})
         const s_prev = [
             Slist[0][i-1] * thetalist[i-1], Slist[1][i-1] * thetalist[i-1], Slist[2][i-1] * thetalist[i-1],
             Slist[3][i-1] * thetalist[i-1], Slist[4][i-1] * thetalist[i-1], Slist[5][i-1] * thetalist[i-1]
         ];
         
-        // 累积变换 T = T_{0, i-1}
+        // T = T_{0, i-1}
         T = numeric.dot(T, MatrixExp6(VecTose3(s_prev)));
 
-        // 2. 直接提取 T 的分量进行 Adjoint 乘法
         const r11 = T[0][0], r12 = T[0][1], r13 = T[0][2], px = T[0][3];
         const r21 = T[1][0], r22 = T[1][1], r23 = T[1][2], py = T[1][3];
         const r31 = T[2][0], r32 = T[2][1], r33 = T[2][2], pz = T[2][3];
@@ -1648,93 +1611,6 @@ function IKinBody(Blist, M, T, thetalist0, eomg, ev) {
     return [thetalist, !err];
 }
 
-/**
- * IKinBodyNull - 带有零空间优化（避开限位）的物体坐标系逆运动学
- * @param {Array} Blist - 6xn 的物体螺旋轴矩阵
- * @param {Array} M - 初始末端位姿矩阵
- * @param {Array} T - 目标末端位姿矩阵
- * @param {Array} thetalist0 - 初始关节角
- * @param {Array} qmin - 关节下限
- * @param {Array} qmax - 关节上限
- * @param {Number} eomg - 旋转误差容忍度
- * @param {Number} ev - 位移误差容忍度
- */
-function IKinBodyNull(Blist, M, T, thetalist0, qmin, qmax, eomg, ev) {
-    let thetalist = thetalist0.slice();
-    let i = 0;
-    const maxiterations = 50;
-    
-    // 阻尼系数（Damped Least Squares）
-    let lambda = 1e-3; 
-    const v_max = 0.25; // 最大步长限幅
-    const n = thetalist.length;
-    const IdentityN = numeric.identity(n);
-
-    while (i < maxiterations) {
-        // 1. 计算当前位姿 (Body Frame)
-        const Tsb = FKinBody(M, Blist, thetalist);
-        
-        // 2. 计算 Body Twist 误差 Vb
-        // 公式：[Vb] = Log(inv(Tsb) * T)
-        const iTsb = TransInv(Tsb);
-        const T_diff = numeric.dot(iTsb, T);
-        const Vb = se3ToVec(MatrixLog6(T_diff));
-
-        // 3. 检查误差
-        const err_omg = Math.sqrt(Vb[0]**2 + Vb[1]**2 + Vb[2]**2);
-        const err_v = Math.sqrt(Vb[3]**2 + Vb[4]**2 + Vb[5]**2);
-        
-        if (err_omg < eomg && err_v < ev) return [thetalist, true];
-
-        // 4. 计算 Body Jacobian
-        const Jb = JacobianBody(Blist, thetalist);
-        const JbT = numeric.transpose(Jb);
-        
-        // 5. DLS 主任务求解
-        // (J^T * J + lambda * I) * dtheta = J^T * Vb
-        const JbTJb = numeric.dot(JbT, Jb);
-        const A = numeric.add(JbTJb, numeric.mul(lambda, IdentityN));
-        const b = numeric.dot(JbT, Vb);
-        
-        const dtheta_task = numeric.solve(A, b);
-
-        // 6. 零空间投影 (Null Space) 避开限位
-        // 目标：让关节尽量靠近中点 qmid
-        const qmid = thetalist.map((_, idx) => (qmax[idx] + qmin[idx]) / 2);
-        const grad = thetalist.map((t, idx) => -1.0 * (t - qmid[idx])); 
-
-        // 投影公式：dtheta_null = (I - J_pinv * J) * grad
-        // 快速实现：grad - J_pinv * (J * grad)
-        const J_grad = numeric.dot(Jb, grad);
-        const JT_J_grad = numeric.dot(JbT, J_grad);
-        const J_pinv_J_grad = numeric.solve(A, JT_J_grad);
-        const dtheta_null = numeric.sub(grad, J_pinv_J_grad);
-
-        // 7. 合成更新（主任务权重 1.0，副任务权重 0.1）
-        let step = dtheta_task.map((v, idx) => v + 0.1 * dtheta_null[idx]);
-        
-        // 8. 步长限幅 (Scaling)
-        let max_s = 0;
-        for (let j = 0; j < n; j++) {
-            const abs_s = Math.abs(step[j]);
-            if (abs_s > max_s) max_s = abs_s;
-        }
-        if (max_s > v_max) {
-            const scale = v_max / max_s;
-            for (let j = 0; j < n; j++) step[j] *= scale;
-        }
-
-        // 9. 更新关节角
-        for (let j = 0; j < n; j++) thetalist[j] += step[j];
-
-        // 10. 迭代优化
-        lambda *= 0.68; 
-        i++;
-    }
-
-    return [thetalist, false];
-}
-
 
 /**
  * Computes inverse kinematics in the space frame for an open chain robot
@@ -1790,45 +1666,41 @@ function IKinSpace(Slist, M, T, thetalist0, eomg, ev) {
     return [thetalist, !err];
 }
 
+// SVD Method
 // function IKinSpaceNull(Slist, M, T, thetalist0, qmin, qmax, eomg, ev) {
 //     let thetalist = thetalist0.slice();
 //     let i = 0;
-//     const maxiterations = 50;
-//     const alpha = 0.25;   // null-space 权重
+//     const maxiterations = 30;
+//     const alpha = 0.25;   
 
 //     let Tsb = FKinSpace(M, Slist, thetalist);
 //     let Vs = numeric.dot(Adjoint(Tsb),
 //         se3ToVec(MatrixLog6(numeric.dot(TransInv(Tsb), T)))
 //     );
 
-//     let err = (Norm(Vs.slice(0, 3)) > eomg) ||
-//               (Norm(Vs.slice(3, 6)) > ev);
+//     let err = (numeric.norm2(Vs.slice(0, 3)) > eomg) ||
+//               (numeric.norm2(Vs.slice(3, 6)) > ev);
 
 //     const n = thetalist.length;
 
-//     let I = Eye(n);
+//     let I = numeric.identity(n);
 
 //     while (err && i < maxiterations) {
 //         const Js = JacobianSpace(Slist, thetalist);
 //         const Js_pinv = matPinv(Js);
 
-//         // ===== 主任务项 =====
 //         let dtheta_task = Js_pinv.map(row =>
 //             row.reduce((sum, val, j) => sum + val * Vs[j], 0)
 //         );
 
-//         // ===== 次任务：关节限位梯度 =====
 //         let grad = thetalist.map((theta, i) => {
 //             let qmid = 0.5 * (qmax[i] + qmin[i]);
 //             return -(theta - qmid);  // 往中间拉
 //         });
-
-//         // ===== Null space 投影 =====
         
 //         let N = numeric.sub(I, numeric.dot(Js_pinv, Js));
 //         let dtheta_null = numeric.dot(N, grad);
 
-//         // ===== 合成更新 =====
 //         let dtheta = dtheta_task.map(
 //             (v, i) => v + alpha * dtheta_null[i]
 //         );
@@ -1842,8 +1714,8 @@ function IKinSpace(Slist, M, T, thetalist0, eomg, ev) {
 //             se3ToVec(MatrixLog6(numeric.dot(TransInv(Tsb), T)))
 //         );
 
-//         err = (Norm(Vs.slice(0, 3)) > eomg) ||
-//               (Norm(Vs.slice(3, 6)) > ev);
+//         err = (numeric.norm2(Vs.slice(0, 3)) > eomg) ||
+//               (numeric.norm2(Vs.slice(3, 6)) > ev);
 
 //         i += 1;
 //     }
@@ -1851,140 +1723,52 @@ function IKinSpace(Slist, M, T, thetalist0, eomg, ev) {
 //     return [thetalist, !err];
 // }
 
-    function IKinSpaceNull(Slist, M, T, thetalist0, qmin, qmax, eomg, ev) {
-        let thetalist = thetalist0.slice();
-        let i = 0;
-        const maxiterations = 50;
-        
-        // 初始阻尼系数（DLS核心）
-        let lambda = 1e-3; 
-        const v_max = 0.35; 
-        const n = thetalist.length;
-        const IdentityN = numeric.identity(n);
+// DLS Method
+function IKinSpaceNull(Slist, M, T, thetalist0, qmin, qmax, eomg, ev) {
+    let i = 0;
+    const maxiterations = 50;
+    
+    const alpha = 0.10;
+    let lambda_squared = 1e-4; 
 
-        while (i < maxiterations) {
-            // 1. 计算当前位姿与误差 (Space Frame)
-            const Tsb = FKinSpace(M, Slist, thetalist);
-            const Vs = numeric.dot(Adjoint(Tsb), 
-                se3ToVec(MatrixLog6(numeric.dot(TransInv(Tsb), T)))
-            );
+    let thetalist = thetalist0.slice();
+    const n = thetalist.length;
+    const IdentityN = numeric.identity(n);
+    const qmid = thetalist.map((_, idx) => (qmax[idx] + qmin[idx]) / 2);
 
-            // 2. 检查误差 (避免 slice 以提升速度)
-            const err_omg = Math.sqrt(Vs[0]*Vs[0] + Vs[1]*Vs[1] + Vs[2]*Vs[2]);
-            const err_v = Math.sqrt(Vs[3]*Vs[3] + Vs[4]*Vs[4] + Vs[5]*Vs[5]);
-            
-            if (err_omg < eomg && err_v < ev) return [thetalist, true];
+    while (i < maxiterations) {
+        // 1. Compute current end-effector pose and error twist
+        const Tsb = FKinSpace(M, Slist, thetalist);
+        const Vs = numeric.dot(Adjoint(Tsb), 
+            se3ToVec(MatrixLog6(numeric.dot(TransInv(Tsb), T)))
+        );
 
-            // 3. 计算雅可比
-            const Js = JacobianSpace(Slist, thetalist);
-            const JsT = numeric.transpose(Js);
-            
-            // 4. Damped Least Squares (DLS) 主任务求解
-            // 公式: (J^T * J + lambda * I) * dtheta = J^T * Vs
-            const JTJ = numeric.dot(JsT, Js);
-            const A = numeric.add(JTJ, numeric.mul(lambda, IdentityN));
-            const b = numeric.dot(JsT, Vs);
-            
-            // dtheta_task 是主任务解
-            const dtheta_task = numeric.solve(A, b);
+        // 2. Check if the error is within tolerances
+        const err_omg = Math.sqrt(Vs[0]*Vs[0] + Vs[1]*Vs[1] + Vs[2]*Vs[2]);
+        const err_v = Math.sqrt(Vs[3]*Vs[3] + Vs[4]*Vs[4] + Vs[5]*Vs[5]);
+        if (err_omg < eomg && err_v < ev) return [thetalist, true];
 
-            // 5. 零空间投影优化 (避开限位)
-            // 重点：不需要计算 N = I - J_pinv * J，这太慢了。
-            // 直接利用 N * grad = grad - J_pinv * (J * grad)
-            // 在 DLS 下，J_pinv 近似为 A^-1 * J^T
-            
-            const qmid = thetalist.map((_, idx) => (qmax[idx] + qmin[idx]) / 2);
-            const grad = thetalist.map((t, idx) => -1.0 * (t - qmid[idx])); 
+        // 3. Space Jacobian and its transpose
+        const Js = JacobianSpace(Slist, thetalist);
+        const JsT = numeric.transpose(Js);
+        const JTJ = numeric.dot(JsT, Js);
 
-            // 零空间投影计算：dtheta_null = grad - A^-1 * J^T * (J * grad)
-            const J_grad = numeric.dot(Js, grad);
-            const JT_J_grad = numeric.dot(JsT, J_grad);
-            const J_pinv_J_grad = numeric.solve(A, JT_J_grad);
-            const dtheta_null = numeric.sub(grad, J_pinv_J_grad);
+        // 4.1 Primary Task
+        const A = numeric.add(JTJ, numeric.mul(lambda_squared, IdentityN));
+        const b_1 = numeric.dot(JsT, Vs);
+        // 4.2 Null Space Task
+        const grad = thetalist.map((t, idx) => (qmid[idx] - t)); 
+        const b_2 = numeric.mul(alpha * lambda_squared, grad);
+        // 4.3 Solve and update dtheta
+        const dtheta = numeric.solve(A, numeric.add(b_1, b_2));
+        for (let j = 0; j < n; j++) thetalist[j] += dtheta[j];
 
-            // 6. 合成更新并进行步长限幅
-            let step = dtheta_task.map((v, idx) => v + 0.1 * dtheta_null[idx]);
-            
-            let max_s = 0;
-            for (let j = 0; j < n; j++) {
-                const abs_s = Math.abs(step[j]);
-                if (abs_s > max_s) max_s = abs_s;
-            }
-
-            if (max_s > v_max) {
-                const scale = v_max / max_s;
-                for (let j = 0; j < n; j++) step[j] *= scale;
-            }
-
-            // 7. 更新关节角
-            for (let j = 0; j < n; j++) thetalist[j] += step[j];
-
-            // 8. 动态调整阻尼 (Levenberg-Marquardt 简化逻辑)
-            // 随迭代减小 lambda，让后期收敛变快
-            lambda *= 0.6; 
-            i++;
-        }
-        return [thetalist, false];
+        // 5. Adjust damping (Levenberg-Marquardt style)
+        lambda_squared *= 0.49; 
+        i++;
     }
-
-    function IKRetarget(Slist, M, T, thetalist0, eomg, ev) {
-        let thetalist = thetalist0.slice();
-        const n = thetalist.length;
-        const IdentityN = numeric.identity(n);
-        
-        // --- Retarget 关键参数 ---
-        // 如果是腰部，通常优先保证旋转 (前3项)，减弱位置要求 (后3项)
-        const taskWeight = [1.0, 1.0, 1.0, 0.01, 0.01, 0.01]; 
-        let lambda = 0.01; // 较大的初始阻尼能让缺少自由度的系统更稳定
-        
-        for (let i = 0; i < 30; i++) {
-            console.log(`Iteration ${i}: thetalist =`, thetalist);
-            const Tsb = FKinSpace(M, Slist, thetalist);
-            console.log("Current Tsb:", Tsb);
-            console.log("Target T:", T);
-            
-            // 计算 Vs 误差
-            const Vs = se3ToVec(MatrixLog6(numeric.dot(TransInv(Tsb), T)));
-            console.log("Vs (before weighting):", numeric.dot(TransInv(Tsb), T));
-            
-            // 应用权重：Vs_w = W * Vs
-            const Vs_w = Vs.map((v, idx) => v * taskWeight[idx]);
-
-            // 检查加权后的误差是否达标
-            const err_omg = Math.sqrt(Vs_w[0]*Vs_w[0] + Vs_w[1]*Vs_w[1] + Vs_w[2]*Vs_w[2]);
-            const err_v = Math.sqrt(Vs_w[3]*Vs_w[3] + Vs_w[4]*Vs_w[4] + Vs_w[5]*Vs_w[5]);
-
-            if (err_omg < eomg && err_v < ev) return [thetalist, true];
-            
-            const Js = JacobianSpace(Slist, thetalist);
-            
-            // --- 加权雅可比求逆 ---
-            // Js_w = W * Js
-            const Js_w = Js.map((row, rIdx) => row.map(val => val * taskWeight[rIdx]));
-            const Js_wT = numeric.transpose(Js_w);
-
-            // DLS 求解: (Jw^T * Jw + lambda * I) * dtheta = Jw^T * Vs_w
-            const A = numeric.add(numeric.dot(Js_wT, Js_w), numeric.mul(lambda, IdentityN));
-            const b = numeric.dot(Js_wT, Vs_w);
-            
-            const dtheta = numeric.solve(A, b);
-            for (let j = 0; j < n; j++) {
-                thetalist[j] += dtheta[j];
-            }
-            // 更新关节角
-            // for (let j = 0; j < n; j++) {
-            //     thetalist[j] += dtheta[j];
-            //     // 强制限制在物理限位内
-            //     if (thetalist[j] < qmin[j]) thetalist[j] = qmin[j];
-            //     if (thetalist[j] > qmax[j]) thetalist[j] = qmax[j];
-            // }
-            
-            // 随迭代略微调整阻尼
-            lambda *= 0.8;
-        }
-        console.log("IKresult", thetalist);
-        return [thetalist, false];
-    }
+    return [thetalist, false];
+}
 
 
 /*** CHAPTER 8: DYNAMICS OF OPEN CHAINS ***/ 
@@ -2758,10 +2542,8 @@ module.exports = {
 
     // Chapter 6: Inverse Kinematics
     IKinBody,
-    IKinBodyNull,
     IKinSpace,
     IKinSpaceNull,
-    IKRetarget,
 
     // Chapter 8: Dynamics of Open Chains
     ad,
