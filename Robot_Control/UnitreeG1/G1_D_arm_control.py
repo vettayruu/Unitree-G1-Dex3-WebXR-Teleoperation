@@ -18,19 +18,19 @@ G1_NUM_MOTOR = 29
 
 # 参考参数 dt = 0.010, omega = 15.0
 Kp = [
-    80, 0.5, 0.5, 0.5, 0.1, 0.1,  # leg left
-    80, 0.5, 0.5, 0.5, 0.1, 0.1,  # leg right
+    0.1, 0.5, 0.5, 0.5, 0.1, 0.1,  # leg left
+    0.1, 0.5, 0.5, 0.5, 0.1, 0.1,  # leg right
     60, 0.5, 0.5,  # waist
-    45, 45, 35, 35, 18, 18, 18,  # arm left
-    45, 45, 35, 35, 18, 18, 18,  # arm right
+    85, 95, 70, 75, 20, 30, 25,  # arm left
+    85, 95, 70, 75, 20, 30, 25,  # arm right
 ]
 
 Kd = [
-    10.0, 0.1, 0.1, 0.1, 0.01, 0.01,  # leg left
-    10.0, 0.1, 0.1, 0.1, 0.01, 0.01,  # leg right
+    0.1, 0.1, 0.1, 0.1, 0.01, 0.01,  # leg left
+    0.1, 0.1, 0.1, 0.1, 0.01, 0.01,  # leg right
     10.0, 1, 1,  # waist
-    8.0, 8.0, 6.5, 6.5, 2.5, 2.5, 2.5,  # arm left
-    8.0, 8.0, 6.5, 6.5, 2.5, 2.5, 2.5,  # arm right
+    5.0, 4.5, 4.2, 4.2, 1.5, 2.0, 2.0,  # arm left
+    5.0, 4.5, 4.2, 4.2, 1.5, 2.0, 2.0,  # arm right
 ]
 
 
@@ -75,7 +75,7 @@ class Custom:
     def __init__(self):
         # FPS
         self.write_dt_ = 0.002  # 500Hz
-        self.control_dt_ = 0.00375  # 266Hz
+        self.control_dt_ = 0.005  # 200Hz
 
         self.time_ = 0.0
         self.duration_ = 5.0
@@ -85,22 +85,18 @@ class Custom:
         self.crc = CRC()
 
         # Shared Memory
-        self.shm_left_arm = shared_memory.SharedMemory(name='Left_Arm')
+        self.shm_left_arm  = shared_memory.SharedMemory(name='Left_Arm')
         self.shm_right_arm = shared_memory.SharedMemory(name='Right_Arm')
-        self.shm_waist = shared_memory.SharedMemory(name='Waist')
+        self.shm_waist     = shared_memory.SharedMemory(name='Waist')
 
         # --- 二阶阻尼核心参数 ---
         # Omega (ω) 决定响应速度。10.0-15.0 比较柔顺，20.0+ 响应快但对噪声敏感
-        self.omega = 16.5
+        self.omega = 12.0
 
         # 必须存储每个关节的实时速度
         self.joint_velocities = np.zeros(G1_NUM_MOTOR)
         self.q_init_start = np.zeros(G1_NUM_MOTOR)
         self.initial_pose_captured = False
-
-        self.shm_left_arm  = shared_memory.SharedMemory(name='Left_Arm')
-        self.shm_right_arm = shared_memory.SharedMemory(name='Right_Arm')
-        self.shm_waist     = shared_memory.SharedMemory(name='Waist')
 
     def Init(self):
         self.msc = MotionSwitcherClient()
@@ -185,35 +181,36 @@ class Custom:
             waist_data = np.ndarray((16,), dtype=np.float32, buffer=self.shm_waist.buf)
 
             self._update_shm_feedback(left_arm_data, right_arm_data, waist_data)
-            self._apply_all_second_order_control(left_arm_data, right_arm_data, waist_data)
+            self._apply_all_second_order_dq_control(left_arm_data, right_arm_data, waist_data)
 
-    def _apply_all_second_order_control(self, left_data, right_data, waist_data):
+    def _apply_all_second_order_dq_control(self, left_arm_q, right_arm_q, waist_data):
         # 这里的索引对应你的 G1_29_JointArmIndex 定义
         # Left Arm (15-21)
         for i in range(7):
-            self.apply_second_order_damped(15 + i, left_data[1 + i])
+            self.apply_second_order_damped(15 + i, left_arm_q[1 + i])
 
         # Right Arm (22-28)
         for i in range(7):
-            self.apply_second_order_damped(22 + i, right_data[1 + i])
+            self.apply_second_order_damped(22 + i, right_arm_q[1 + i])
 
         # Waist (12-14)
         for i in range(3):
             self.apply_second_order_damped(12 + i, waist_data[i])
 
     def apply_second_order_damped(self, joint_idx, target_q):
-        curr_q = self.low_cmd.motor_cmd[joint_idx].q  # 指令滤波器，用指令值积分
-        curr_v = self.joint_velocities[joint_idx]
+        curr_q = self.low_cmd.motor_cmd[joint_idx].q
+        curr_v = self.low_cmd.motor_cmd[joint_idx].dq
         dt = self.control_dt_
 
         error = target_q - curr_q
-        accel = (self.omega ** 2) * error - (2.0 * self.omega) * curr_v
-        # new_v = np.clip(curr_v + accel * dt, -self.max_v, self.max_v)
+        error_v = 0 - curr_v
+
+        accel = (self.omega ** 2) * error + (2.0 * self.omega) * error_v
         new_v = curr_v + accel * dt
         new_q = curr_q + new_v * dt
 
         self.low_cmd.motor_cmd[joint_idx].q = float(new_q)
-        self.joint_velocities[joint_idx] = float(new_v)
+        self.low_cmd.motor_cmd[joint_idx].dq = float(new_v)
 
     def _update_shm_feedback(self, left_data, right_data, waist_data):
         for i in range(7):
