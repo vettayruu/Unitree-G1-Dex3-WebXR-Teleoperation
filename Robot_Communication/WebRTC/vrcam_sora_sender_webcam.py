@@ -1,6 +1,6 @@
 import cv2
 import time
-from WebRTC.WebRTC_Client import StereoSender, WebCamSender
+from WebRTC_Client import StereoSender, WebCamSender
 
 SIGNALING_URLS = ["wss://sora2.uclab.jp/signaling"]
 CHANNEL = "g1-vr180"
@@ -44,11 +44,12 @@ def main():
 
             cv2.putText(frame, f"FPS: {fps:.1f}", (20, 80),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-
-            cv2.imshow("frame", frame)
+            # Option
+            # cv2.imshow("frame", frame)
+            
             webrtc.send_frames(frame)
 
-            time.sleep(0.010) # Important
+            time.sleep(0.010)
             if cv2.waitKey(1) >= 0:
                 break
 
