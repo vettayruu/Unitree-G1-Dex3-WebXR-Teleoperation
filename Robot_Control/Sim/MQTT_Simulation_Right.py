@@ -1,0 +1,75 @@
+import sys
+import time
+from multiprocessing import shared_memory
+import numpy as np
+from Sim.CoppeliasimControl import CoppeliasimControl
+
+
+if __name__ == '__main__':
+
+    joint_list = ['/waist_yaw_joint',
+                  '/waist_roll_joint/right_shoulder_pitch_joint',
+                  '/waist_roll_joint/right_shoulder_roll_joint',
+                  '/waist_roll_joint/right_shoulder_yaw_joint',
+                  '/waist_roll_joint/right_elbow_joint',
+                  '/waist_roll_joint/right_wrist_roll_joint',
+                  '/waist_roll_joint/right_wrist_pitch_joint',
+                  '/waist_roll_joint/right_wrist_yaw_joint',
+                  ]
+    tool_list = [
+                 '/waist_roll_joint/right_hand_palm_joint/right_hand_thumb_0_joint',
+                 '/waist_roll_joint/right_hand_palm_joint/right_hand_thumb_0_joint/right_hand_thumb_1_joint',
+                 '/waist_roll_joint/right_hand_palm_joint/right_hand_thumb_0_joint/right_hand_thumb_2_joint',
+                 '/waist_roll_joint/right_hand_palm_joint/right_hand_middle_0_joint',
+                 '/waist_roll_joint/right_hand_palm_joint/right_hand_middle_0_joint/right_hand_middle_1_joint',
+                 '/waist_roll_joint/right_hand_palm_joint/right_hand_index_0_joint',
+                 '/waist_roll_joint/right_hand_palm_joint/right_hand_index_0_joint/right_hand_index_1_joint',
+                 ]
+    sim = CoppeliasimControl(joint_list, tool_list)
+
+    try:
+        shm_right_arm = shared_memory.SharedMemory(name='Right_Arm')
+        shm_right_hand = shared_memory.SharedMemory(name='Right_Hand')
+
+        arm_data = np.ndarray((16,), dtype=np.float32, buffer=shm_right_arm.buf)
+        hand_data = np.ndarray((16,), dtype=np.float32, buffer=shm_right_hand.buf)
+
+        omega_n_body = 36.0
+        omega_n_tool = 65.0
+        dt = 0.005
+
+        curr_body_pos = np.array(sim.get_joint_position())
+        curr_body_vel = np.zeros_like(curr_body_pos)
+
+        curr_tool_pos = np.array(sim.get_tool_position())
+        curr_tool_vel = np.zeros_like(curr_tool_pos)
+
+        print("Right Arm Simulation Running...")
+
+        while True:
+            thetaBody_Target = arm_data[0:8].copy()
+            thetaTool_Target = hand_data[0:7].copy()
+
+            for _ in range(10):
+                accel_body = (omega_n_body ** 2) * (thetaBody_Target - curr_body_pos) - (2 * omega_n_body) * curr_body_vel
+                curr_body_vel += accel_body * dt
+                curr_body_pos += curr_body_vel * dt
+
+                accel_tool = (omega_n_tool ** 2) * (thetaTool_Target - curr_tool_pos) - (2 * omega_n_tool) * curr_tool_vel
+                curr_tool_vel += accel_tool * dt
+                curr_tool_pos += curr_tool_vel * dt
+
+                sim.send_joint_position(curr_body_pos)
+                sim.send_tool_position(curr_tool_pos)
+
+                time.sleep(dt)
+
+            arm_data[8:16] = sim.get_joint_position()
+            hand_data[8:15] = sim.get_tool_position()
+
+    except KeyboardInterrupt:
+        print("Right Arm Simulation Stopped.")
+        sys.exit(0)
+    except Exception as e:
+        print("Right Arm Simulation Error:", e)
+        sys.exit(1)
