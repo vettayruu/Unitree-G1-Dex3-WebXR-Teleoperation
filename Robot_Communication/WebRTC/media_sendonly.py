@@ -17,7 +17,7 @@ from sora_sdk import (
     SoraVideoCodecPreference,
 )
 
-from WebRTC.misc import get_video_codec_preference
+from misc import get_video_codec_preference
 
 class Sendonly:
     """
