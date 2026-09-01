@@ -3,20 +3,16 @@ const os = require('os');
 const path = require('path');
 const { execSync } = require('child_process');
 
-// 强制切换到脚本所在目录，确保生成的 pem 文件就在这里
 process.chdir(__dirname);
 
 async function main() {
     let forge;
     try {
-        // 尝试加载，如果失败则进入 catch 安装
         forge = require('node-forge');
     } catch (e) {
         console.log('📦 node-forge not found. Installing...');
         try {
-            // 在当前目录安装 node-forge
             execSync('npm install node-forge', { stdio: 'inherit' });
-            // 安装完后重新 require
             forge = require('node-forge');
             console.log('✅ node-forge installed and loaded.');
         } catch (installError) {
@@ -25,7 +21,6 @@ async function main() {
         }
     }
 
-    // 只有加载成功了才执行生成逻辑
     generateSelfSignedCert(forge);
 }
 
@@ -64,7 +59,7 @@ function generateSelfSignedCert(forge) {
         { type: 2, value: 'liust.local' },
         { type: 7, ip: '127.0.0.1' },
         ...ips.map(ip => ({ type: 7, ip: ip })),
-        ...ips.map(ip => ({ type: 2, value: ip })) // 兼容性：某些浏览器把IP当DNS
+        ...ips.map(ip => ({ type: 2, value: ip })) 
     ];
     
     cert.setExtensions([{
@@ -87,5 +82,4 @@ function generateSelfSignedCert(forge) {
     ips.forEach(ip => console.log(`  - Supported IP: ${ip}`));
 }
 
-// 执行主函数
 main();
