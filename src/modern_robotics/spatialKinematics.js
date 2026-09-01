@@ -45,7 +45,7 @@ function IK_joint_limit(T_sd, M, Slist, jointLimits, theta_body) {
   [thetalist_sol, ik_success] = mr.IKinSpaceNull(Slist, M, T_sd, theta_body, qmin, qmax, 1e-6, 1e-6);
 
   if (!ik_success) {
-    console.warn("IK failed");
+    // console.warn("IK failed");
     return { new_theta_body: theta_body, error_code: STATE_CODES.IK_FAILED };
   }
 
@@ -85,7 +85,7 @@ function IK_joint_velocity_limit(T_sd, M, Slist, jointLimits, theta_body, dt) {
   [thetalist_sol, ik_success] = mr.IKinSpaceNull(Slist, M, T_sd, theta_body, qmin, qmax, 1e-6, 1e-6);
 
   if (!ik_success) {
-    console.warn("IK failed");
+    // console.warn("IK failed");
     return { new_theta_body: theta_body, error_code: STATE_CODES.IK_FAILED };
   }
 
@@ -107,7 +107,7 @@ function IK_joint_velocity_limit(T_sd, M, Slist, jointLimits, theta_body, dt) {
   if (total_vel > max_joint_vel) {
     scale = max_joint_vel / total_vel;
     error_code = STATE_CODES.VELOCITY_LIMIT;
-    console.warn("Velocity Limit Reached");
+    // console.warn("Velocity Limit Reached");
   } 
   
   let scale = 1.0;
