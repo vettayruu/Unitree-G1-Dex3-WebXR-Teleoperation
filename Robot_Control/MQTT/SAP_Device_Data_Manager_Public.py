@@ -1,33 +1,3 @@
-"""
-SAP Device Manager + DataLogger — 完整版
-=========================================
-DataLogger 新增功能说明
------------------------
-触发链路（完全由 MQTT 驱动，无需改动前端）：
-
-  1. /offer  POST  → BTP 下发 taskID，转发 btp_action 给对应 user WebSocket
-             同时 DataLogger.on_user_online(user_id)
-             → 订阅 data/<user_id>
-
-  2. MQTT  data/<user_id>  payload: {"record": "on"}
-             → DataLogger 进入 RECORDING 状态
-             → 订阅 control/<user_id>
-             → 开始缓存控制消息（带服务器时间戳）
-
-  3. MQTT  control/<user_id>  payload: 任意 JSON
-             → 追加一行到内存缓冲区（timestamp_ms + 所有字段展开）
-
-  4. MQTT  data/<user_id>  payload: {"record": "off"}
-             → 停止录制，取消订阅 control/<user_id>
-             → 把缓冲区写入 logs/<task_id>.csv
-             → 清理本次会话状态
-
-状态机：
-  IDLE ──on_user_online──► WAITING
-  WAITING ──record:on──► RECORDING
-  RECORDING ──record:off──► IDLE  (同时写 CSV)
-"""
-
 from __future__ import annotations
 
 import csv
@@ -49,9 +19,7 @@ import paho.mqtt.client as mqtt
 from flask import Flask, Response, jsonify, request
 from flask_socketio import SocketIO, emit
 
-# ---------------------------------------------------------------------------
-# 日志配置
-# ---------------------------------------------------------------------------
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
@@ -59,51 +27,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger("SAP")
 
-
-# ---------------------------------------------------------------------------
-# 配置
-# ---------------------------------------------------------------------------
 @dataclass
 class Config:
-    mqtt_host: str = "liust.local"
+    mqtt_host: str = "localhost"
     mqtt_port: int = 443
     flask_host: str = "0.0.0.0"
     flask_port: int = 8080
     active_devices_path: str = "active_devices.json"
-    log_dir: str = "logs"           # CSV 保存目录
-    result_upload_url: str = "https://133.6.254.50/upload" # Upload result to public server
-
+    log_dir: str = "logs"
+    result_upload_url: str = "https://133.6.254.50/upload"
 
 # ===========================================================================
 # DataLogger
 # ===========================================================================
 class RecordState(Enum):
-    IDLE      = auto()   # 无任务
-    WAITING   = auto()   # 已知 taskID，等待 record:on
-    RECORDING = auto()   # 正在录制 control 消息
+    IDLE      = auto()
+    WAITING   = auto()
+    RECORDING = auto()
 
 
 @dataclass
 class _Session:
-    """单个用户的录制会话（内部用）"""
     user_id:       str
     state:         RecordState  = RecordState.WAITING
-    # header 从 record:on 消息中提取，原样保存，写入 CSV 注释行和 task_log
     header:        dict         = field(default_factory=dict)
-    # task_id 从 header["WarehouseTask"] 读取，用作 CSV 文件名
     task_id:       str          = ""
     buffer:        list[dict]   = field(default_factory=list)
     columns:       list[str]    = field(default_factory=list)
-    start_time_ms: int          = 0      # record:on 时刻（毫秒）
-    start_dt:      str          = ""     # 同上，人类可读
+    start_time_ms: int          = 0
+    start_dt:      str          = ""
 
 
 class DataLogger:
-    """
-    共享同一个 paho MQTT client（由 DeviceManager 传入），
-    只负责订阅 / 取消订阅 / 记录 / 落盘，不持有独立连接。
-    """
-
     def __init__(self, mqtt_client: mqtt.Client, log_dir: str, upload_url: str = "") -> None:
         self._client  = mqtt_client
         self._log_dir = log_dir
@@ -113,14 +68,9 @@ class DataLogger:
         os.makedirs(log_dir, exist_ok=True)
 
     # ------------------------------------------------------------------
-    # 外部调用：DeviceManager / Flask 路由触发
+    # DeviceManager / Flask
     # ------------------------------------------------------------------
     def on_user_online(self, user_id: str) -> None:
-        """
-        /offer 转发成功后调用。
-        确保 data/<user_id> 已订阅、会话已建立。
-        taskID 和 header 由后续 record:on 消息决定，不在这里绑定。
-        """
         with self._lock:
             if user_id in self._sessions:
                 logger.info("[LOGGER] User '%s' already has a session; keeping it.", user_id)
@@ -130,7 +80,6 @@ class DataLogger:
         logger.info("[LOGGER] User '%s' online; watching data/%s", user_id, user_id)
 
     def on_user_disconnected(self, user_id: str) -> None:
-        """用户 WebSocket 断开时由 DeviceManager 通知，强制结束录制。"""
         with self._lock:
             if user_id in self._sessions:
                 sess = self._sessions[user_id]
@@ -141,14 +90,9 @@ class DataLogger:
                     self._cleanup(user_id)
 
     # ------------------------------------------------------------------
-    # MQTT 消息入口（由 DeviceManager._on_message 路由进来）
+    # MQTT Message
     # ------------------------------------------------------------------
     def handle_data_message(self, user_id: str, data: dict) -> None:
-        """
-        处理 data/<user_id> 的消息（record 指令）。
-        消息格式（VR 端发出）：
-          { header: {...}, time: <ms>, task: "<id>", record: "on"|"off"|"reset" }
-        """
         record_cmd = str(data.get("record", "")).strip().lower()
 
         with self._lock:
@@ -169,7 +113,6 @@ class DataLogger:
                 logger.debug("[LOGGER] Ignored data msg for '%s': %s", user_id, data)
 
     def handle_control_message(self, user_id: str, data: dict) -> None:
-        """处理 control/<user_id> 的消息（控制帧录制）"""
         with self._lock:
             sess = self._sessions.get(user_id)
             if sess is None or sess.state != RecordState.RECORDING:
@@ -184,9 +127,6 @@ class DataLogger:
 
             sess.buffer.append(row)
 
-    # ------------------------------------------------------------------
-    # 内部状态机操作（必须在 _lock 内调用）
-    # ------------------------------------------------------------------
     def _start_recording(self, sess: _Session, header: dict) -> None:
         if sess.state != RecordState.WAITING:
             logger.warning("[LOGGER] record:on received but state=%s for user '%s'", sess.state, sess.user_id)
@@ -194,7 +134,6 @@ class DataLogger:
 
         now_ms = int(time.time() * 1000)
 
-        # task_id 优先取 header["WarehouseTask"]，回退到 header["task"]，最后用时间戳兜底
         sess.header        = header
         sess.task_id       = str(header.get("WarehouseTask") or header.get("task") or now_ms)
         sess.state         = RecordState.RECORDING
@@ -209,19 +148,11 @@ class DataLogger:
             sess.task_id, sess.user_id, sess.start_dt,
         )
 
-    # def _stop_recording(self, sess: _Session) -> None:
-    #     if sess.state != RecordState.RECORDING:
-    #         logger.warning("[LOGGER] record:off received but state=%s for user '%s'", sess.state, sess.user_id)
-    #         return
-    #     self._save_csv(sess)
-    #     sess.state = RecordState.WAITING
-
     def _stop_recording(self, sess: _Session, header: dict) -> None:
         if sess.state != RecordState.RECORDING:
             logger.warning("[LOGGER] record:off received but state=%s for user '%s'", sess.state, sess.user_id)
             return
 
-        # stop 消息的 header 包含更完整的信息（如 destination），合并覆盖 start 时的 header
         if header:
             sess.header.update(header)
             logger.info("[LOGGER] Header updated from record:off | task=%s", sess.task_id)
@@ -230,12 +161,6 @@ class DataLogger:
         sess.state = RecordState.WAITING
 
     def _reset_recording(self, sess: _Session) -> None:
-        """
-        清空当前录制数据，回到 WAITING 状态重新开始。
-        · RECORDING：取消订阅 control，丢弃 buffer，等待下一次 record:on
-        · WAITING：仅清空（本来就是空的）
-        · IDLE：忽略
-        """
         if sess.state == RecordState.IDLE:
             logger.warning("[LOGGER] record:reset ignored: session already idle for user '%s'", sess.user_id)
             return
@@ -257,7 +182,6 @@ class DataLogger:
         logger.info("[LOGGER] ↺ Recording reset | user='%s' | ready for next record:on", sess.user_id)
 
     def _save_csv(self, sess: _Session) -> None:
-        """将缓冲区写入 logs/<task_id>.csv，并将本次任务摘要追加到 task_log.json。"""
         csv_path = os.path.join(self._log_dir, f"{sess.task_id}.csv")
 
         if not sess.buffer:
@@ -265,7 +189,6 @@ class DataLogger:
             sess.state = RecordState.WAITING
             return
 
-        # ── 写 CSV（顶部附 header 注释行，方便离线查阅）──────────────────
         all_keys: list[str] = list(dict.fromkeys(
             k for row in sess.buffer for k in row
         ))
@@ -288,7 +211,6 @@ class DataLogger:
             logger.error("[LOGGER] Failed to write CSV: %s", exc)
             return
 
-        # ── 用首尾帧的 timestamp_recv 计算实际操作时长 ────────────────────
         t_first = sess.buffer[0].get("timestamp_recv")
         t_last  = sess.buffer[-1].get("timestamp_recv")
         if t_first is not None and t_last is not None:
@@ -297,7 +219,6 @@ class DataLogger:
             task_time_ms = int(time.time() * 1000) - sess.start_time_ms
             logger.warning("[LOGGER] 'timestamp_recv' missing; falling back to record-on/off duration.")
 
-        # ── 追加任务摘要到 task_log.json ─────────────────────────────────
         self._append_task_log(
             start_dt=sess.start_dt,
             task_id=sess.task_id,
@@ -306,7 +227,6 @@ class DataLogger:
         )
 
     def get_task_log(self) -> list:
-        """读取 task_log.json 并返回记录列表；文件不存在或损坏则返回空列表。"""
         log_path = os.path.join(self._log_dir, "task_log.json")
         if not os.path.exists(log_path):
             return []
@@ -325,7 +245,6 @@ class DataLogger:
         task_time_ms: int,
         header: dict,
     ) -> None:
-        """将任务摘要（含完整 header）追加写入 logs/task_log.json。"""
         log_path = os.path.join(self._log_dir, "task_log.json")
 
         entry = {
@@ -366,13 +285,12 @@ class DataLogger:
             ).start()
 
     def _upload_result(self, entry: dict) -> None:
-        """在独立线程中 POST 单条任务结果，不阻塞 MQTT 主循环。"""
         try:
             resp = requests.post(
                 self._upload_url,
                 json=entry,
                 timeout=10,
-                verify=False, # 服务器使用自签名证书，跳过验证
+                verify=False,
             )
             resp.raise_for_status()
             logger.info(
@@ -420,12 +338,8 @@ class DeviceManager:
 
         self._client = self._build_mqtt_client()
 
-        # DataLogger 共享同一个 MQTT client
         self.data_logger = DataLogger(self._client, config.log_dir, config.result_upload_url)
 
-    # ------------------------------------------------------------------
-    # MQTT 初始化
-    # ------------------------------------------------------------------
     def _build_mqtt_client(self) -> mqtt.Client:
         client = mqtt.Client(transport="websockets")
         client.tls_set(cert_reqs=ssl.CERT_NONE)
@@ -448,9 +362,6 @@ class DeviceManager:
         self._client.disconnect()
         logger.info("Device Manager stopped.")
 
-    # ------------------------------------------------------------------
-    # MQTT 回调
-    # ------------------------------------------------------------------
     def _on_connect(self, client, userdata, flags, rc) -> None:
         if rc != 0:
             logger.error("MQTT connect failed, rc=%d", rc)
@@ -465,7 +376,7 @@ class DeviceManager:
         if data is None:
             return
 
-        # ── 时间同步（无需解析设备字段）
+        # Time Sync
         if topic.startswith("sap/time/ping/"):
             self._handle_time_ping(topic, data)
             return
@@ -482,7 +393,6 @@ class DeviceManager:
             self.data_logger.handle_control_message(user_id, data)
             return
 
-        # ── 标准设备管理消息
         handlers = {
             "sap/register":   self._handle_register,
             "sap/unregister": self._handle_unregister,
@@ -494,7 +404,7 @@ class DeviceManager:
             handler(data)
 
     # ------------------------------------------------------------------
-    # 消息解析
+    # Json Decode
     # ------------------------------------------------------------------
     @staticmethod
     def _parse_payload(topic: str, raw: bytes) -> Optional[dict]:
@@ -508,7 +418,7 @@ class DeviceManager:
         return parsed if isinstance(parsed, dict) else None
 
     # ------------------------------------------------------------------
-    # 设备管理业务
+    # Device Manage
     # ------------------------------------------------------------------
     def _handle_register(self, data: dict) -> None:
         dev_id    = data.get("devId", "unknown")
@@ -601,9 +511,7 @@ class DeviceManager:
         except Exception as exc:
             logger.error("[TIME PING] %s", exc)
 
-    # ------------------------------------------------------------------
-    # 工具方法
-    # ------------------------------------------------------------------
+
     def _find_available_robot(self, model: str) -> Optional[str]:
         for r_id, info in self.devices.items():
             if (
@@ -640,7 +548,7 @@ class DeviceManager:
 
 
 # ===========================================================================
-# Flask 应用工厂
+# Flask APP
 # ===========================================================================
 def create_app(config: Config):
     app      = Flask(__name__)
@@ -648,8 +556,6 @@ def create_app(config: Config):
     sid_mapping: dict = {}
     task_cache: dict = {}
     manager  = DeviceManager(config, socketio, sid_mapping)
-
-    # ---- HTTP 路由 --------------------------------------------------------
 
     @app.route("/offer", methods=["POST"])
     def handle_offer():
@@ -667,16 +573,12 @@ def create_app(config: Config):
         if not sid:
             return jsonify({"status": "failed", "message": f"User {target_id} not connected"}), 404
 
-        # 1. 转发给前端，并缓存当前任务
         socketio.emit("btp_action", data, to=sid, namespace="/ws")
         logger.info("[OFFER] Dispatched '%s' tasks to user '%s'", warehouse, target_id)
 
         task_cache[target_id] = [data]
         logger.info("[CACHE] Updated cache with '%s' tasks for user '%s'",
                     warehouse, target_id)
-
-        # 2. 确保 DataLogger 会话已建立（taskID 将由 record:on 消息提供）
-        # manager.data_logger.on_user_online(target_id)
 
         return jsonify({"status": "dispatched", "msg": f"Sent to {target_id}"}), 200
 
@@ -699,7 +601,7 @@ def create_app(config: Config):
     def get_server_time():
         return jsonify({"status": "success", "server_time": int(time.time() * 1000)}), 200
 
-    # ---- WebSocket 事件 ---------------------------------------------------
+    # ---- WebSocket Event ---------------------------------------------------
 
     @socketio.on("connect", namespace="/ws")
     def on_ws_connect():
@@ -723,13 +625,6 @@ def create_app(config: Config):
             manager.data_logger.on_user_disconnected(uid)
             logger.info("[WS] User '%s' disconnected.", uid)
 
-    # @socketio.on("sync_time_ping", namespace="/ws")
-    # def on_sync_time(data):
-    #     emit("sync_time_pong", {
-    #         "client_t0":   data.get("client_t0"),
-    #         "server_time": int(time.time() * 1000),
-    #     })
-
     @socketio.on("sync_time_ping", namespace="/ws")
     def on_sync_time(data):
         return {
@@ -751,8 +646,6 @@ def create_app(config: Config):
     return app, socketio, sid_mapping, manager
 
 
-# ===========================================================================
-# 入口
 # ===========================================================================
 if __name__ == "__main__":
     cfg = Config()
