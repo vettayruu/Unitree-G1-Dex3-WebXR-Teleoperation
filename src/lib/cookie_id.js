@@ -49,10 +49,13 @@ function getOrSetUUID() {
     if(window.location.pathname.endsWith("/monitor/")) {
         name = name + "-monitor";
     }
-    return uuid + "-" + name; 
+
     // The 'name' is a dynamic uuid.
     // For static uuid, change to static value like "user1" or "robot1". 
     // Static value is for testing only, not recommended for production. 
+    // return uuid + "-" + name; 
+    return "demo.user01@example.com"
+
 }
 
 export const userUUID = getOrSetUUID(); 

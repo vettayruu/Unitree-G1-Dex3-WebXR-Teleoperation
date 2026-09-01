@@ -1,6 +1,9 @@
 import * as React from 'react';
 import Sora from "sora-js-sdk";
 
+// 导入我们自己的 Hook
+// import { useNativeWebRTCReceiver } from './NativeWebRTC.js'; 
+
 // WebRTC setup (change to your signaling URL and channel IDs)
 const signalingUrl = 'wss://sora2.uclab.jp/signaling'; 
  
@@ -45,6 +48,9 @@ export function WebRTC_G1_VRCam({ onVideoStream1 }) {
       }
     });
     recvonly_webcam1.connect();
+    // recvonly_webcam1.connect().catch(err => {
+    //   console.error("Sora connect failed:", err);
+    // });
 
     // Cleanup function
     return () => {

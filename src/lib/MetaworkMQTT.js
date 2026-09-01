@@ -10,26 +10,36 @@ console.log("Robot Type:", codeType);
 
 // global private variable
 export var mqttclient = null;
-export var idtopic = userUUID;
-export const currentIP = typeof window !== 'undefined' ? window.location.hostname : '';
-console.log("Current IP:", currentIP);
+export { userUUID };
 
+
+// MQTT Broker URL
 // const MQTT_BROKER_URL = "wss://sora2.uclab.jp/mqws"; // For Nagoya-U UCLab Development
 // const MQTT_BROKER_URL = "wss://santolina/mqtt"; // For Local Development, change to your broker address
-// const MQTT_BROKER_URL = "wss://133.6.254.50/mqtt"; // For Internet Development, change to your broker address
-const MQTT_BROKER_URL = "wss://liust.local/mqtt";
+const MQTT_BROKER_URL = "wss://192.168.207.161/mqtt"; // For Internet Development, change to your broker address
+// const MQTT_BROKER_URL = "wss://liust.local/mqtt";
 
-export var mqttBrokerURL = MQTT_BROKER_URL;
+// WebSocket URL
+const WS_URL = "https://192.168.207.161/ws";
+// const WS_URL = 'https://liust.local/ws';
+// const currentIP = typeof window !== 'undefined' ? window.location.hostname : '';
+// console.log("Current IP:", currentIP);
+// const WS_URL = currentIP + '/ws';
 
-export const MQTT_REGISTER_TOPIC = 'sap/register';
-export const MQTT_UNREGISTER_TOPIC = 'sap/unregister';
-export const MQTT_REQUEST_TOPIC = "sap/request";
-export const MQTT_UNREQUEST_TOPIC = "sap/unrequest";
-export const MQTT_DEVICE_TOPIC = 'sap/dev/'
-export const MQTT_CTRL_TOPIC = 'control/'
-export const MQTT_ROBOT_STATE_TOPIC = 'robot/'
-export const MQTT_ROBOT_SCAN_TOPIC = 'scan/'
-export const MQTT_ROBOT_DATA_TOPIC = 'data/'
+export {MQTT_BROKER_URL};
+export const wsURL = WS_URL;
+
+export const Topic = {
+    REGISTER: 'sap/register',
+    UNREGISTER: 'sap/unregister',
+    REQUEST: 'sap/request',
+    UNREQUEST: 'sap/unrequest',
+    DEVICE: 'sap/dev/',
+    CONTROL: 'control/',
+    ROBOT_STATE: 'robot/',
+    ROBOT_SCAN: 'scan/',
+    ROBOT_DATA: 'data/'
+};
 
 export const connectMQTT = (callback) => {
     if (mqttclient == null) {
@@ -63,10 +73,10 @@ export const connectMQTT = (callback) => {
             }
 
             // Register device info to MQTT manager. 
-            client.publish(MQTT_REGISTER_TOPIC, JSON.stringify(info)) 
+            client.publish(Topic.REGISTER, JSON.stringify(info)) 
 
             // Subscribe to the device topic to receive robotID
-            client.subscribe(MQTT_DEVICE_TOPIC+ userUUID, {noLocal: true}, (err, granted) => {
+            client.subscribe(Topic.DEVICE + userUUID, {noLocal: true}, (err, granted) => {
                 if (!err) {
                     console.log('MQTT Subscribe Granted',  granted);
                 } else {
