@@ -7,7 +7,7 @@ if (typeof window !== 'undefined' && window.AFRAME) {
 import * as React from 'react'
 import numeric from 'numeric';
 
-import { WebRTC_G1_VRCam } from '../lib/WebRTC_Sora';
+import { WebRTC_G1_VRCam } from '../lib/WebRTC_mediamtx';
 import RobotScene from './RobotScene_SAPNOW';
 import registerAframeComponents from './registerAframeComponents'; 
 import MQTT_Setup from './MQTT_Setup';
