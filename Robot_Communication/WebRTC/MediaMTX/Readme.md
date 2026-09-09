@@ -6,6 +6,9 @@ If use NAT, change `webrtcAdditionalHosts` in mediamtx.yml, for example the serv
 webrtcAdditionalHosts: [192.168.207.161]
 ```
 
+NAT port
+8119, 8554
+
 Run the MediaMTX, double click mediamtx.exe on Windows or ./mediamtx on Ubuntu
 
 Stream your video, it is recommand to use PC with Nvida GPU to support nv12
