@@ -1,4 +1,4 @@
-Download Meida MTX from https://github.com/bluenviron/mediamtx
+Download MeidaMTX from [https://github.com/bluenviron/mediamtx](https://github.com/bluenviron/mediamtx/releases)
 
 If use NAT, change `webrtcAdditionalHosts` in mediamtx.yml, for example the server IP in robot network is `192.168.123.235`, and the NAT net is `192.168.207.161`: 
 
