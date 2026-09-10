@@ -48,15 +48,13 @@ FFmpeg is used for video capture, encoding, RTSP streaming, and stream testing.
 
 ## 3.1 Windows
 
-Download an FFmpeg build and extract it.
+Open the terminal as administrator, and install ffmpeg with choco
 
-Add the `bin` directory to the system `PATH`.
-
-For example:
-
-```text
-C:\ffmpeg\bin
+```bash
+choco install ffmpeg
 ```
+
+Check [Download FFmpeg](https://ffmpeg.org/download.html#build-windows) for more details.
 
 Verify the installation:
 
@@ -206,7 +204,6 @@ For testing RTSP streams, the most useful tools are:
 
 - `ffplay`
 - VLC
-- GStreamer
 
 ## 5.1 FFplay
 
@@ -230,4 +227,20 @@ For lower latency:
 ffplay -fflags nobuffer -flags low_delay -framedrop \
   -rtsp_transport tcp \
   rtsp://192.168.123.235:8554/g1-vr180
+```
+
+## 5.2 VLC
+
+VLC can also be used to test RTSP streams.
+
+Open:
+
+```text
+Media → Open Network Stream
+```
+
+Then enter:
+
+```text
+rtsp://192.168.123.235:8554/g1-vr180
 ```
