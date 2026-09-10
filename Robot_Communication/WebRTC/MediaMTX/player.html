@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaMTX WebRTC Player</title>
+
+```
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        background: #000;
+        color: #fff;
+        font-family: Arial, sans-serif;
+
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+
+        padding: 30px 20px;
+    }
+
+    h2 {
+        margin: 0 0 20px 0;
+        font-weight: normal;
+    }
+
+    .video-container {
+        width: 90vw;
+        max-width: 1400px;
+
+        background: #111;
+        border-radius: 8px;
+        overflow: hidden;
+
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    video {
+        width: 100%;
+        height: auto;
+        min-height: 200px;
+
+        display: block;
+        background: #000;
+    }
+
+    .panel {
+        width: 90vw;
+        max-width: 1400px;
+
+        margin-top: 15px;
+        padding: 15px;
+
+        background: #111;
+        border-radius: 8px;
+    }
+
+    .url-row {
+        display: flex;
+        gap: 10px;
+    }
+
+    #whepUrl {
+        flex: 1;
+
+        padding: 10px 12px;
+
+        background: #222;
+        color: #fff;
+
+        border: 1px solid #444;
+        border-radius: 4px;
+
+        font-size: 14px;
+        outline: none;
+    }
+
+    #whepUrl:focus {
+        border-color: #007bff;
+    }
+
+    button {
+        padding: 10px 18px;
+
+        background: #007bff;
+        color: white;
+
+        border: none;
+        border-radius: 4px;
+
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    button:hover {
+        background: #0056b3;
+    }
+
+    button.stop {
+        background: #555;
+    }
+
+    button.stop:hover {
+        background: #777;
+    }
+
+    .status-row {
+        margin-top: 12px;
+
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+
+        font-size: 14px;
+    }
+
+    #status {
+        color: #aaa;
+    }
+
+    .hint {
+        margin-top: 8px;
+        color: #666;
+        font-size: 12px;
+    }
+
+    @media (max-width: 700px) {
+        .url-row {
+            flex-direction: column;
+        }
+
+        button {
+            width: 100%;
+        }
+
+        .status-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 5px;
+        }
+    }
+</style>
+```
+
+</head>
+
+<body>
+
+```
+<h2>MediaMTX WebRTC / WHEP Player</h2>
+
+<!-- Video -->
+<div class="video-container">
+    <video
+        id="videoPlayer"
+        autoplay
+        playsinline
+        muted
+        controls>
+    </video>
+</div>
+
+<!-- Controls -->
+<div class="panel">
+
+    <div class="url-row">
+
+        <input
+            id="whepUrl"
+            type="text"
+            placeholder="Enter WHEP URL, e.g. https://192.168.123.235/vrstream/g1-vr180/whep"
+        >
+
+        <button onclick="startPlay()">
+            Play / Reconnect
+        </button>
+
+        <button class="stop" onclick="stopPlay()">
+            Stop
+        </button>
+
+    </div>
+
+    <div class="status-row">
+        <span id="status">
+            Status: Ready
+        </span>
+
+        <span id="connection">
+            WebRTC: -
+        </span>
+    </div>
+
+    <div class="hint">
+        Press Enter to connect. The URL is saved in your browser.
+    </div>
+
+</div>
+
+
+<script>
+
+    let pc = null;
+
+    const videoEl = document.getElementById("videoPlayer");
+    const statusEl = document.getElementById("status");
+    const connectionEl = document.getElementById("connection");
+    const urlInput = document.getElementById("whepUrl");
+
+
+    // --------------------------------------------------
+    // Load saved URL
+    // --------------------------------------------------
+
+    const savedUrl = localStorage.getItem("whepUrl");
+
+    if (savedUrl) {
+        urlInput.value = savedUrl;
+    }
+
+
+    // --------------------------------------------------
+    // Enter key -> Play
+    // --------------------------------------------------
+
+    urlInput.addEventListener("keydown", function(event) {
+
+        if (event.key === "Enter") {
+            startPlay();
+        }
+
+    });
+
+
+    // --------------------------------------------------
+    // Stop WebRTC
+    // --------------------------------------------------
+
+    function stopPlay() {
+
+        if (pc) {
+            pc.close();
+            pc = null;
+        }
+
+        if (videoEl.srcObject) {
+
+            videoEl.srcObject
+                .getTracks()
+                .forEach(track => track.stop());
+
+            videoEl.srcObject = null;
+        }
+
+        statusEl.innerText = "Status: Stopped";
+        connectionEl.innerText = "WebRTC: disconnected";
+    }
+
+
+    // --------------------------------------------------
+    // Start WebRTC / WHEP
+    // --------------------------------------------------
+
+    async function startPlay() {
+
+        const whepUrl = urlInput.value.trim();
+
+        // Check URL
+        if (!whepUrl) {
+
+            statusEl.innerText =
+                "Status: Please enter a WHEP URL";
+
+            urlInput.focus();
+
+            return;
+        }
+
+
+        // Save URL
+        localStorage.setItem("whepUrl", whepUrl);
+
+
+        // Close previous connection
+        stopPlay();
+
+
+        statusEl.innerText =
+            "Status: Establishing WebRTC connection...";
+
+        connectionEl.innerText =
+            "WebRTC: connecting";
+
+
+        // --------------------------------------------------
+        // Create PeerConnection
+        // --------------------------------------------------
+
+        pc = new RTCPeerConnection({
+
+            iceServers: [
+                {
+                    urls: "stun:stun.l.google.com:19302"
+                }
+            ]
+
+        });
+
+
+        // Receive video
+        pc.addTransceiver(
+            "video",
+            {
+                direction: "recvonly"
+            }
+        );
+
+
+        // --------------------------------------------------
+        // Receive remote track
+        // --------------------------------------------------
+
+        pc.ontrack = async function(event) {
+
+            console.log("Received track:", event.track.kind);
+
+            if (event.track.kind === "video") {
+
+                videoEl.srcObject =
+                    event.streams[0];
+
+                try {
+
+                    await videoEl.play();
+
+                    statusEl.innerText =
+                        "Status: Playing";
+
+                } catch (err) {
+
+                    console.warn(
+                        "Autoplay failed:",
+                        err
+                    );
+
+                    statusEl.innerText =
+                        "Status: Video ready - press Play";
+                }
+            }
+        };
+
+
+        // --------------------------------------------------
+        // Connection state
+        // --------------------------------------------------
+
+        pc.onconnectionstatechange = function() {
+
+            const state =
+                pc.connectionState;
+
+            console.log(
+                "WebRTC connection state:",
+                state
+            );
+
+            connectionEl.innerText =
+                `WebRTC: ${state}`;
+
+
+            switch (state) {
+
+                case "connected":
+
+                    statusEl.innerText =
+                        "Status: Playing";
+
+                    break;
+
+
+                case "connecting":
+
+                    statusEl.innerText =
+                        "Status: Connecting...";
+
+                    break;
+
+
+                case "disconnected":
+
+                    statusEl.innerText =
+                        "Status: Disconnected";
+
+                    break;
+
+
+                case "failed":
+
+                    statusEl.innerText =
+                        "Status: Connection failed";
+
+                    break;
+
+
+                case "closed":
+
+                    statusEl.innerText =
+                        "Status: Closed";
+
+                    break;
+            }
+        };
+
+
+        // --------------------------------------------------
+        // ICE connection state
+        // --------------------------------------------------
+
+        pc.oniceconnectionstatechange = function() {
+
+            console.log(
+                "ICE state:",
+                pc.iceConnectionState
+            );
+
+        };
+
+
+        // --------------------------------------------------
+        // WHEP request
+        // --------------------------------------------------
+
+        try {
+
+            statusEl.innerText =
+                "Status: Creating SDP offer...";
+
+
+            const offer =
+                await pc.createOffer();
+
+
+            await pc.setLocalDescription(offer);
+
+
+            statusEl.innerText =
+                "Status: Sending WHEP request...";
+
+
+            const response =
+                await fetch(
+                    whepUrl,
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/sdp"
+                        },
+
+                        body: offer.sdp
+                    }
+                );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    `Server returned ${response.status} ${response.statusText}`
+                );
+            }
+
+
+            const answerSdp =
+                await response.text();
+
+
+            await pc.setRemoteDescription({
+
+                type: "answer",
+
+                sdp: answerSdp
+
+            });
+
+
+            statusEl.innerText =
+                "Status: WebRTC negotiation completed";
+
+
+        } catch (err) {
+
+            console.error(
+                "WHEP play failed:",
+                err
+            );
+
+
+            statusEl.innerText =
+                `Status: Play failed - ${err.message}`;
+
+
+            connectionEl.innerText =
+                "WebRTC: failed";
+
+
+            if (pc) {
+
+                pc.close();
+                pc = null;
+
+            }
+        }
+
+    }
+
+</script>
+```
+
+</body>
+</html>

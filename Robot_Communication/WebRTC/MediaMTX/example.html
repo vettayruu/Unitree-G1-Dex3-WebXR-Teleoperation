@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>MediaMTX WebRTC Player</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        .video-container {
+            width: 90vw;
+            max-width: 1400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            overflow: hidden;
+            background: #111;
+        }
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        button {
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #0056b3; }
+        #status { font-size: 14px; color: #aaa; }
+    </style>
+</head>
+<body>
+
+    <h2>Stream Test (WebRTC/WHEP)</h2>
+
+    <div class="video-container">
+        <video id="videoPlayer" autoplay playsinline muted controls></video>
+    </div>
+
+    <div class="controls">
+        <button onclick="startPlay()">Reconnect / Play</button>
+        <span id="status">Status: Ready</span>
+    </div>
+
+    <script>
+        // You can use the stream directly: whepUrl = 'https://<your mediax server IP>/<stream name>/whep'
+        // or use the stream domain: whepUrl = 'https://<your mediax server IP>/<stream domain>/<stream name>/whep' or 
+        // To use the stream domain, you need to configure the stream domain in Nginx first.
+        const whepUrl = 'https://192.168.123.235/vrstream/g1-vr180/whep';
+        
+        let pc = null;
+
+        async function startPlay() {
+            const videoEl = document.getElementById('videoPlayer');
+            const statusEl = document.getElementById('status');
+
+            if (pc) {
+                pc.close();
+            }
+
+            statusEl.innerText = "Status: Establishing WebRTC connection...";
+
+            pc = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+
+            pc.addTransceiver('video', { direction: 'recvonly' });
+
+            pc.ontrack = (event) => {
+                if (event.track.kind === 'video') {
+                    videoEl.srcObject = event.streams[0];
+                    statusEl.innerText = "Status: Playing (Ultra-low latency)";
+                }
+            };
+
+            pc.onconnectionstatechange = () => {
+                statusEl.innerText = `Status: WebRTC connection state -> ${pc.connectionState}`;
+            };
+
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                const response = await fetch(whepUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/sdp'
+                    },
+                    body: offer.sdp
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server returned ${response.status} ${response.statusText}`);
+                }
+
+                const answerSdp = await response.text();
+                await pc.setRemoteDescription({
+                    type: 'answer',
+                    sdp: answerSdp
+                });
+
+            } catch (err) {
+                console.error("WHEP play failed:", err);
+                statusEl.innerText = `Status: Play failed (${err.message})`;
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', startPlay);
+    </script>
+</body>
+</html>
