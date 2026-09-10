@@ -333,31 +333,7 @@ sudo systemctl status nginx
 
 ---
 
-### 6.5 WebRTC Stream URL
 
-After configuring the reverse proxy, the WHEP endpoint can be accessed through the Nginx HTTPS endpoint:
-
-```text
-https://192.168.123.235/vrstream/g1-vr180/whep
-```
-
-The URL structure is:
-
-```text
-https://<server>/vrstream/<stream-path>/whep
-```
-
-For example:
-
-```text
-https://192.168.123.235/vrstream/g1-vr180/whep
-```
-
-corresponds to the MediaMTX endpoint:
-
-```text
-http://127.0.0.1:8889/g1-vr180/whep
-```
 ## 7 Recommended Architecture
 
 To achieve low-latency VR streaming (2800×1400 @ 30fps) within a cross-subnet cyber-physical framework, the system decouples **Ingress (Ingestion)**, **Signaling (Control)**, and **Media Delivery (Data)** across network boundaries.
