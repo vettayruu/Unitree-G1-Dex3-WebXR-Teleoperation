@@ -132,6 +132,8 @@ as the RTSP stream URL, where `g1-vr180` is the video channel.
 
 > **Recommendation:** For high-resolution video such as `2800 × 1400 @ 30 FPS`, use a PC equipped with an NVIDIA GPU when possible. Hardware H.264(AVC) or H.265(HEVC) encoding with NVENC can significantly reduce CPU usage.
 
+Check more nvenc option details in `nvenc_options.txt`. 
+
 ---
 
 ### 5.1 Windows — FFmpeg + NVIDIA NVENC
