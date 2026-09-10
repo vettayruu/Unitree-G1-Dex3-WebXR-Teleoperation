@@ -9,7 +9,6 @@ The following tools may be required depending on your platform:
 - **MediaMTX** — RTSP/WebRTC streaming server
 - **FFmpeg** — Video capture, encoding, and RTSP streaming
 - **GStreamer** — Recommended for video streaming on NVIDIA Jetson
-- **FFplay** — RTSP stream testing tool, included with FFmpeg
 
 ---
 
