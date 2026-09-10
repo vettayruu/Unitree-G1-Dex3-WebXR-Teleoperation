@@ -249,6 +249,35 @@ http://192.168.123.235:8889/g1-vr180/whep
 To stream on the VR device, the reverse proxy is essential.
 The stream domin is recommanded to seperate from other components.
 
+add to nginx config file
+
+```text
+location ~ ^/vrstream/(?<channel>[a-zA-Z0-9_-]+)(?<path_extra>/.*)?$ {
+    rewrite ^/vrstream/(.*)$ /$1 break;
+    
+    proxy_pass             http://127.0.0.1:8889;
+    proxy_http_version     1.1;
+
+    proxy_set_header       Upgrade           $http_upgrade;
+    proxy_set_header       Connection        $connection_upgrade;
+    proxy_set_header       Host              $host;
+    proxy_set_header       X-Real-IP         $remote_addr;
+    proxy_set_header       X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header       X-Forwarded-Proto $scheme;
+
+    proxy_pass_header      Location;
+    proxy_hide_header      'Access-Control-Allow-Origin';
+    add_header             'Access-Control-Allow-Origin' '*' always;
+    add_header             'Access-Control-Expose-Headers' 'Location' always;
+    add_header             'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+    add_header             'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PATCH, DELETE' always;
+
+    if ($request_method = 'OPTIONS') {
+        return 204;
+    }
+}
+```
+
 ```text
 https://192.168.123.235/vrstream/g1-vr180/whep
 ```
