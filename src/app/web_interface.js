@@ -2,7 +2,7 @@
 import * as React from 'react'
 import "./web_interface.css";
 import { userUUID, MQTT_BROKER_URL } from '../lib/MetaworkMQTT'
-import { soraConfig } from '../lib/WebRTC_Sora';
+import { WebRTC_Config } from '../lib/WebRTC_mediamtx';
 
 function rad2deg(rad) {
     if (Array.isArray(rad)) {
@@ -66,8 +66,8 @@ export default function WebInterface(props) {
   return (
     <>
       <div className="mqtt-broker">
-        MQTT Broker URL: <span>{MQTT_BROKER_URL}</span> \n
-        Time Offset: <span>{props.time_offset} ms</span>
+        MQTT Broker URL: <span>{MQTT_BROKER_URL}</span> 
+        {/* Time Offset: <span>{props.time_offset} ms</span> */}
       </div>
 
       <div className="user-uuid">
@@ -75,8 +75,8 @@ export default function WebInterface(props) {
       </div>
 
       <div className="webrtc-channel">
-        WebRTC Signaling Url: <span>{soraConfig.signalingUrl}</span><br/>
-        Recv Channel 1 (G1 VRCam): <span>{soraConfig.G1_VRCAM_CHANNEL}</span><br/>
+        WebRTC Signaling Url: <span>{WebRTC_Config.URL}</span><br/>
+        Recv Channel 1 (G1 VRCam): <span>{WebRTC_Config.CHANNEL}</span><br/>
       </div>
 
       <div className="robot-id">
