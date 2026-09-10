@@ -1,9 +1,6 @@
 import * as React from 'react';
 import Sora from "sora-js-sdk";
 
-// 导入我们自己的 Hook
-// import { useNativeWebRTCReceiver } from './NativeWebRTC.js'; 
-
 // WebRTC setup (change to your signaling URL and channel IDs)
 const signalingUrl = 'wss://sora2.uclab.jp/signaling'; 
  
@@ -17,49 +14,141 @@ const signalingUrl = 'wss://sora2.uclab.jp/signaling';
 const G1_VRCAM_CHANNEL = 'g1-vr180';
 const recv_channel_1 = G1_VRCAM_CHANNEL;
 
-export const soraConfig = {
-  signalingUrl: 'wss://sora2.uclab.jp/signaling',
-  G1_VRCAM_CHANNEL: G1_VRCAM_CHANNEL
-  // recv_channel_1: 'sora_liust_left',
-  // recv_channel_2: 'sora_liust_right',
-  // recv_channel_3: 'sora_liust_sub',
-  // send_channel_1: 'sora_liust_vr_left',
-  // send_channel_2: 'sora_liust_vr_right'
+export const WebRTC_Config = {
+  URL: 'wss://sora2.uclab.jp/signaling',
+  CHANNEL: G1_VRCAM_CHANNEL
 };
 
 const sora = Sora.connection(signalingUrl);
 
-export function WebRTC_G1_VRCam({ onVideoStream1 }) {
+export function WebRTC_G1_VRCam({
+    showVideo,
+    onVideoStream1
+  }) {
   React.useEffect(() => {
-    const options = {
-      role: 'recvonly',
-      multistream: false,
-      video: { codecType: 'H264', resolution: 'HD', bitrate: 5000 },
-      audio: false,
-    };
+  let recvonly_webcam1 = null;
+  let stopped = false;
 
-    // Webcam 1 (Stereo Left)
-    const recvonly_webcam1 = sora.recvonly(recv_channel_1, options);
-    recvonly_webcam1.on('track', event => {
-      if (event.track.kind === 'video') {
-        const mediaStream = new MediaStream();
-        mediaStream.addTrack(event.track);
-        if (onVideoStream1) onVideoStream1(mediaStream);
+  const startVideo = async () => {
+
+    if (!showVideo) {
+      console.log("Sora video disabled");
+      return;
+    }
+
+    try {
+      console.log("Starting Sora WebRTC...");
+
+      const options = {
+        role: 'recvonly',
+        multistream: false,
+        video: {
+          codecType: 'H264',
+          resolution: 'HD',
+          bitrate: 5000
+        },
+        audio: false,
+      };
+
+      recvonly_webcam1 = sora.recvonly(
+        recv_channel_1,
+        options
+      );
+
+      // -----------------------------
+      // Receive video track
+      // -----------------------------
+      recvonly_webcam1.on('track', event => {
+        if (stopped) return;
+        if (event.track.kind === 'video') {
+          console.log("Sora video track received");
+          const mediaStream = new MediaStream();
+          mediaStream.addTrack(event.track);
+          if (onVideoStream1) {
+            onVideoStream1(mediaStream);
+          }
+        }
+      });
+
+      // -----------------------------
+      // Connect
+      // -----------------------------
+      await recvonly_webcam1.connect();
+      if (!stopped) {
+        console.log("Sora WebRTC connected");
       }
-    });
-    recvonly_webcam1.connect();
-    // recvonly_webcam1.connect().catch(err => {
-    //   console.error("Sora connect failed:", err);
-    // });
+    } catch (err) {
+      if (!stopped) {
+        console.error(
+          "Sora WebRTC connection failed:",
+          err
+        );
+      }
+    }
+  };
 
-    // Cleanup function
-    return () => {
-      recvonly_webcam1.disconnect();
-    };
-  }, [onVideoStream1]);
+  startVideo();
 
-  return null; 
+  // -----------------------------
+  // Cleanup
+  // -----------------------------
+  return () => {
+    stopped = true;
+    console.log("Stopping Sora WebRTC...");
+    if (recvonly_webcam1) {
+      try {
+        recvonly_webcam1.disconnect();
+      } catch (err) {
+        console.warn(
+          "Sora disconnect failed:",
+          err
+        );
+      }
+      recvonly_webcam1 = null;
+    }
+
+    if (onVideoStream1) {
+      onVideoStream1(null);
+    }
+  };
+
+}, [showVideo, onVideoStream1]);
+
+return null;
 }
+
+
+// export function WebRTC_G1_VRCam({ onVideoStream1 }) {
+//   React.useEffect(() => {
+//     const options = {
+//       role: 'recvonly',
+//       multistream: false,
+//       video: { codecType: 'H264', resolution: 'HD', bitrate: 5000 },
+//       audio: false,
+//     };
+
+//     // Webcam 1 (Stereo Video)
+//     const recvonly_webcam1 = sora.recvonly(recv_channel_1, options);
+//     recvonly_webcam1.on('track', event => {
+//       if (event.track.kind === 'video') {
+//         const mediaStream = new MediaStream();
+//         mediaStream.addTrack(event.track);
+//         if (onVideoStream1) onVideoStream1(mediaStream);
+//       }
+//     });
+//     recvonly_webcam1.connect();
+//     // recvonly_webcam1.connect().catch(err => {
+//     //   console.error("Sora connect failed:", err);
+//     // });
+
+//     // Cleanup function
+//     return () => {
+//       recvonly_webcam1.disconnect();
+//     };
+//   }, [onVideoStream1]);
+
+//   return null; 
+// }
 
 // Receive video streams， for ZEDmini and Realsense
 export function WebRTC_Video_Recv({ onVideoStream1, onVideoStream2, onVideoStream3 }) {
