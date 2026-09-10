@@ -204,6 +204,7 @@ For testing RTSP streams, the most useful tools are:
 
 - `ffplay`
 - VLC
+- Test Html
 
 ## 5.1 FFplay
 
@@ -232,6 +233,7 @@ ffplay -fflags nobuffer -flags low_delay -framedrop \
 ## 5.2 VLC
 
 VLC can also be used to test RTSP streams.
+This method can only test signaling, the stream could be slow.
 
 Open:
 
@@ -244,3 +246,7 @@ Then enter:
 ```text
 rtsp://192.168.123.235:8554/g1-vr180
 ```
+
+## 5.3 Test Html
+
+Chanege Run the index.html to check the stream.
