@@ -206,8 +206,8 @@ WebRTC Client
 When NAT is used:
 
 ```text
-Robot Network
-192.168.123.0/24
+Robot
+192.168.123.164
         │
         │
         ▼
@@ -240,32 +240,18 @@ g1-vr180
 
 The same MediaMTX path can then be accessed by WebRTC clients through the MediaMTX WebRTC interface.
 
-## 10. Troubleshooting
+The receving URL is:
 
-### RTSP connection fails
-
-Check that MediaMTX is running and that port `8554/TCP` is reachable.
-
-```bash
-ffplay rtsp://192.168.123.235:8554/g1-vr180
+```text
+http://192.168.123.235:8889/g1-vr180/whep
 ```
 
-### WebRTC handshake succeeds but no video is received
+To stream on the VR device, the reverse proxy is essential.
+The stream domin is recommanded to seperate from other components.
 
-Check the following:
+```text
+https://192.168.123.235/vrstream/g1-vr180/whep
+```
 
-1. `webrtcAdditionalHosts` contains the NAT-accessible IP.
-2. UDP port `8119` is forwarded to the MediaMTX server.
-3. The firewall allows UDP traffic on port `8119`.
-4. The RTSP publisher is still connected.
-5. MediaMTX can successfully read the RTSP stream.
-
-### Check the MediaMTX log
-
-Keep the MediaMTX terminal open while testing. It can be used to verify:
-
-- RTSP publisher connection
-- stream path creation
-- WebRTC client connection
-- ICE candidate information
-- connection/disconnection events
+For testing the RTSP streams, open the `player.html` and input your receive URL.
+And `example.html` provides an example code of signaling.
