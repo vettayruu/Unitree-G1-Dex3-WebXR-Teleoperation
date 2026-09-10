@@ -70,7 +70,9 @@ ffmpeg -encoders | findstr nvenc
 The following encoder should be available:
 
 ```text
-h264_nvenc
+ V....D av1_nvenc            NVIDIA NVENC av1 encoder (codec av1)
+ V....D h264_nvenc           NVIDIA NVENC H.264 encoder (codec h264)
+ V....D hevc_nvenc           NVIDIA NVENC hevc encoder (codec hevc)
 ```
 
 Check available cameras:
