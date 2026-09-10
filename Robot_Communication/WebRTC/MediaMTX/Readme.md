@@ -76,7 +76,49 @@ chmod +x mediamtx
 ./mediamtx
 ```
 
-## 4. Stream Video to MediaMTX
+
+## 4. Streaming Architecture
+
+The overall communication flow is:
+
+```text
+VR Camera
+    │
+    │ USB
+    ▼
+Video Capture PC / Jetson
+    │
+    │ RTSP / TCP
+    ▼
+MediaMTX
+    │
+    │ WebRTC / UDP
+    ▼
+WebRTC Client
+```
+
+When NAT is used:
+
+```text
+Robot
+192.168.123.164
+        │
+        │
+        ▼
+MediaMTX Server
+192.168.123.235
+        │
+        │ NAT
+        ▼
+NAT Address
+192.168.207.161
+        │
+        │ WebRTC
+        ▼
+Remote WebRTC Client
+```
+
+## 5. Stream Video to MediaMTX
 
 The video source should publish an **RTSP stream** to MediaMTX.
 
@@ -92,7 +134,7 @@ as the RTSP stream URL, where `g1-vr180` is the video channel.
 
 ---
 
-## 5. Windows — FFmpeg + NVIDIA NVENC
+### 5.1 Windows — FFmpeg + NVIDIA NVENC
 
 On Windows, use FFmpeg with NVIDIA NVENC for hardware H.264 encoding.
 
@@ -115,7 +157,7 @@ ffmpeg -f dshow -video_size 2800x1400 -framerate 30 -i video="VR.Cam 02" `  -vf 
 
 ---
 
-## 6. Jetson — GStreamer
+### 5.2 Jetson — GStreamer
 
 On NVIDIA Jetson, GStreamer can use the hardware video encoder directly.
 
@@ -160,7 +202,7 @@ RTSP
 MediaMTX
 ```
 
-## 7. Ubuntu — FFmpeg + NVIDIA NVENC
+### 5.3 Ubuntu — FFmpeg + NVIDIA NVENC
 
 On an Ubuntu PC with an NVIDIA GPU:
 
@@ -183,64 +225,13 @@ ffmpeg \
   rtsp://192.168.123.235:8554/g1-vr180
 ```
 
-## 8. Streaming Architecture
 
-The overall data flow is:
+## 6. Media Play
 
-```text
-VR Camera
-    │
-    │ USB
-    ▼
-Video Capture PC / Jetson
-    │
-    │ RTSP / TCP
-    ▼
-MediaMTX
-    │
-    │ WebRTC / UDP
-    ▼
-WebRTC Client
-```
+For testing the RTSP streams, open the `player.html` and input your receive URL.
+And `example.html` provides an example code of signaling.
 
-When NAT is used:
-
-```text
-Robot
-192.168.123.164
-        │
-        │
-        ▼
-MediaMTX Server
-192.168.123.235
-        │
-        │ NAT
-        ▼
-NAT Address
-192.168.207.161
-        │
-        │ WebRTC
-        ▼
-Remote WebRTC Client
-```
-
-## 9. Stream URL
-
-The RTSP publishing URL is:
-
-```text
-rtsp://192.168.123.235:8554/g1-vr180
-```
-
-The path name is:
-
-```text
-g1-vr180
-```
-
-The same MediaMTX path can then be accessed by WebRTC clients through the MediaMTX WebRTC interface.
-
-The receving URL is:
+To stream on the local network
 
 ```text
 http://192.168.123.235:8889/g1-vr180/whep
@@ -281,6 +272,3 @@ location ~ ^/vrstream/(?<channel>[a-zA-Z0-9_-]+)(?<path_extra>/.*)?$ {
 ```text
 https://192.168.123.235/vrstream/g1-vr180/whep
 ```
-
-For testing the RTSP streams, open the `player.html` and input your receive URL.
-And `example.html` provides an example code of signaling.
