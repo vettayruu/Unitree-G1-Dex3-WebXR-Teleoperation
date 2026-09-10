@@ -356,48 +356,96 @@ corresponds to the MediaMTX endpoint:
 ```text
 http://127.0.0.1:8889/g1-vr180/whep
 ```
+## 7 Recommended Architecture
 
-### 6.6 Recommended Architecture
+To achieve low-latency VR streaming (2800×1400 @ 30fps) within a cross-subnet cyber-physical framework, the system decouples **Ingress (Ingestion)**, **Signaling (Control)**, and **Media Delivery (Data)** across network boundaries.
 
-The complete playback architecture is:
+### 7.1 Local Network Deployment (Direct HTTP/UDP)
 
-```text
-                         Local Network
+When operating within the internal edge subnet, clients connect directly to MediaMTX. Ingestion occurs over RTSP (TCP), while WebRTC execution is split into WHEP signaling (HTTP) and real-time media transfer (SRTP over UDP).
 
-Camera
-   │
-   │ RTSP
-   ▼
-MediaMTX
-192.168.123.235:8554
-   │
-   │ WebRTC / WHEP
-   ▼
-player.html / WebXR
-192.168.123.235:8889
+```
+                  [Edge Subnet: 192.168.123.0/24]
+
+ +--------------------+
+ |  VR Camera Source  |
+ |  (Windows/Jetson)  |
+ +--------------------+
+           │
+           │ RTSP Ingestion (TCP :8554)
+           ▼
+ +--------------------+
+ |  MediaMTX Relay    |
+ |  192.168.123.235   |
+ +--------------------+
+     │            │
+     │            │ SRTP Media Stream (UDP :8189)
+     │ WHEP       ▼
+     │ Signaling  +----------------------------+
+     │ (HTTP      | Local WebXR Client /        |
+     │  :8889)    | Browser Player              |
+     └───────────►| (192.168.123.x)             |
+                  +----------------------------+
 ```
 
-For VR devices using HTTPS:
+### 7.2 Cross-Subnet & Security Deployment (HTTPS / WHEP Reverse Proxy)
 
-```text
-Camera
-   │
-   │ RTSP
-   ▼
-MediaMTX
-192.168.123.235
-   │
-   │ HTTP :8889
-   ▼
-Nginx Reverse Proxy
-   │
-   │ HTTPS :443
-   ▼
-https://<server>/vrstream/g1-vr180/whep
-   │
-   ▼
-VR Device / WebXR
+Modern WebXR APIs and Quest/PICO HMD browser runtimes mandate Secure Contexts (`https://`). Cross-subnet traffic routes through an Nginx reverse proxy at the gateway (`192.168.207.161`), securing SDP negotiation while routing low-latency media payload directly via UDP.
+
+```
+ [Edge Subnet: 192.168.123.0/24]           [Gateway / External Subnet: 192.168.207.0/24]
+
+ +--------------------+
+ |  VR Camera Source  |
+ |  (Windows/Jetson)  |
+ +--------------------+
+           │
+           │ RTSP Ingestion (TCP :8554)
+           ▼
+ +--------------------+                   +----------------------------------+
+ |  MediaMTX Relay    |                   | Nginx Reverse Proxy               |
+ |  192.168.123.235   |                   | 192.168.207.161                   |
+ +--------------------+                   +----------------------------------+
+     ▲            │                                     ▲
+     │            │                                     │ WHEP Signaling
+     │ HTTP       │                                     │ (HTTPS :443)
+     │ Signaling  │                                     │
+     │ (:8889)    │                                     ▼
+     └────────────┼───────────────────────  https://<gateway>/vrstream/g1-vr180/whep
+                  │                                      ▲
+                  │                                      │
+                  │ SRTP Media Stream                    │
+                  │ (Direct NAT Mapped UDP :8189)        │
+                  └──────────────────────────────────────┼────────┐
+                                                         │        │
+                                                         ▼        ▼
+                                                +----------------------------+
+                                                | Remote VR HMD / WebXR       |
+                                                | Web Browser Client          |
+                                                +----------------------------+
 ```
 
-The reverse proxy therefore provides a single HTTPS endpoint for the WebXR client while MediaMTX remains responsible for WebRTC stream handling.
+### 7.3 Component & Port Protocol Matrix
+
+| Lifecycle Stage | Protocol | Network Port | Direction | Description |
+|---|---|---|---|---|
+| **Ingress (Push)** | RTSP over TCP | `8554` | Camera → MediaMTX | Zero-drop H.264 stream ingestion with CBR and 0 B-frames. |
+| **Signaling (Control)** | HTTPS / WHEP | `443` → `8889` | Client ↔ Nginx ↔ MediaMTX | SDP exchange and ICE candidate negotiation over TLS. |
+| **Media (Data)** | SRTP over UDP | `8189` | MediaMTX → Client | Direct low-latency RTP payload delivery (`webrtcAdditionalHosts` resolved). |
+
+### 7.4 Key Operational Constraints
+
+- **NAT IP Declaration** — MediaMTX must explicitly declare `webrtcAdditionalHosts: [192.168.207.161]` (or `webrtcICEHostNAT1To1IPs`) in `mediamtx.yml` so that ICE candidates returned during WHEP signaling expose the outer gateway IP rather than internal grid IPs.
+- **Firewall Rules** — Gateway interfaces must allow **UDP 8189** bidirectional mapping alongside **TCP 443** to prevent SDP session timeouts (`deadline exceeded while waiting connection`).
+- **TLS Termination** — Nginx terminates TLS for the WHEP HTTP endpoint only; the SRTP media path bypasses the reverse proxy entirely and flows directly over UDP once ICE negotiation completes, keeping the latency-critical path off the proxy hop.
+- **Codec Constraints** — H.264 with CBR and zero B-frames is required at ingestion to avoid re-ordering buffer delay downstream, which is critical for maintaining the sub-frame latency budget needed at 30fps.
+
+### 7.5 Summary
+
+| Deployment Mode | Signaling Path | Media Path | Use Case |
+|---|---|---|---|
+| Local Network | Direct HTTP (`:8889`) | Direct UDP (`:8189`) | Same-subnet testing, low-latency lab use |
+| Cross-Subnet | HTTPS via Nginx (`:443`) | Direct UDP (`:8189`), NAT-mapped | Remote HMD access, Secure Context compliance |
+
+This dual-mode design keeps the control-plane (signaling) and data-plane (media) architecturally separate: signaling can be hardened and routed through TLS-terminating infrastructure without adding overhead to the latency-sensitive media stream, which always takes the shortest possible path to the client.
 
