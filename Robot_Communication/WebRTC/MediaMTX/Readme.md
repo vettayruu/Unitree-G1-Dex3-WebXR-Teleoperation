@@ -130,7 +130,7 @@ rtsp://192.168.123.235:8554/g1-vr180
 
 as the RTSP stream URL, where `g1-vr180` is the video channel.
 
-> **Recommendation:** For high-resolution video such as `2800 × 1400 @ 30 FPS`, use a PC equipped with an NVIDIA GPU when possible. Hardware H.265(HEVC) encoding with NVENC can significantly reduce CPU usage.
+> **Recommendation:** For high-resolution video such as `2800 × 1400 @ 30 FPS`, use a PC equipped with an NVIDIA GPU when possible. Hardware H.264(AVC) or H.265(HEVC) encoding with NVENC can significantly reduce CPU usage.
 
 ---
 
@@ -154,6 +154,12 @@ ffmpeg -f dshow -video_size 2800x1400 -framerate 30 -i video="VR.Cam 02" `  -vf 
 | `-g 30` | Keyframe interval: 30 frames |
 | `-tune ll` | Low-latency encoding |
 | `-rtsp_transport tcp` | Use TCP for RTSP streaming |
+
+To check encoder
+
+```bash
+ffmpeg -encoders | findstr nvenc
+```
 
 ---
 
