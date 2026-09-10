@@ -1099,6 +1099,7 @@ export default function DynamicHome(props) {
   return (
     <>
       <WebRTC_G1_VRCam 
+        showVideo={showVideo}
         onVideoStream1={setWebcamStream1}
         // onVideoStream2={setWebcamStream2}
         // onVideoStream3={setWebcamStream3} 
