@@ -225,27 +225,68 @@ ffmpeg \
   rtsp://192.168.123.235:8554/g1-vr180
 ```
 
+## 6. Media Playback
 
-## 6. Media Play
+This section describes how to test and access MediaMTX WebRTC streams from a local PC and from a VR device.
 
-For testing the RTSP streams, open the `player.html` and input your receive URL.
-And `example.html` provides an example code of signaling.
+### 6.1 Test with the Web Player
 
-To stream on the local network
+The project provides two HTML files for testing:
+
+* `player.html` — WebRTC player for testing a MediaMTX WHEP stream.
+* `example.html` — Example implementation of the WebRTC signaling procedure.
+
+Open `player.html` in a web browser and enter the WHEP URL of the stream.
+
+### 6.2 Local Network
+
+When the client and MediaMTX server are on the same network, the WHEP endpoint can be accessed directly:
 
 ```text
 http://192.168.123.235:8889/g1-vr180/whep
 ```
 
-To stream on the VR device, the reverse proxy is essential.
-The stream domin is recommanded to seperate from other components.
+where:
 
-add to nginx config file
+* `192.168.123.235` is the MediaMTX server.
+* `8889` is the MediaMTX WebRTC HTTP port.
+* `g1-vr180` is the MediaMTX stream path.
+* `/whep` is the WHEP endpoint.
+
+The direct URL is suitable for testing on the local network.
+
+---
+
+### 6.3 VR Device
+
+When accessing the stream from a VR device, a **reverse proxy is recommended**.
+
+In particular, if the WebXR application is served over HTTPS, the WebRTC endpoint should also be accessible through HTTPS. A reverse proxy such as Nginx can be used to provide the HTTPS endpoint and forward requests to MediaMTX.
+
+It is also recommended to use a **dedicated domain or subdomain for the video streaming service**, rather than sharing the same path with other application components.
+
+For example:
 
 ```text
+https://192.168.123.235/vrstream/g1-vr180/whep
+```
+
+The request is forwarded by Nginx to:
+
+```text
+http://127.0.0.1:8889/g1-vr180/whep
+```
+
+---
+
+### 6.4 Nginx Reverse Proxy Configuration
+
+Add the following configuration to the Nginx configuration file:
+
+```nginx
 location ~ ^/vrstream/(?<channel>[a-zA-Z0-9_-]+)(?<path_extra>/.*)?$ {
     rewrite ^/vrstream/(.*)$ /$1 break;
-    
+
     proxy_pass             http://127.0.0.1:8889;
     proxy_http_version     1.1;
 
@@ -257,18 +298,108 @@ location ~ ^/vrstream/(?<channel>[a-zA-Z0-9_-]+)(?<path_extra>/.*)?$ {
     proxy_set_header       X-Forwarded-Proto $scheme;
 
     proxy_pass_header      Location;
-    proxy_hide_header      'Access-Control-Allow-Origin';
-    add_header             'Access-Control-Allow-Origin' '*' always;
-    add_header             'Access-Control-Expose-Headers' 'Location' always;
-    add_header             'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
-    add_header             'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PATCH, DELETE' always;
 
+    # CORS
+    proxy_hide_header      Access-Control-Allow-Origin;
+    add_header             Access-Control-Allow-Origin '*' always;
+    add_header             Access-Control-Expose-Headers 'Location' always;
+    add_header             Access-Control-Allow-Headers 'Content-Type, Authorization' always;
+    add_header             Access-Control-Allow-Methods 'GET, POST, OPTIONS, PATCH, DELETE' always;
+
+    # CORS preflight
     if ($request_method = 'OPTIONS') {
         return 204;
     }
 }
 ```
 
+After modifying the configuration, check the Nginx configuration:
+
+```bash
+sudo nginx -t
+```
+
+If the configuration is valid, reload Nginx:
+
+```bash
+sudo systemctl reload nginx
+```
+
+If necessary, check the Nginx status:
+
+```bash
+sudo systemctl status nginx
+```
+
+---
+
+### 6.5 WebRTC Stream URL
+
+After configuring the reverse proxy, the WHEP endpoint can be accessed through the Nginx HTTPS endpoint:
+
 ```text
 https://192.168.123.235/vrstream/g1-vr180/whep
 ```
+
+The URL structure is:
+
+```text
+https://<server>/vrstream/<stream-path>/whep
+```
+
+For example:
+
+```text
+https://192.168.123.235/vrstream/g1-vr180/whep
+```
+
+corresponds to the MediaMTX endpoint:
+
+```text
+http://127.0.0.1:8889/g1-vr180/whep
+```
+
+### 6.6 Recommended Architecture
+
+The complete playback architecture is:
+
+```text
+                         Local Network
+
+Camera
+   │
+   │ RTSP
+   ▼
+MediaMTX
+192.168.123.235:8554
+   │
+   │ WebRTC / WHEP
+   ▼
+player.html / WebXR
+192.168.123.235:8889
+```
+
+For VR devices using HTTPS:
+
+```text
+Camera
+   │
+   │ RTSP
+   ▼
+MediaMTX
+192.168.123.235
+   │
+   │ HTTP :8889
+   ▼
+Nginx Reverse Proxy
+   │
+   │ HTTPS :443
+   ▼
+https://<server>/vrstream/g1-vr180/whep
+   │
+   ▼
+VR Device / WebXR
+```
+
+The reverse proxy therefore provides a single HTTPS endpoint for the WebXR client while MediaMTX remains responsible for WebRTC stream handling.
+
