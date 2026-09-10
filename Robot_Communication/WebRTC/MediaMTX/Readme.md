@@ -138,10 +138,16 @@ Check more nvenc option details in `nvenc_options.txt`.
 
 ### 5.1 Windows — FFmpeg + NVIDIA NVENC
 
-On Windows, use FFmpeg with NVIDIA NVENC for hardware HEVC encoding.
+On Windows, use FFmpeg with NVIDIA NVENC for hardware H.264 or HEVC encoding.
 
+H.264
 ```bash
 ffmpeg -f dshow -video_size 2800x1400 -framerate 30 -i video="VR.Cam 02" `  -vf "format=nv12" `  -c:v h264_nvenc -b:v 10M -g 30 -preset p5 -tune ll -rc vbr `  -f rtsp -rtsp_transport tcp rtsp://192.168.123.235:8554/g1-vr180
+```
+
+HEVC(H.265)
+```bash
+ffmpeg -f dshow -video_size 2800x1400 -framerate 30 -i video="VR.Cam 02" `  -vf "format=nv12" `  -c:v hevc_nvenc -b:v 10M -g 30 -preset p5 -tune ll -rc vbr `  -f rtsp -rtsp_transport tcp rtsp://192.168.123.235:8554/g1-vr180
 ```
 
 ### Parameters
@@ -152,6 +158,7 @@ ffmpeg -f dshow -video_size 2800x1400 -framerate 30 -i video="VR.Cam 02" `  -vf 
 | `30` | Frame rate |
 | `format=nv12` | Convert input to NV12 |
 | `h264_nvenc` | NVIDIA hardware H.264 encoder |
+| `hevc_nvenc` | NVIDIA hardware HEVC(H.265) encoder |
 | `-g 30` | Keyframe interval: 30 frames |
 | `-tune ll` | Low-latency encoding |
 | `-rtsp_transport tcp` | Use TCP for RTSP streaming |
