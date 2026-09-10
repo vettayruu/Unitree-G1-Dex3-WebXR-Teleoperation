@@ -139,7 +139,7 @@ as the RTSP stream URL, where `g1-vr180` is the video channel.
 On Windows, use FFmpeg with NVIDIA NVENC for hardware HEVC encoding.
 
 ```bash
-ffmpeg -f dshow -video_size 2800x1400 -framerate 30 -i video="VR.Cam 02" `  -vf "format=nv12" `  -c:v hevc_nvenc -b:v 10M -g 30 -preset p5 -tune ll -rc vbr `  -f rtsp -rtsp_transport tcp rtsp://192.168.123.235:8554/g1-vr180
+ffmpeg -f dshow -video_size 2800x1400 -framerate 30 -i video="VR.Cam 02" `  -vf "format=nv12" `  -c:v h264_nvenc -b:v 10M -g 30 -preset p5 -tune ll -rc vbr `  -f rtsp -rtsp_transport tcp rtsp://192.168.123.235:8554/g1-vr180
 ```
 
 ### Parameters
@@ -149,17 +149,11 @@ ffmpeg -f dshow -video_size 2800x1400 -framerate 30 -i video="VR.Cam 02" `  -vf 
 | `2800x1400` | Input resolution |
 | `30` | Frame rate |
 | `format=nv12` | Convert input to NV12 |
-| `hevc_nvenc` | NVIDIA hardware HEVC(H.265) encoder |
+| `h264_nvenc` | NVIDIA hardware H.264 encoder |
 | `10M` | Target bitrate: 10 Mbps |
 | `-g 30` | Keyframe interval: 30 frames |
 | `-tune ll` | Low-latency encoding |
 | `-rtsp_transport tcp` | Use TCP for RTSP streaming |
-
-To check encoder
-
-```bash
-ffmpeg -encoders | findstr nvenc
-```
 
 ---
 
