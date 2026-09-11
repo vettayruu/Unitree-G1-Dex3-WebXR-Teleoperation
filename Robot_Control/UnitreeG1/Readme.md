@@ -5,7 +5,7 @@
 ```bash
 ssh unitree@192.168.123.164
 ```
-
+Password: 123
 > The robot's IP may occasionally be reassigned by the router's DHCP. If you can't connect, check the device list on the router's admin page to find the current IP.
 
 ## 2. Start the MQTT Client
