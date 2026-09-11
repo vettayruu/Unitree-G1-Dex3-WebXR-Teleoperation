@@ -1,0 +1,7 @@
+numpy
+paho-mqtt
+python-dotenv
+requests
+urllib3
+Flask
+Flask-SocketIO
