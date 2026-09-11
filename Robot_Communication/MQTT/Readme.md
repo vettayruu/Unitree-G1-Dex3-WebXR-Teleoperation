@@ -49,12 +49,18 @@ This repository uses **Mosquitto** as the MQTT broker. Both Windows and Ubuntu c
     sudo apt install mosquitto mosquitto-clients -y
     ```
 
-2. Edit the configuration file (typically at `/etc/mosquitto/mosquitto.conf` or a file under `/etc/mosquitto/conf.d/`) with the same listener settings as above:
-
+2. Open the configuration file. The main config lives at `/etc/mosquitto/mosquitto.conf`, and it's usually cleaner to add your own listener settings as a separate file under `/etc/mosquitto/conf.d/` (any `.conf` file placed there is automatically included).
+    Open the main config file directly:
+    ```bash
+    sudo nano /etc/mosquitto/mosquitto.conf
+    ```
+ 
+    Add the same listener settings as above:
+ 
     ```conf
     listener 1883
     allow_anonymous true
-
+ 
     listener 9001
     protocol websockets
     ```
