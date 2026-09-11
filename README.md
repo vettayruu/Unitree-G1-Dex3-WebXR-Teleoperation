@@ -1,24 +1,20 @@
-# Unitree-G1-Dex3 WebXR Teleoperation Operation Manual
+# Unitree-G1-Dex3 WebXR Teleoperation Tutorial
 
-## Quick Start
-- [Step 1: Install and Run HTTPS Server](#step-1-install-and-run-https-server)
+## Contents
+- [Tutorial 1: Quick Start](#quick-start)
 - [Step 2: Build MQTT Broker](#step-2-build-mqtt-broker)
 - [Step 3: Simulator Setup](#step-3-simulator-setup)
 - [Step 4: Operate the Robot in Simulator](#step-4-operate-the-robot-in-simulator)
 
 ---
-## Step 1: Install and Run HTTPS Server
+## Tutorial 1: Quick Start
 
 💡 **If this is your first time running the project, install the required Node.js modules:**
 ```bash
 npm install
 ```
 
-**The project is designed to run in VS Code. Download it here:**  
-[https://code.visualstudio.com/](https://code.visualstudio.com/Download)
-
-**If you do not have Node.js installed, download it here:**  
-[https://nodejs.org/en/download](https://nodejs.org/en/download)
+**If you do not have Node.js installed, download it here:** [https://nodejs.org/en/download](https://nodejs.org/en/download)
 
 **On Windows, you may need to allow script execution before running the server:**
 ```powershell
@@ -26,19 +22,18 @@ Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 ```
 
 🚀 **To start the Next.js HTTPS server, run:**
+⚠️ **In VR, only HTTPS can enter VR/AR mode.** you can try to access the webpage with `dev-https` at first
 ```bash
 npm run dev-https
 ```
 
 After starting, you will see two URLs:
-- Local:   [https://localhost:3000](https://localhost:3000)
-- Network: https://192.168.197.**:****
+- Local:   [https://localhost:<port>](https://localhost:3000)
+- Network: https://192.168.***.***:<port>
 
 ⚠️ **The Network IP address may vary** depending on your network environment.
 
-⚠️ **In VR, only HTTPS can enter VR/AR mode.**
-
-**Open the browser in your VR device and enter `https://192.168.197.**:****` to access the web interface.**
+**Open the browser in your VR device and enter server IP to access the web interface.**
 
 ---
 ## Step 2: Robot Communication Network Setup
