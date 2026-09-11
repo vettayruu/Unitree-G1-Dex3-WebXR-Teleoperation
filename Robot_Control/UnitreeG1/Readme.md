@@ -46,3 +46,8 @@ gst-launch-1.0 \
   location=rtsp://192.168.123.235:8554/g1-vr180 \
   protocols=tcp
 ```
+
+## References
+- Arm Low-Level Control: [unitree_sdk2_python/g1_low_level_example.py](https://github.com/unitreerobotics/unitree_sdk2_python/blob/master/example/g1/low_level/g1_low_level_example.py)
+
+- Hand Low-Level Control: [xr_teleoperate/robot_hand_unitree.py](https://github.com/unitreerobotics/xr_teleoperate/blob/main/teleop/robot_control/robot_hand_unitree.py)
