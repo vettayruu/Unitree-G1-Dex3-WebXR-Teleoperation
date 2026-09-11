@@ -64,7 +64,7 @@ export default function registerAframeComponents(options) {
   } = options;
   
   // set rendered state after a short delay to ensure the scene is ready
-  setTimeout(() => set_rendered(true), 16.67); // ~ 60 FPS
+  setTimeout(() => set_rendered(true), 100); 
 
   /* ========================== Robot Model ========================= */
   AFRAME.registerComponent('robot-click', {
