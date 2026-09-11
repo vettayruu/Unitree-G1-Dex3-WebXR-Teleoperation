@@ -54,12 +54,12 @@ const loadRobotParams = (robot_model) => {
 function worlr2three(v) { return [-v[1], v[2], -v[0]]; }
 function three2world(v) { return [-v[2], -v[0], v[1]]; }
 
-function roundArray(arr, decimals = 8) {
+function roundArray(arr, decimals = 6) {
   const factor = Math.pow(10, decimals);
   return arr.map(v => Math.round(v * factor) / factor);
 }
 
-function roundScalar(v, decimals = 8) {
+function roundScalar(v, decimals = 6) {
   const factor = Math.pow(10, decimals);
   return Math.round(v * factor) / factor;
 }
