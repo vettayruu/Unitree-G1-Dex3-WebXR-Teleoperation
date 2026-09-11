@@ -174,14 +174,10 @@ export default function registerAframeComponents(options) {
       
       if (!frame || !xr.enabled) return;
 
-      // 获取参考空间
       const refSpace = xr.getReferenceSpace();
-      // 'viewer' 是 WebXR 标准中代表头显的专用名称
       const viewerPose = frame.getViewerPose(refSpace);
 
       if (viewerPose) {
-        // viewerPose 包含多个 view（通常左右眼各一个）
-        // 但它的 transform 属性代表了头部的中心位置
         const pose = viewerPose.transform;
 
         this.hmdProxy.position.set(pose.position.x, pose.position.y, pose.position.z);
@@ -1294,7 +1290,7 @@ export default function registerAframeComponents(options) {
       shape.lineTo(x + r, y);
       shape.quadraticCurveTo(x, y, x, y + r);
 
-      const points = shape.getPoints(32); // 32段分辨率，圆角够平滑
+      const points = shape.getPoints(32); 
       const geometry = new THREE.BufferGeometry().setFromPoints(points);
       const material = new THREE.LineBasicMaterial({
         color: data.color,
@@ -1304,7 +1300,7 @@ export default function registerAframeComponents(options) {
 
       this.el.removeObject3D('border');
       const line = new THREE.LineLoop(geometry, material);
-      line.position.z = 0.001; // 避免和底面 z-fighting
+      line.position.z = 0.001; 
       line.raycast = () => {};
       this.el.setObject3D('border', line);
     },
