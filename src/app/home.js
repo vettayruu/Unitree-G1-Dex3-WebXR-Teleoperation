@@ -8,7 +8,7 @@ import * as React from 'react'
 import numeric from 'numeric';
 
 import { WebRTC_G1_VRCam } from '../lib/WebRTC_mediamtx';
-import RobotScene from './RobotScene_SAPNOW';
+import RobotScene from './RobotScene';
 import registerAframeComponents from './registerAframeComponents'; 
 import MQTT_Setup from './MQTT_Setup';
 import { mqttclient, userUUID, publishMQTT, subscribeMQTT, codeType, wsURL, Topic } from '../lib/MetaworkMQTT'
@@ -970,7 +970,7 @@ export default function DynamicHome(props) {
     theta_body_cam: mr.rad2deg(thetaBodyCamRef.current),
   };
 
-  const interfacePropos = {
+  const interfaceProps = {
     theta_body: thetaBodyRef.current,
     theta_body_left: thetaBodyLeftRef.current,
     theta_tool_left: thetaToolLeftRef.current,
@@ -981,7 +981,7 @@ export default function DynamicHome(props) {
   }
 
   /* ================================== VR Animation Loop =====================================*/
-  const [, tick] = React.useReducer(x => x + 1, 0);
+  const [, tickPub] = React.useReducer(x => x + 1, 0);
   // const [, setNow] = React.useState(Date.now());
 
   const lastRenderTimeRef = React.useRef(0);
@@ -1005,7 +1005,7 @@ export default function DynamicHome(props) {
     
     lastRenderTimeRef.current = time;
     // setNow(performance.now()); not stable, will cause flickering in the UI, use tick() instead
-    tick(); // Trigger re-render
+    tickPub(); // MQTT Publisher Trigger
 
     if (mqttclient && !showMenuRef.current) {
       // MQTT Message 
@@ -1111,7 +1111,7 @@ export default function DynamicHome(props) {
         rendered={rendered}
 
         robotProps={robotProps}
-        interfacePropos={interfacePropos}
+        interfaceProps={interfaceProps}
         view_cam_pose={view_cam_pose}
         viewer={props.viewer}
         monitor={props.monitor}
