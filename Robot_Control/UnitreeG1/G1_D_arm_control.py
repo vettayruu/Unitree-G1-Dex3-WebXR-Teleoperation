@@ -16,7 +16,6 @@ from multiprocessing import shared_memory
 
 G1_NUM_MOTOR = 29
 
-# 参考参数 dt = 0.010, omega = 15.0
 Kp = [
     0.1, 0.5, 0.5, 0.5, 0.1, 0.1,  # leg left
     0.1, 0.5, 0.5, 0.5, 0.1, 0.1,  # leg right
@@ -89,11 +88,8 @@ class Custom:
         self.shm_right_arm = shared_memory.SharedMemory(name='Right_Arm')
         self.shm_waist     = shared_memory.SharedMemory(name='Waist')
 
-        # --- 二阶阻尼核心参数 ---
-        # Omega (ω) 决定响应速度。10.0-15.0 比较柔顺，20.0+ 响应快但对噪声敏感
         self.omega = 12.0
 
-        # 必须存储每个关节的实时速度
         self.joint_velocities = np.zeros(G1_NUM_MOTOR)
         self.q_init_start = np.zeros(G1_NUM_MOTOR)
         self.initial_pose_captured = False
@@ -143,11 +139,9 @@ class Custom:
     def ControlLogic(self):
         self.time_ += self.control_dt_
 
-        # ★ 第一帧捕捉初始位置，同时设好所有轴的kp/kd
         if not self.initial_pose_captured:
             for i in range(G1_NUM_MOTOR):
                 self.q_init_start[i] = self.low_state.motor_state[i].q
-                # 初始化指令值 = 当前实际值，让二阶积分器有正确起点
                 self.low_cmd.motor_cmd[i].q  = self.q_init_start[i]
                 self.low_cmd.motor_cmd[i].kp = Kp[i]
                 self.low_cmd.motor_cmd[i].kd = Kd[i]
@@ -156,25 +150,20 @@ class Custom:
             self.initial_pose_captured = True
             print("Initial pose captured.")
 
-        # Stage 1: 归零（用二阶阻尼，目标是零位+髋关节偏置）
         if self.time_ < self.duration_:
             hip_target = np.deg2rad(0.0)
 
-            # 用 quintic 包络让目标值本身缓慢移动
             t = np.clip(self.time_ / self.duration_, 0.0, 1.0)
-            envelope = 10 * t ** 3 - 15 * t ** 4 + 6 * t ** 5  # 0→1，起止速度=0
+            envelope = 10 * t ** 3 - 15 * t ** 4 + 6 * t ** 5 
 
             for i in range(G1_NUM_MOTOR):
                 if i == 0 or i == 6:
-                    # 从初始位置缓动到 hip_target
                     target = self.q_init_start[i] + envelope * (hip_target - self.q_init_start[i])
                 else:
-                    # 从初始位置缓动到 0
                     target = self.q_init_start[i] + envelope * (0.0 - self.q_init_start[i])
 
                 self.apply_second_order_damped(i, target)
 
-        # Stage 2: 遥操
         else:
             left_arm_data = np.ndarray((16,), dtype=np.float32, buffer=self.shm_left_arm.buf)
             right_arm_data = np.ndarray((16,), dtype=np.float32, buffer=self.shm_right_arm.buf)
@@ -184,7 +173,6 @@ class Custom:
             self._apply_all_second_order_dq_control(left_arm_data, right_arm_data, waist_data)
 
     def _apply_all_second_order_dq_control(self, left_arm_q, right_arm_q, waist_data):
-        # 这里的索引对应你的 G1_29_JointArmIndex 定义
         # Left Arm (15-21)
         for i in range(7):
             self.apply_second_order_damped(15 + i, left_arm_q[1 + i])
