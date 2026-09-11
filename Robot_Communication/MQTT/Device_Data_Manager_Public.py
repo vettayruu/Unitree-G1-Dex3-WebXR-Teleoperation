@@ -35,7 +35,7 @@ class Config:
     flask_port: int = 8080
     active_devices_path: str = "active_devices.json"
     log_dir: str = "logs"
-    result_upload_url: str = "https://133.6.254.50/upload"
+    result_upload_url: str = "https://<your public gateway IP>/upload"
 
 # ===========================================================================
 # DataLogger
