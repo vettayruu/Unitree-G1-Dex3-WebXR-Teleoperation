@@ -1,37 +1,79 @@
 # Build Your MQTT Broker
 
-This repository Mosquitto acts as an MQTT broker
+This repository uses **Mosquitto** as the MQTT broker. Both Windows and Ubuntu can install the mosquitto.
 
 ## Installation and Setup on Windows
-For Windows, download the required software:
-- [Mosquitto](https://mosquitto.org/download/)
 
-Open the configuration file `mosquitto.conf` in the installation folder and add the following:
+1. Download and install [Mosquitto](https://mosquitto.org/download/) for Windows.
 
-```bash
-listener 1883
-allow_anonymous true
+2. Open the configuration file `mosquitto.conf` in the installation folder and add the following:
 
-listener 9001
-protocol websockets
-```
+    ```conf
+    listener 1883
+    allow_anonymous true
 
-> Port `1883` is used for standard MQTT (TCP) and port `9001` for MQTT over WebSockets.
-> The port numbers can be changed as needed.
+    listener 9001
+    protocol websockets
+    ```
 
-Then start 
+    > Port `1883` is used for standard MQTT (TCP) and port `9001` for MQTT over WebSockets.
+    > The port numbers can be changed as needed.
 
-```bash
-cd "C:\Program Files\mosquitto"
-mosquitto -v
-```
+3. Start the broker:
 
-to kill the process
-```bash
-taskkill /f /im mosquitto.exe
-.\mosquitto.exe -c mosquitto.conf -v
-```
+    ```bash
+    cd "C:\Program Files\mosquitto"
+    mosquitto -v
+    ```
 
-[Reference config file on windows](/Robot_Communication/Setting/Windows/mosquitto.conf)
+4. To stop the broker:
+
+    ```bash
+    taskkill /f /im mosquitto.exe
+    ```
+
+5. To restart the broker with the config file explicitly:
+
+    ```bash
+    .\mosquitto.exe -c mosquitto.conf -v
+    ```
+
+📄 [Reference config file (Windows)](/Robot_Communication/Setting/Windows/mosquitto.conf)
 
 ## Installation and Setup on Ubuntu
+
+1. Install Mosquitto:
+
+    ```bash
+    sudo apt update
+    sudo apt install mosquitto mosquitto-clients -y
+    ```
+
+2. Edit the configuration file (typically at `/etc/mosquitto/mosquitto.conf` or a file under `/etc/mosquitto/conf.d/`) with the same listener settings as above:
+
+    ```conf
+    listener 1883
+    allow_anonymous true
+
+    listener 9001
+    protocol websockets
+    ```
+
+3. Restart the service to apply changes:
+
+    ```bash
+    sudo systemctl restart mosquitto
+    ```
+
+4. To run manually in the foreground for debugging:
+
+    ```bash
+    mosquitto -c /etc/mosquitto/mosquitto.conf -v
+    ```
+
+📄 [Reference config file (Ubuntu)](/Robot_Communication/Setting/Ubuntu/mosquitto.conf)
+
+## Notes
+
+- `allow_anonymous true` disables authentication — suitable for local/lab networks only. For production or externally reachable brokers, configure username/password auth or TLS instead.
+- Both platforms expose the same two listeners (`1883` for raw MQTT, `9001` for MQTT over WebSockets), so clients — regardless of OS — can connect using either transport.
