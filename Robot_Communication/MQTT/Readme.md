@@ -32,6 +32,6 @@ taskkill /f /im mosquitto.exe
 .\mosquitto.exe -c mosquitto.conf -v
 ```
 
-[Reference config file on windows](./Setting/Windows/mosquitto.conf)
+[Reference config file on windows](.Robot_Communication/Setting/Windows/mosquitto.conf)
 
 ## Installation and Setup on Ubuntu
