@@ -17,6 +17,7 @@
 3. **Load the simulation scene**
 
    In folder `Robot_Control/Sim` find the file `g1_scene.zip` and unzip it.
+
    In CoppeliaSim, `File/Open scene...` to load this scene file.
 
 5. **Start the simulation**
