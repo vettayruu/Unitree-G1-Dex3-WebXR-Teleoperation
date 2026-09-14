@@ -16,15 +16,15 @@ Check the our tutorial video here ↓↓↓
     npm install
     ```
 
-3. **On Windows**, you may need to allow script execution before running the server:
-
+    > On Windows, you may need to allow script execution before running the server:
+    
     ```powershell
     Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
     ```
 
-4. **Build your teleoperation network** by following [Network Setting](./Robot_Communication/Readme.md).
+3. **Build your teleoperation network** by following [Network Setting](./Robot_Communication/Readme.md).
 
-5. **Start the server.**
+4. **Start the server.**
 
     HTTP:
 
