@@ -10,7 +10,7 @@ Password: 123
 
 ## 2. Start the MQTT Client
 
-See [MQTT Client](/Robot_Communication/MQTT/MQTT_Client/py) for details.
+See [MQTT Client](/Robot_Communication/MQTT/MQTT_Client.py) for details.
 
 ```bash
 python MQTT_Client.py
