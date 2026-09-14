@@ -1,5 +1,10 @@
 # Unitree-G1-Dex3 WebXR Teleoperation Tutorial
 
+Check our tutorial video here ↓↓↓
+<iframe src="https://www.youtube.com/shorts/WiOdoYFDfDA" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>
+
+
+
 ## Contents
 - [Tutorial 1: Quick Start](#quick-start)
 - [Step 2: Build MQTT Broker](#step-2-build-mqtt-broker)
