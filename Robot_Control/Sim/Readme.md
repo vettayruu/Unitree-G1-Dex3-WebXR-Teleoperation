@@ -16,9 +16,9 @@
 
 3. **Load the simulation scene**
 
-   In folder `Robot_Control/Sim` find the file `g1_scene.zip` and unzip it.
+   [Download scene or urdf file.](https://github.com/vettayruu/Robot_Descriptions/tree/main/Unitree/G1)
 
-   In CoppeliaSim, `File/Open scene...` to load this scene file.
+   In CoppeliaSim, `File/Open scene...` to load this scene file or `Modules/Importers/URDF importer...` to import urdf file.
 
 5. **Start the simulation**
 
